@@ -1,0 +1,144 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:bugmaster:schema:event:1.0",
+  "title": "BugMaster Action Journal Event",
+  "description": "One append-only session event. Hashes support local integrity checks but do not prove source authenticity or event truth.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "sessionId",
+    "sequence",
+    "eventType",
+    "actionId",
+    "recordedAt",
+    "data",
+    "previousHash",
+    "entryHash"
+  ],
+  "properties": {
+    "schemaVersion": {"const": "1.0"},
+    "sessionId": {"type": "string", "minLength": 1},
+    "sequence": {"type": "integer", "minimum": 1},
+    "eventType": {
+      "enum": [
+        "action_prepared",
+        "action_dispatched",
+        "action_outcome",
+        "action_reconciled"
+      ]
+    },
+    "actionId": {"type": "string", "minLength": 1},
+    "recordedAt": {"type": "string", "format": "date-time"},
+    "data": {"type": "object"},
+    "previousHash": {
+      "oneOf": [
+        {"type": "null"},
+        {"$ref": "#/$defs/sha256"}
+      ]
+    },
+    "entryHash": {"$ref": "#/$defs/sha256"}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "preparedData": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["intentDigest", "scopeRevision", "risk", "approvalRef"],
+      "properties": {
+        "intentDigest": {"$ref": "#/$defs/sha256"},
+        "scopeRevision": {"type": "integer", "minimum": 1},
+        "risk": {"enum": ["R0", "R1", "R2"]},
+        "approvalRef": {
+          "type": ["string", "null"],
+          "minLength": 1
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {"risk": {"const": "R2"}},
+            "required": ["risk"]
+          },
+          "then": {
+            "properties": {"approvalRef": {"type": "string", "minLength": 1}}
+          }
+        }
+      ]
+    },
+    "dispatchedData": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["intentDigest"],
+      "properties": {"intentDigest": {"$ref": "#/$defs/sha256"}}
+    },
+    "outcomeData": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["outcome", "resultRef"],
+      "properties": {
+        "outcome": {"enum": ["completed", "failed", "outcome_unknown"]},
+        "resultRef": {
+          "type": ["string", "null"],
+          "minLength": 1
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {"outcome": {"enum": ["completed", "failed"]}},
+            "required": ["outcome"]
+          },
+          "then": {
+            "properties": {"resultRef": {"type": "string", "minLength": 1}}
+          }
+        }
+      ]
+    },
+    "reconciledData": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["outcome", "observationRef", "observerRef", "basis"],
+      "properties": {
+        "outcome": {"enum": ["completed", "not_executed"]},
+        "observationRef": {"type": "string", "minLength": 1},
+        "observerRef": {"type": "string", "minLength": 1},
+        "basis": {"const": "authoritative-read-only"}
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {"eventType": {"const": "action_prepared"}},
+        "required": ["eventType"]
+      },
+      "then": {"properties": {"data": {"$ref": "#/$defs/preparedData"}}
+      }
+    },
+    {
+      "if": {
+        "properties": {"eventType": {"const": "action_dispatched"}},
+        "required": ["eventType"]
+      },
+      "then": {"properties": {"data": {"$ref": "#/$defs/dispatchedData"}}
+      }
+    },
+    {
+      "if": {
+        "properties": {"eventType": {"const": "action_outcome"}},
+        "required": ["eventType"]
+      },
+      "then": {"properties": {"data": {"$ref": "#/$defs/outcomeData"}}
+      }
+    },
+    {
+      "if": {
+        "properties": {"eventType": {"const": "action_reconciled"}},
+        "required": ["eventType"]
+      },
+      "then": {"properties": {"data": {"$ref": "#/$defs/reconciledData"}}
+      }
+    }
+  ]
+}
