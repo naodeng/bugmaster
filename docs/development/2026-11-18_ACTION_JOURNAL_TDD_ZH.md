@@ -70,7 +70,7 @@ RFC3339 时间校验也先加了负例；格式错误、无时区和无效日历
 | Release 门禁 | `python3.12 scripts/quality_gate.py --mode release --coverage /private/tmp/bugmaster-core-coverage.json`：exit 1 / No-Go；单元覆盖报告有效，但功能清单未冻结、真实覆盖未超过 60%、核心三类执行证据缺失 |
 | Diff 空白 | `git diff --check`：PASS |
 
-当前 W6 工作基于已推送基线 `cef3cb514c5502c62a3060c789649b3916aca2ae`。首版实现提交 `d317001` 经审查后发现两处阻断边界；RED → GREEN 修复及 Python 3.12/3.9 回归、Schema 测试、核心模块 100% 行/分支覆盖均已完成，修正代码与更新后的证据尚待独立提交。100% 覆盖只针对维护范围 `bugmaster_core`，不覆盖独立 `scripts/`，也不是业务功能覆盖。
+当前 W6 工作基于已推送基线 `cef3cb514c5502c62a3060c789649b3916aca2ae`。首版实现提交 `d317001` 经审查后发现两处阻断边界；RED → GREEN 修复及 Python 3.12/3.9 回归、Schema 测试、核心模块 100% 行/分支覆盖均已完成，并通过提交 `8376067` 修正。两个 W6 代码提交均已推送到 fork 的 `origin/main`。100% 覆盖只针对维护范围 `bugmaster_core`，不覆盖独立 `scripts/`，也不是业务功能覆盖。
 
 ## 未通过或未执行项
 

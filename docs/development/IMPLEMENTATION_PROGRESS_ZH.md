@@ -1,7 +1,7 @@
 # BugMaster 工程实施进度矩阵
 
 **更新日期：** 2026-11-18
-**当前状态：** 工程基线已提交并推送到 `origin/main`（`cef3cb5`）；W6 本地 Action Journal 切片已完成单元与事件 Schema 验证；完整产品仍为 Release No-Go。
+**当前状态：** 工程基线与 W6 本地 Action Journal 切片均已提交并推送到 fork 的 `origin/main`（W6 提交 `d317001`、`8376067`）；完整产品仍为 Release No-Go。
 
 ## 仓库审计摘要
 
@@ -12,7 +12,7 @@
 - 现有实现仍是工程起点：`bugmaster_core` 已有严格表面/范围门禁与本地 OpenAPI 3 静态发现；没有 URL/Browser 动态发现或真实 API/Browser 执行闭环。
 - 16 个 Patterns 属于候选规则，50 个 Benchmark 属于计划清单；不能据此声称真实验证完成。
 - 当前默认 Python 为 3.9.6；仓库 CI 指定 Python 3.12。测试所需的 `coverage.py` 和 `jsonschema` 使用 Python 3.12，并安装在 `/private/tmp`，未改动系统 Python 或产品运行时依赖。
-- 本机默认 Python 为 3.9.6；CI 和契约测试使用 Python 3.12。W6 文件锁使用 POSIX `fcntl`，Windows 兼容性未验证。W6 实现提交为 `d317001`，尚待远端推送。
+- 本机默认 Python 为 3.9.6；CI 和契约测试使用 Python 3.12。W6 文件锁使用 POSIX `fcntl`，Windows 兼容性未验证。W6 实现提交 `d317001` 与审查修正 `8376067` 已推送到 fork 的 `origin/main`；未向组织上游推送代码。
 
 ## W0–W11 进度
 
