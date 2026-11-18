@@ -16,7 +16,7 @@
 | API/Browser 自主探索 | **未完成** | 未建立真实执行闭环 |
 | Codex/Claude 双宿主 | **未验证** | 未提供可复查运行 ID |
 | GitHub 项目信息 | 已更新 | 上游 `AI-Native-QA-Lab/bugmaster` 与 fork `naodeng/bugmaster` 描述及 13 个 topics 已同步 |
-| GitHub 代码 | fork 已有基线与 W6 切片 | 基线 `cef3cb514c5502c62a3060c789649b3916aca2ae`、W6 提交 `d317001` 和审查修正 `8376067` 均已推送到 fork `main`；未向组织上游推代码 |
+| GitHub 代码 | fork 有基线、W6 切片与审查分支 | 基线 `cef3cb5`、W6 提交 `d317001`/`8376067`、Checkpoint Schema `bcf7e0c` 已推送到 fork `main`；Journal 前缀核验 `d2dba9c` 已推送到 `codex/checkpoint-anchor-verification`，待独立 R3 Review，未合并；未向组织上游推代码 |
 | GitHub Issues / CI | 未验证或未建立 | 导入清单未创建为 Issues；本地 CI 文件尚无远端运行结果 |
 | Release | **No-Go** | Q15/Q16 独立人工审批证据不存在 |
 
