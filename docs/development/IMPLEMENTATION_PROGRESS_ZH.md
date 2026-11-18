@@ -38,7 +38,7 @@
 | 品牌与 Skill 命名扫描 | PASS | `python3 scripts/check_branding.py`；命名契约包含 4 项 Skill ID 检查 |
 | Catalog/Registry | PASS | `python3 scripts/validate_catalog.py` |
 | Benchmark Manifest | PASS（结构） | `validate_benchmark.py` 明确提示场景未执行 |
-| GitHub Actions | 修复待远端复核 | Run `44300382541` 的行覆盖率步骤因错误 JSON key 失败；修复分支本地覆盖率和契约检查通过，PR Actions 结果待核验 |
+| GitHub Actions | 修复通过（PR 草稿） | 原 Run `44300382541` 因错误 JSON key 失败；PR #1 的 Run `44304069748` 在 `ef5bc1d` 全步骤通过。等待独立质量审查，尚未合并 |
 | 单元测试 | PASS，56/56 | Python 3.12 与默认 Python 3.9：`python -m unittest discover -s tests/unit -v` |
 | 契约测试 | PASS，64/64 | Python 3.12 + `jsonschema[format-nongpl]==4.26.0`：`python3.12 -m unittest discover -s tests/contracts -v` |
 | 当前核心模块行/分支覆盖率 | PASS，100% / 100% | `bugmaster_core`：432/432 语句、194/194 分支；不包括独立 `scripts/` 的生产脚本覆盖，也不等于业务功能覆盖 |

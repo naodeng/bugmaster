@@ -3,7 +3,7 @@
 **日期：** 2026-11-18
 **工作流 / 门禁：** W11 开发反馈 CI；`GATE-U100`
 **风险：** R2（覆盖率门禁准确性）
-**状态：** 工作流断言和配置回归测试已在本地验证；GitHub PR 运行结果待核验。
+**状态：** 本地定向检查通过；GitHub PR Actions 运行 `44304069748` 在提交 `ef5bc1d37fc3775c6f38fc6ca0a1fde1326f4920` 上全步骤通过。PR #1 仍为草稿，等待独立质量审查，尚未合并。
 
 ## 需求与 Oracle
 
@@ -42,4 +42,4 @@ python3.12 -m unittest discover -s tests/contracts -p 'test_quality_gate.py' -v
 | 品牌 / Catalog | `scripts/check_branding.py`、`scripts/validate_catalog.py`：PASS |
 | Benchmark Manifest | `scripts/validate_benchmark.py`：结构 PASS，场景未执行 |
 
-GitHub 上的新运行仍待 PR 检查；本次只修复 CI 覆盖率字段错误。完整 Release 仍为 No-Go，真实业务覆盖、核心三类执行证据、双宿主和独立审批尚未达标。
+远端验证：[GitHub Actions 运行 44304069748](https://github.com/naodeng/bugmaster/actions/runs/44304069748) 在修复提交 `ef5bc1d37fc3775c6f38fc6ca0a1fde1326f4920` 上成功；单测、契约、覆盖率精确比较、Catalog、Benchmark 结构及品牌步骤均通过。对应 [草稿 PR #1](https://github.com/naodeng/bugmaster/pull/1) 尚未合并，仍需独立质量审查。本次只修复 CI 覆盖率字段错误。完整 Release 仍为 No-Go，真实业务覆盖、核心三类执行证据、双宿主和独立审批尚未达标。
