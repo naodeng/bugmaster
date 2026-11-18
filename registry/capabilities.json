@@ -1,0 +1,160 @@
+{
+  "schemaVersion": "1.0",
+  "capabilities": [
+    {
+      "id": "discovery.bug-discovery",
+      "skill": "bug-discovery",
+      "patternIds": [],
+      "requiredTools": [
+        "workspace.read"
+      ],
+      "optionalTools": [
+        "browser.navigate"
+      ],
+      "fallback": "guided"
+    },
+    {
+      "id": "discovery.discover-business-logic",
+      "skill": "discover-business-logic",
+      "patternIds": [
+        "BP-BIZ-001",
+        "BP-BIZ-002",
+        "BP-BIZ-003"
+      ],
+      "requiredTools": [
+        "workspace.read"
+      ],
+      "optionalTools": [
+        "browser.navigate"
+      ],
+      "fallback": "guided"
+    },
+    {
+      "id": "discovery.discover-boundary-defects",
+      "skill": "discover-boundary-defects",
+      "patternIds": [
+        "BP-BOUNDARY-001",
+        "BP-BOUNDARY-002",
+        "BP-BOUNDARY-003"
+      ],
+      "requiredTools": [
+        "workspace.read"
+      ],
+      "optionalTools": [
+        "browser.navigate"
+      ],
+      "fallback": "guided"
+    },
+    {
+      "id": "discovery.discover-state-defects",
+      "skill": "discover-state-defects",
+      "patternIds": [
+        "BP-STATE-001",
+        "BP-STATE-002",
+        "BP-STATE-003"
+      ],
+      "requiredTools": [
+        "workspace.read"
+      ],
+      "optionalTools": [
+        "browser.navigate"
+      ],
+      "fallback": "guided"
+    },
+    {
+      "id": "discovery.discover-api-contract-defects",
+      "skill": "discover-api-contract-defects",
+      "patternIds": [
+        "BP-API-003"
+      ],
+      "requiredTools": [
+        "workspace.read"
+      ],
+      "optionalTools": [
+        "http.request"
+      ],
+      "fallback": "guided"
+    },
+    {
+      "id": "discovery.discover-api-idempotency-defects",
+      "skill": "discover-api-idempotency-defects",
+      "patternIds": [
+        "BP-API-001",
+        "BP-API-002"
+      ],
+      "requiredTools": [
+        "workspace.read"
+      ],
+      "optionalTools": [
+        "http.request"
+      ],
+      "fallback": "guided"
+    },
+    {
+      "id": "discovery.discover-web-interaction-defects",
+      "skill": "discover-web-interaction-defects",
+      "patternIds": [
+        "BP-UI-001",
+        "BP-UI-004"
+      ],
+      "requiredTools": [
+        "workspace.read"
+      ],
+      "optionalTools": [
+        "browser.navigate"
+      ],
+      "fallback": "guided"
+    },
+    {
+      "id": "discovery.discover-ui-api-inconsistencies",
+      "skill": "discover-ui-api-inconsistencies",
+      "patternIds": [
+        "BP-UI-002",
+        "BP-UI-003"
+      ],
+      "requiredTools": [
+        "workspace.read"
+      ],
+      "optionalTools": [
+        "http.request"
+      ],
+      "fallback": "guided"
+    },
+    {
+      "id": "discovery.bug-validation",
+      "skill": "bug-validation",
+      "patternIds": [],
+      "requiredTools": [
+        "workspace.read"
+      ],
+      "optionalTools": [
+        "browser.navigate"
+      ],
+      "fallback": "guided"
+    },
+    {
+      "id": "discovery.bug-reporting",
+      "skill": "bug-reporting",
+      "patternIds": [],
+      "requiredTools": [
+        "workspace.read"
+      ],
+      "optionalTools": [
+        "browser.navigate"
+      ],
+      "fallback": "guided"
+    },
+    {
+      "id": "discovery.bug-regression-recommendation",
+      "skill": "bug-regression-recommendation",
+      "patternIds": [],
+      "requiredTools": [
+        "workspace.read"
+      ],
+      "optionalTools": [
+        "browser.navigate"
+      ],
+      "fallback": "guided"
+    }
+  ]
+}

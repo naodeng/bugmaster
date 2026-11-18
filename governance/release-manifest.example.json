@@ -1,0 +1,32 @@
+{
+  "schemaVersion": "1.0",
+  "releaseId": "RC-PENDING",
+  "status": "design-template",
+  "sourceCommit": null,
+  "manifestDigest": null,
+  "artifactDigests": [],
+  "attestationRefs": [],
+  "benchmarkDatasetDigest": null,
+  "acceptance": {
+    "requiredSkills": 11,
+    "requiredPatterns": 16,
+    "requiredBenchmarkCases": 50,
+    "requiredHosts": [
+      "codex",
+      "claude-code"
+    ]
+  },
+  "initiator": {
+    "identity": null,
+    "decision": null
+  },
+  "reviewer": {
+    "identity": null,
+    "decision": null,
+    "approvedManifestDigest": null
+  },
+  "publish": {
+    "status": "blocked",
+    "tag": null
+  }
+}

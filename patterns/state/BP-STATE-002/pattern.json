@@ -1,0 +1,42 @@
+{
+  "schemaVersion": "1.0",
+  "id": "BP-STATE-002",
+  "revision": "0.1.0",
+  "status": "candidate",
+  "title": "Terminal state can be modified",
+  "category": "state.transition",
+  "applicability": {
+    "surfaces": [
+      "rest-api"
+    ],
+    "requiredConditions": []
+  },
+  "hypothesis": {
+    "statement": "Under some valid conditions, terminal state can be modified.",
+    "falsifiable": true
+  },
+  "oracle": {
+    "type": "state-machine",
+    "status": "needs-validation",
+    "requiredSource": true
+  },
+  "evidenceRequirements": [
+    "tool-execution",
+    "environment",
+    "observed-state"
+  ],
+  "falsePositiveChecks": [
+    "unverified-contract",
+    "test-data-contamination",
+    "environment-variance"
+  ],
+  "provenance": {
+    "origin": "original",
+    "sourceRefs": []
+  },
+  "evaluation": {
+    "status": "pending",
+    "positiveCaseIds": [],
+    "negativeCaseIds": []
+  }
+}

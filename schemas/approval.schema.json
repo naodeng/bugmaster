@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:bugmaster:schema:approval:1.0",
+  "title": "BugMaster Approval Record",
+  "description": "A versioned record of a scope or action approval. References to approver and source events must be authenticated by a trusted host; document fields alone never prove provenance.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "approvalId",
+    "kind",
+    "status",
+    "scopeId",
+    "scopeRevision",
+    "targetRef",
+    "environmentRef",
+    "identityRef",
+    "approverRef",
+    "sourceEventRef",
+    "issuedAt",
+    "expiresAt"
+  ],
+  "properties": {
+    "schemaVersion": {"const": "1.0"},
+    "approvalId": {"type": "string", "minLength": 1},
+    "kind": {"enum": ["scope", "action"]},
+    "status": {"enum": ["approved", "rejected"]},
+    "scopeId": {"type": "string", "minLength": 1},
+    "scopeRevision": {"type": "integer", "minimum": 1},
+    "targetRef": {"type": "string", "minLength": 1},
+    "environmentRef": {"type": "string", "minLength": 1},
+    "identityRef": {"type": "string", "minLength": 1},
+    "approverRef": {"type": "string", "minLength": 1},
+    "sourceEventRef": {"type": "string", "minLength": 1},
+    "issuedAt": {"type": "string", "format": "date-time"},
+    "expiresAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "The runtime must reject the approval after this time and verify expiresAt is later than issuedAt."
+    },
+    "reason": {"type": "string", "minLength": 1},
+    "actionDigest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "SHA-256 of the canonical normalized action intent."
+    },
+    "method": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[A-Z]+$"
+    },
+    "parameterDigest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "risk": {"const": "R2"},
+    "count": {"type": "integer", "minimum": 1}
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {"kind": {"const": "action"}},
+        "required": ["kind"]
+      },
+      "then": {
+        "required": ["actionDigest", "method", "parameterDigest", "risk", "count"]
+      }
+    },
+    {
+      "if": {
+        "properties": {"kind": {"const": "scope"}},
+        "required": ["kind"]
+      },
+      "then": {
+        "not": {
+          "anyOf": [
+            {"required": ["actionDigest"]},
+            {"required": ["method"]},
+            {"required": ["parameterDigest"]},
+            {"required": ["risk"]},
+            {"required": ["count"]}
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {"status": {"const": "rejected"}},
+        "required": ["status"]
+      },
+      "then": {"required": ["reason"]}
+    }
+  ]
+}

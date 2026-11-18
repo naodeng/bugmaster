@@ -1,0 +1,10 @@
+id,workstream,requirement,acceptance,priority
+VS-01,W5-W8,API end-to-end finding,correct/faulty/timeout variants independently checked,P0
+MVP-01,W2,11 skills,11 standalone packages verified,P0
+MVP-02,W3,16 patterns,all published patterns schema and provenance checked,P0
+MVP-03,W9,50 evaluation scenarios,fixed manifest complete and executable,P0
+MVP-04,W10,two hosts,real Codex and Claude Code run IDs recorded,P0
+MVP-05,W6,safe resume,unknown external effects never blindly replayed,P0
+MVP-06,W7,evidence bundles,no unsupported confirmed findings,P0
+MVP-07,W8,regression advice,no test code write,P0
+MVP-08,W11,release gates,all blocking checks green and human sign-off,P0

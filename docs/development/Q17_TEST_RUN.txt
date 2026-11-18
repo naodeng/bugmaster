@@ -1,0 +1,17 @@
+test_50_planned_cases_not_execution_claims (test_contracts.CoreContractTests.test_50_planned_cases_not_execution_claims) ... ok
+test_bad_registry_ref_rejected (test_contracts.CoreContractTests.test_bad_registry_ref_rejected) ... ok
+test_catalog (test_contracts.CoreContractTests.test_catalog) ... ok
+test_missing_oracle_blocks (test_contracts.CoreContractTests.test_missing_oracle_blocks) ... ok
+test_model_assertion_is_not_evidence (test_contracts.CoreContractTests.test_model_assertion_is_not_evidence) ... ok
+test_r2_without_enforcement_denied (test_contracts.CoreContractTests.test_r2_without_enforcement_denied) ... ok
+test_r3_never_dispatches (test_contracts.CoreContractTests.test_r3_never_dispatches) ... ok
+test_review_blocks (test_contracts.CoreContractTests.test_review_blocks) ... ok
+test_standalone_contains_patterns (test_contracts.CoreContractTests.test_standalone_contains_patterns) ... ok
+test_unknown_outcome_never_replays (test_contracts.CoreContractTests.test_unknown_outcome_never_replays) ... ok
+
+----------------------------------------------------------------------
+Ran 10 tests in 0.007s
+
+OK
+
+exit_code=0

@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "1.0",
+  "approvalId": "approval-scope-001",
+  "kind": "scope",
+  "status": "approved",
+  "scopeId": "scope-local-orders",
+  "scopeRevision": 1,
+  "targetRef": "https://orders.example.test/openapi.json",
+  "environmentRef": "env-isolated-test",
+  "identityRef": "identity-test-account",
+  "approverRef": "identity-qa-reviewer",
+  "sourceEventRef": "host-event-approval-001",
+  "issuedAt": "2026-11-18T09:00:00Z",
+  "expiresAt": "2099-11-18T09:00:00Z"
+}

@@ -1,0 +1,151 @@
+{
+  "version": "0.1",
+  "frozen": false,
+  "note": "Draft inventory — freeze under approved PR; no actual business run evidence exists.",
+  "features": [
+    {
+      "id": "F-SCOPE",
+      "name": "自主范围发现",
+      "applicable": true,
+      "critical": true,
+      "status": "planned",
+      "evidenceRefs": [],
+      "oracleRef": null
+    },
+    {
+      "id": "F-AUTH",
+      "name": "风险授权与强制阻断",
+      "applicable": true,
+      "critical": true,
+      "status": "planned",
+      "evidenceRefs": [],
+      "oracleRef": null
+    },
+    {
+      "id": "F-API",
+      "name": "API 探索",
+      "applicable": true,
+      "critical": true,
+      "status": "planned",
+      "evidenceRefs": [],
+      "oracleRef": null
+    },
+    {
+      "id": "F-WEB",
+      "name": "Browser Basic 探索",
+      "applicable": true,
+      "critical": true,
+      "status": "planned",
+      "evidenceRefs": [],
+      "oracleRef": null
+    },
+    {
+      "id": "F-ORACLE",
+      "name": "业务 Oracle 与判定",
+      "applicable": true,
+      "critical": true,
+      "status": "planned",
+      "evidenceRefs": [],
+      "oracleRef": null
+    },
+    {
+      "id": "F-FINDING",
+      "name": "证据与缺陷确认",
+      "applicable": true,
+      "critical": true,
+      "status": "planned",
+      "evidenceRefs": [],
+      "oracleRef": null
+    },
+    {
+      "id": "F-REPORT",
+      "name": "Session 汇总报告",
+      "applicable": true,
+      "critical": true,
+      "status": "planned",
+      "evidenceRefs": [],
+      "oracleRef": null
+    },
+    {
+      "id": "F-DEDUP",
+      "name": "跨入口关联去重",
+      "applicable": true,
+      "critical": true,
+      "status": "planned",
+      "evidenceRefs": [],
+      "oracleRef": null
+    },
+    {
+      "id": "F-RECOVERY",
+      "name": "安全恢复",
+      "applicable": true,
+      "critical": true,
+      "status": "planned",
+      "evidenceRefs": [],
+      "oracleRef": null
+    },
+    {
+      "id": "F-ROUTING",
+      "name": "风险路由和探索循环",
+      "applicable": true,
+      "critical": true,
+      "status": "planned",
+      "evidenceRefs": [],
+      "oracleRef": null
+    },
+    {
+      "id": "F-PATTERN",
+      "name": "Pattern 匹配与误报",
+      "applicable": true,
+      "critical": true,
+      "status": "planned",
+      "evidenceRefs": [],
+      "oracleRef": null
+    },
+    {
+      "id": "F-REGRESSION",
+      "name": "回归建议输出",
+      "applicable": true,
+      "critical": false,
+      "status": "planned",
+      "evidenceRefs": [],
+      "oracleRef": null
+    },
+    {
+      "id": "F-HOST",
+      "name": "双宿主适配",
+      "applicable": true,
+      "critical": true,
+      "status": "planned",
+      "evidenceRefs": [],
+      "oracleRef": null
+    },
+    {
+      "id": "F-DISTRIBUTION",
+      "name": "Skill 独立安装",
+      "applicable": true,
+      "critical": true,
+      "status": "planned",
+      "evidenceRefs": [],
+      "oracleRef": null
+    },
+    {
+      "id": "F-BENCHMARK",
+      "name": "50 个真实 Benchmark",
+      "applicable": true,
+      "critical": true,
+      "status": "planned",
+      "evidenceRefs": [],
+      "oracleRef": null
+    },
+    {
+      "id": "F-RELEASE",
+      "name": "发布审批与产物验证",
+      "applicable": true,
+      "critical": true,
+      "status": "planned",
+      "evidenceRefs": [],
+      "oracleRef": null
+    }
+  ]
+}

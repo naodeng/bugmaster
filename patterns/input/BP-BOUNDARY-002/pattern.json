@@ -1,0 +1,42 @@
+{
+  "schemaVersion": "1.0",
+  "id": "BP-BOUNDARY-002",
+  "revision": "0.1.0",
+  "status": "candidate",
+  "title": "Null and missing property are conflated",
+  "category": "input.boundary",
+  "applicability": {
+    "surfaces": [
+      "rest-api"
+    ],
+    "requiredConditions": []
+  },
+  "hypothesis": {
+    "statement": "Under some valid conditions, null and missing property are conflated.",
+    "falsifiable": true
+  },
+  "oracle": {
+    "type": "contract",
+    "status": "needs-validation",
+    "requiredSource": true
+  },
+  "evidenceRequirements": [
+    "tool-execution",
+    "environment",
+    "observed-state"
+  ],
+  "falsePositiveChecks": [
+    "unverified-contract",
+    "test-data-contamination",
+    "environment-variance"
+  ],
+  "provenance": {
+    "origin": "original",
+    "sourceRefs": []
+  },
+  "evaluation": {
+    "status": "pending",
+    "positiveCaseIds": [],
+    "negativeCaseIds": []
+  }
+}

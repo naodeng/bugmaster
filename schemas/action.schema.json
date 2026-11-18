@@ -1,0 +1,111 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:bugmaster:schema:action:1.0",
+  "title": "BugMaster Action Intent and State",
+  "description": "A normalized action record. Approval and enforcement references are pointers only and must be verified by a trusted host before any dispatch.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "actionId",
+    "sessionId",
+    "sequence",
+    "status",
+    "targetRef",
+    "surface",
+    "method",
+    "parameterDigest",
+    "intentDigest",
+    "environmentRef",
+    "scopeId",
+    "scopeRevision",
+    "risk",
+    "operationMutates",
+    "count",
+    "createdAt"
+  ],
+  "properties": {
+    "schemaVersion": {"const": "1.0"},
+    "actionId": {"type": "string", "minLength": 1},
+    "sessionId": {"type": "string", "minLength": 1},
+    "sequence": {"type": "integer", "minimum": 1},
+    "status": {
+      "enum": [
+        "proposed",
+        "authorized",
+        "prepared",
+        "dispatched",
+        "completed",
+        "failed",
+        "outcome_unknown",
+        "reconciled_completed",
+        "reconciled_not_executed",
+        "needs_review",
+        "rejected",
+        "cancelled"
+      ]
+    },
+    "targetRef": {"type": "string", "minLength": 1},
+    "surface": {"enum": ["api", "web", "android", "ios", "unknown"]},
+    "method": {"type": "string", "minLength": 1, "pattern": "^[A-Z][A-Z0-9_-]*$"},
+    "parameterDigest": {"$ref": "#/$defs/sha256"},
+    "intentDigest": {
+      "$ref": "#/$defs/sha256",
+      "description": "Digest of the canonical normalized intent, including target, operation, parameters, environment, scope revision, risk, and count."
+    },
+    "environmentRef": {"type": "string", "minLength": 1},
+    "scopeId": {"type": "string", "minLength": 1},
+    "scopeRevision": {"type": "integer", "minimum": 1},
+    "risk": {"enum": ["R0", "R1", "R2", "R3"]},
+    "operationMutates": {"type": "boolean"},
+    "count": {"type": "integer", "minimum": 1},
+    "approvalRef": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Reference to an action-level Approval record; not authorization proof by itself."
+    },
+    "enforcementRef": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Reference to host-enforced controls; the host must verify it rather than trusting this document."
+    },
+    "createdAt": {"type": "string", "format": "date-time"}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"risk": {"const": "R0"}}, "required": ["risk"]},
+      "then": {"properties": {"operationMutates": {"const": false}}}
+    },
+    {
+      "if": {"properties": {"risk": {"const": "R2"}}, "required": ["risk"]},
+      "then": {"properties": {"operationMutates": {"const": true}}}
+    },
+    {
+      "if": {
+        "properties": {"risk": {"const": "R2"}, "status": {"enum": ["authorized", "prepared", "dispatched", "completed", "failed", "outcome_unknown", "reconciled_completed", "reconciled_not_executed", "needs_review"]}},
+        "required": ["risk", "status"]
+      },
+      "then": {"required": ["approvalRef"]}
+    },
+    {
+      "if": {
+        "properties": {"risk": {"const": "R1"}, "operationMutates": {"const": true}, "status": {"enum": ["authorized", "prepared", "dispatched", "completed", "failed", "outcome_unknown", "reconciled_completed", "reconciled_not_executed", "needs_review"]}},
+        "required": ["risk", "operationMutates", "status"]
+      },
+      "then": {"required": ["enforcementRef"]}
+    },
+    {
+      "if": {"properties": {"risk": {"const": "R3"}}, "required": ["risk"]},
+      "then": {"properties": {"status": {"enum": ["proposed", "needs_review", "rejected", "cancelled"]}}
+      }
+    },
+    {
+      "if": {"properties": {"surface": {"enum": ["android", "ios", "unknown"]}}, "required": ["surface"]},
+      "then": {"properties": {"status": {"enum": ["proposed", "needs_review", "rejected", "cancelled"]}}
+      }
+    }
+  ]
+}

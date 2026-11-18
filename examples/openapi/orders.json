@@ -1,0 +1,38 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Example Orders API",
+    "version": "1.0.0"
+  },
+  "security": [
+    {"bearerAuth": []}
+  ],
+  "paths": {
+    "/orders": {
+      "get": {
+        "operationId": "listOrders",
+        "summary": "List orders",
+        "tags": ["Orders"],
+        "responses": {
+          "200": {"description": "Orders returned"}
+        }
+      },
+      "post": {
+        "operationId": "createOrder",
+        "summary": "Create an order",
+        "tags": ["Orders"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {"type": "object"}
+            }
+          }
+        },
+        "responses": {
+          "201": {"description": "Order created"}
+        }
+      }
+    }
+  }
+}

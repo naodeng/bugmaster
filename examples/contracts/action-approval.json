@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "1.0",
+  "approvalId": "approval-action-001",
+  "kind": "action",
+  "status": "approved",
+  "scopeId": "scope-local-orders",
+  "scopeRevision": 1,
+  "targetRef": "https://orders.example.test/v1/orders",
+  "environmentRef": "env-isolated-test",
+  "identityRef": "identity-test-account",
+  "approverRef": "identity-qa-reviewer",
+  "sourceEventRef": "host-event-approval-002",
+  "issuedAt": "2026-11-18T09:15:00Z",
+  "expiresAt": "2099-11-18T09:15:00Z",
+  "actionDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "method": "POST",
+  "parameterDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "risk": "R2",
+  "count": 1
+}

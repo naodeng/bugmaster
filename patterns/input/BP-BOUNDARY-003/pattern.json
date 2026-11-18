@@ -1,0 +1,42 @@
+{
+  "schemaVersion": "1.0",
+  "id": "BP-BOUNDARY-003",
+  "revision": "0.1.0",
+  "status": "candidate",
+  "title": "Extreme input is mishandled",
+  "category": "input.boundary",
+  "applicability": {
+    "surfaces": [
+      "rest-api"
+    ],
+    "requiredConditions": []
+  },
+  "hypothesis": {
+    "statement": "Under some valid conditions, extreme input is mishandled.",
+    "falsifiable": true
+  },
+  "oracle": {
+    "type": "contract",
+    "status": "needs-validation",
+    "requiredSource": true
+  },
+  "evidenceRequirements": [
+    "tool-execution",
+    "environment",
+    "observed-state"
+  ],
+  "falsePositiveChecks": [
+    "unverified-contract",
+    "test-data-contamination",
+    "environment-variance"
+  ],
+  "provenance": {
+    "origin": "original",
+    "sourceRefs": []
+  },
+  "evaluation": {
+    "status": "pending",
+    "positiveCaseIds": [],
+    "negativeCaseIds": []
+  }
+}

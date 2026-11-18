@@ -1,0 +1,45 @@
+﻿Key,Title,Kind,Risk,Depends,Acceptance
+EPIC-W0,[W0] Architecture and decisions,Epic,R2,,See docs/zh-CN/04-implementation.md and Q15 governance; release remains No-Go
+EPIC-W1,[W1] Schemas and contracts,Epic,R3,,See docs/zh-CN/04-implementation.md and Q15 governance; release remains No-Go
+EPIC-W2,[W2] Portable Skills,Epic,R2,,See docs/zh-CN/04-implementation.md and Q15 governance; release remains No-Go
+EPIC-W3,[W3] Pattern Catalog,Epic,R2,,See docs/zh-CN/04-implementation.md and Q15 governance; release remains No-Go
+EPIC-W4,[W4] Hybrid Routing,Epic,R2,,See docs/zh-CN/04-implementation.md and Q15 governance; release remains No-Go
+EPIC-W5,[W5] Tool and Approval Gateway,Epic,R3,,See docs/zh-CN/04-implementation.md and Q15 governance; release remains No-Go
+EPIC-W6,[W6] Session and recovery,Epic,R3,,See docs/zh-CN/04-implementation.md and Q15 governance; release remains No-Go
+EPIC-W7,[W7] Evidence and Finding,Epic,R3,,See docs/zh-CN/04-implementation.md and Q15 governance; release remains No-Go
+EPIC-W8,[W8] Regression recommendations,Epic,R2,,See docs/zh-CN/04-implementation.md and Q15 governance; release remains No-Go
+EPIC-W9,[W9] Benchmark and Ground Truth,Epic,R3,,See docs/zh-CN/04-implementation.md and Q15 governance; release remains No-Go
+EPIC-W10,[W10] Codex/Claude Code,Epic,R3,,See docs/zh-CN/04-implementation.md and Q15 governance; release remains No-Go
+EPIC-W11,[W11] Release governance,Epic,R3,,See docs/zh-CN/04-implementation.md and Q15 governance; release remains No-Go
+W0-01,Architecture decision ledger and identifier freeze,Task,R2,,"Decision ledger, canonical IDs, accepted ADR-015"
+W0-02,Cross-contract state-machine and directory review,Task,R3,W0-01,No contradictory enums or authoritative paths
+W0-03,Blocking-spike risk register and tracking,Task,R2,W0-01,BLK-01..07 owners and outcomes
+W1-01,Core JSON Schemas and negative fixtures,Task,R2,W0-02,Schema negative and positive runs
+W1-02,Approval and execution contract validators,Task,R3,W1-01,"Parameters, scope and risk binding"
+W1-03,Reference integrity and compatibility contract,Task,R2,W1-01,No broken cross-refs
+W2-01,Eleven canonical Skills and bilingual references,Task,R2,W1-01,Complete Skills and examples
+W2-02,Standalone dependency-closure builder,Task,R2,"W2-01,W3-01",Independent clean install
+W3-01,Sixteen canonical Bug Patterns and taxonomy,Task,R2,W1-01,"16 unique IDs, source and oracle"
+W3-02,"Pattern provenance, aliases and status gates",Task,R2,W3-01,Canonical BP-API-002; alias tests
+W4-01,Three-valued deterministic resolver,Task,R2,"W1-01,W3-01",Stable candidates and exclusions
+W4-02,"Semantic rerank, budget and novel hypothesis",Task,R2,W4-01,"Valid decisions, fallbacks"
+W5-01,Scope and action gateway with enforced approval,Task,R3,W1-02,BLK-02 negative scenarios
+W5-02,API/Browser tooling and target allowlists,Task,R3,W5-01,BLK-06 redirects and tools
+W6-01,"Journal, immutable session and checkpoint",Task,R3,W5-01,Write-ahead intent and single writer
+W6-02,Safe resume and crash fault injection,Task,R3,W6-01,BLK-03 no unsafe replay
+W7-01,Oracle/Evidence Gate and provenance,Task,R3,W6-01,BLK-04 fake evidence rejected
+W7-02,"Finding revisions, reports and evidence bundle",Task,R3,W7-01,"Immutable findings, redacted export"
+W8-01,Regression recommendation contracts and renderer,Task,R2,W7-02,Recommendation only; no code writes
+W9-01,Reference order API/UI and faulty variants,Task,R2,"W1-01,W5-01",Reference tests distinguish variants
+W9-02,"Fifty benchmark tasks, separated answers and scorer",Task,R3,W9-01,BLK-05 answers inaccessible
+W9-03,G0–G3 comparative runs and metric report,Task,R2,W9-02,Reproducible records and denominators
+W10-01,Codex/Claude Code packaging and clean installs,Task,R2,"W2-02,W3-02",BLK-01 logs and hashes
+W10-02,Dual-host API/Browser/permission evaluation,Task,R3,"W5-02,W7-02,W9-02",BLK-06 real run IDs
+W11-01,CI rules and governed PR workflows,Task,R3,W0-03,Fork isolation; protected release
+W11-02,VS-01 and full release-candidate dry run,Task,R3,"W2-02,W3-02,W4-02,W5-02,W6-02,W7-02,W8-01,W9-03,W10-02",BLK-07 complete scope and evidence
+W11-03,"Release manifest, licensing, bilingual docs, rollback",Task,R3,W11-02,No-Go unless every gate passed
+Q16-01,Freeze Release Authorization Contract,Task,R3,,"ADR-016, distinct human signoffs"
+Q16-02,Implement release manifest and signoff validation,Task,R3,,"RELAUTH-003..006,016"
+Q16-03,Configure protected production environment and tag rulesets,Task,R3,,"RELAUTH-001,002,008,010,014"
+Q16-04,Attest and verify release artifacts with least privilege,Task,R3,,"RELAUTH-005..007,012,015"
+Q16-05,Rehearse failed release and immutable rollback,Task,R3,,RELAUTH-011..013

@@ -1,0 +1,160 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:bugmaster:schema:scope:1.0",
+  "title": "BugMaster Authorization Scope",
+  "description": "A versioned scope declaration. approvalRef is a pointer only; a trusted authorization gateway must verify its source, binding, expiry, and enforcement before any action.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "scopeId",
+    "revision",
+    "environmentRef",
+    "identityRef",
+    "targets",
+    "allowedRisks",
+    "actionBudget"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0"
+    },
+    "scopeId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "environmentRef": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Non-secret reference to the intended environment; use 'unknown' while proposing a scope that has not been authorized for execution."
+    },
+    "identityRef": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Non-secret reference to the identity to be used; never store credentials here."
+    },
+    "targets": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/target"
+      }
+    },
+    "allowedRisks": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": ["R0", "R1", "R2", "R3"]
+      },
+      "description": "Declared risk ceiling only. R2 still requires action-level trusted approval and enforceable controls; R3 remains denied unless a separate security policy permits it."
+    },
+    "actionBudget": {
+      "$ref": "#/$defs/actionBudget"
+    }
+  },
+  "$defs": {
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["targetRef", "surface", "decision"],
+      "properties": {
+        "targetRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "surface": {
+          "enum": ["api", "web", "android", "ios", "unknown"]
+        },
+        "decision": {
+          "enum": ["in_scope", "out_of_scope", "pending_authorization"]
+        },
+        "approvalRef": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Reference to a separately verifiable approval record; its presence alone is not proof of authorization."
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {"decision": {"const": "in_scope"}},
+            "required": ["decision"]
+          },
+          "then": {
+            "required": ["approvalRef"]
+          }
+        },
+        {
+          "if": {
+            "properties": {"decision": {"enum": ["out_of_scope", "pending_authorization"]}},
+            "required": ["decision"]
+          },
+          "then": {
+            "required": ["reason"]
+          }
+        },
+        {
+          "if": {
+            "properties": {"surface": {"enum": ["android", "ios", "unknown"]}},
+            "required": ["surface"]
+          },
+          "then": {
+            "properties": {
+              "decision": {"enum": ["out_of_scope", "pending_authorization"]}
+            }
+          }
+        }
+      ]
+    },
+    "actionBudget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["maxActions"],
+      "properties": {
+        "maxActions": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maxRequests": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maxDurationSeconds": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "targets": {
+            "contains": {
+              "properties": {"decision": {"const": "in_scope"}},
+              "required": ["decision"]
+            }
+          }
+        },
+        "required": ["targets"]
+      },
+      "then": {
+        "properties": {
+          "allowedRisks": {"minItems": 1},
+          "actionBudget": {
+            "properties": {"maxActions": {"minimum": 1}}
+          }
+        }
+      }
+    }
+  ]
+}

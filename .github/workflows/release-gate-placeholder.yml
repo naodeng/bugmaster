@@ -1,0 +1,13 @@
+# No publishing action intentionally enabled.
+# Q16 requires two distinct authenticated humans, an immutable source commit,
+# artifact/attestation verification and protected GitHub environment checks.
+name: Release gate placeholder
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  blocked:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo 'NO-GO - manual Q16 authorization and full MVP acceptance pending'; exit 1

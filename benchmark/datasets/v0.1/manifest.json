@@ -1,0 +1,407 @@
+{
+  "schemaVersion": "1.0",
+  "datasetVersion": "0.1.0",
+  "status": "planned",
+  "cases": [
+    {
+      "id": "BENCH-API-BUSINESS-01",
+      "category": "api-business",
+      "status": "planned",
+      "fixtureRef": null,
+      "groundTruthRef": null,
+      "executionVerified": false
+    },
+    {
+      "id": "BENCH-API-BUSINESS-02",
+      "category": "api-business",
+      "status": "planned",
+      "fixtureRef": null,
+      "groundTruthRef": null,
+      "executionVerified": false
+    },
+    {
+      "id": "BENCH-API-BUSINESS-03",
+      "category": "api-business",
+      "status": "planned",
+      "fixtureRef": null,
+      "groundTruthRef": null,
+      "executionVerified": false
+    },
+    {
+      "id": "BENCH-API-BUSINESS-04",
+      "category": "api-business",
+      "status": "planned",
+      "fixtureRef": null,
+      "groundTruthRef": null,
+      "executionVerified": false
+    },
+    {
+      "id": "BENCH-API-BUSINESS-05",
+      "category": "api-business",
+      "status": "planned",
+      "fixtureRef": null,
+      "groundTruthRef": null,
+      "executionVerified": false
+    },
+    {
+      "id": "BENCH-API-BUSINESS-06",
+      "category": "api-business",
+      "status": "planned",
+      "fixtureRef": null,
+      "groundTruthRef": null,
+      "executionVerified": false
+    },
+    {
+      "id": "BENCH-API-BUSINESS-07",
+      "category": "api-business",
+      "status": "planned",
+      "fixtureRef": null,
+      "groundTruthRef": null,
+      "executionVerified": false
+    },
+    {
+      "id": "BENCH-API-BUSINESS-08",
+      "category": "api-business",
+      "status": "planned",
+      "fixtureRef": null,
+      "groundTruthRef": null,
+      "executionVerified": false
+    },
+    {
+      "id": "BENCH-API-BUSINESS-09",
+      "category": "api-business",
+      "status": "planned",
+      "fixtureRef": null,
+      "groundTruthRef": null,
+      "executionVerified": false
+    },
+    {
+      "id": "BENCH-API-BUSINESS-10",
+      "category": "api-business",
+      "status": "planned",
+      "fixtureRef": null,
+      "groundTruthRef": null,
+      "executionVerified": false
+    },
+    {
+      "id": "BENCH-API-BUSINESS-11",
+      "category": "api-business",
+      "status": "planned",
+      "fixtureRef": null,
+      "groundTruthRef": null,
+      "executionVerified": false
+    },
+    {
+      "id": "BENCH-API-BUSINESS-12",
+      "category": "api-business",
+      "status": "planned",
+      "fixtureRef": null,
+      "groundTruthRef": null,
+      "executionVerified": false
+    },
+    {
+      "id": "BENCH-API-BUSINESS-13",
+      "category": "api-business",
+      "status": "planned",
+      "fixtureRef": null,
+      "groundTruthRef": null,
+      "executionVerified": false
+    },
+    {
+      "id": "BENCH-API-BUSINESS-14",
+      "category": "api-business",
+      "status": "planned",
+      "fixtureRef": null,
+      "groundTruthRef": null,
+      "executionVerified": false
+    },
+    {
+      "id": "BENCH-API-BUSINESS-15",
+      "category": "api-business",
+      "status": "planned",
+      "fixtureRef": null,
+      "groundTruthRef": null,
+      "executionVerified": false
+    },
+    {
+      "id": "BENCH-API-BUSINESS-16",
+      "category": "api-business",
+      "status": "planned",
+      "fixtureRef": null,
+      "groundTruthRef": null,
+      "executionVerified": false
+    },
+    {
+      "id": "BENCH-API-BUSINESS-17",
+      "category": "api-business",
+      "status": "planned",
+      "fixtureRef": null,
+      "groundTruthRef": null,
+      "executionVerified": false
+    },
+    {
+      "id": "BENCH-API-BUSINESS-18",
+      "category": "api-business",
+      "status": "planned",
+      "fixtureRef": null,
+      "groundTruthRef": null,
+      "executionVerified": false
+    },
+    {
+      "id": "BENCH-BROWSER-UI-API-01",
+      "category": "browser-ui-api",
+      "status": "planned",
+      "fixtureRef": null,
+      "groundTruthRef": null,
+      "executionVerified": false
+    },
+    {
+      "id": "BENCH-BROWSER-UI-API-02",
+      "category": "browser-ui-api",
+      "status": "planned",
+      "fixtureRef": null,
+      "groundTruthRef": null,
+      "executionVerified": false
+    },
+    {
+      "id": "BENCH-BROWSER-UI-API-03",
+      "category": "browser-ui-api",
+      "status": "planned",
+      "fixtureRef": null,
+      "groundTruthRef": null,
+      "executionVerified": false
+    },
+    {
+      "id": "BENCH-BROWSER-UI-API-04",
+      "category": "browser-ui-api",
+      "status": "planned",
+      "fixtureRef": null,
+      "groundTruthRef": null,
+      "executionVerified": false
+    },
+    {
+      "id": "BENCH-BROWSER-UI-API-05",
+      "category": "browser-ui-api",
+      "status": "planned",
+      "fixtureRef": null,
+      "groundTruthRef": null,
+      "executionVerified": false
+    },
+    {
+      "id": "BENCH-BROWSER-UI-API-06",
+      "category": "browser-ui-api",
+      "status": "planned",
+      "fixtureRef": null,
+      "groundTruthRef": null,
+      "executionVerified": false
+    },
+    {
+      "id": "BENCH-BROWSER-UI-API-07",
+      "category": "browser-ui-api",
+      "status": "planned",
+      "fixtureRef": null,
+      "groundTruthRef": null,
+      "executionVerified": false
+    },
+    {
+      "id": "BENCH-BROWSER-UI-API-08",
+      "category": "browser-ui-api",
+      "status": "planned",
+      "fixtureRef": null,
+      "groundTruthRef": null,
+      "executionVerified": false
+    },
+    {
+      "id": "BENCH-BROWSER-UI-API-09",
+      "category": "browser-ui-api",
+      "status": "planned",
+      "fixtureRef": null,
+      "groundTruthRef": null,
+      "executionVerified": false
+    },
+    {
+      "id": "BENCH-BROWSER-UI-API-10",
+      "category": "browser-ui-api",
+      "status": "planned",
+      "fixtureRef": null,
+      "groundTruthRef": null,
+      "executionVerified": false
+    },
+    {
+      "id": "BENCH-BROWSER-UI-API-11",
+      "category": "browser-ui-api",
+      "status": "planned",
+      "fixtureRef": null,
+      "groundTruthRef": null,
+      "executionVerified": false
+    },
+    {
+      "id": "BENCH-BROWSER-UI-API-12",
+      "category": "browser-ui-api",
+      "status": "planned",
+      "fixtureRef": null,
+      "groundTruthRef": null,
+      "executionVerified": false
+    },
+    {
+      "id": "BENCH-SAFETY-APPROVAL-01",
+      "category": "safety-approval",
+      "status": "planned",
+      "fixtureRef": null,
+      "groundTruthRef": null,
+      "executionVerified": false
+    },
+    {
+      "id": "BENCH-SAFETY-APPROVAL-02",
+      "category": "safety-approval",
+      "status": "planned",
+      "fixtureRef": null,
+      "groundTruthRef": null,
+      "executionVerified": false
+    },
+    {
+      "id": "BENCH-SAFETY-APPROVAL-03",
+      "category": "safety-approval",
+      "status": "planned",
+      "fixtureRef": null,
+      "groundTruthRef": null,
+      "executionVerified": false
+    },
+    {
+      "id": "BENCH-SAFETY-APPROVAL-04",
+      "category": "safety-approval",
+      "status": "planned",
+      "fixtureRef": null,
+      "groundTruthRef": null,
+      "executionVerified": false
+    },
+    {
+      "id": "BENCH-SAFETY-APPROVAL-05",
+      "category": "safety-approval",
+      "status": "planned",
+      "fixtureRef": null,
+      "groundTruthRef": null,
+      "executionVerified": false
+    },
+    {
+      "id": "BENCH-SAFETY-APPROVAL-06",
+      "category": "safety-approval",
+      "status": "planned",
+      "fixtureRef": null,
+      "groundTruthRef": null,
+      "executionVerified": false
+    },
+    {
+      "id": "BENCH-SAFETY-APPROVAL-07",
+      "category": "safety-approval",
+      "status": "planned",
+      "fixtureRef": null,
+      "groundTruthRef": null,
+      "executionVerified": false
+    },
+    {
+      "id": "BENCH-SAFETY-APPROVAL-08",
+      "category": "safety-approval",
+      "status": "planned",
+      "fixtureRef": null,
+      "groundTruthRef": null,
+      "executionVerified": false
+    },
+    {
+      "id": "BENCH-SAFETY-APPROVAL-09",
+      "category": "safety-approval",
+      "status": "planned",
+      "fixtureRef": null,
+      "groundTruthRef": null,
+      "executionVerified": false
+    },
+    {
+      "id": "BENCH-SAFETY-APPROVAL-10",
+      "category": "safety-approval",
+      "status": "planned",
+      "fixtureRef": null,
+      "groundTruthRef": null,
+      "executionVerified": false
+    },
+    {
+      "id": "BENCH-FALLBACK-RECOVERY-01",
+      "category": "fallback-recovery",
+      "status": "planned",
+      "fixtureRef": null,
+      "groundTruthRef": null,
+      "executionVerified": false
+    },
+    {
+      "id": "BENCH-FALLBACK-RECOVERY-02",
+      "category": "fallback-recovery",
+      "status": "planned",
+      "fixtureRef": null,
+      "groundTruthRef": null,
+      "executionVerified": false
+    },
+    {
+      "id": "BENCH-FALLBACK-RECOVERY-03",
+      "category": "fallback-recovery",
+      "status": "planned",
+      "fixtureRef": null,
+      "groundTruthRef": null,
+      "executionVerified": false
+    },
+    {
+      "id": "BENCH-FALLBACK-RECOVERY-04",
+      "category": "fallback-recovery",
+      "status": "planned",
+      "fixtureRef": null,
+      "groundTruthRef": null,
+      "executionVerified": false
+    },
+    {
+      "id": "BENCH-FALLBACK-RECOVERY-05",
+      "category": "fallback-recovery",
+      "status": "planned",
+      "fixtureRef": null,
+      "groundTruthRef": null,
+      "executionVerified": false
+    },
+    {
+      "id": "BENCH-FALLBACK-RECOVERY-06",
+      "category": "fallback-recovery",
+      "status": "planned",
+      "fixtureRef": null,
+      "groundTruthRef": null,
+      "executionVerified": false
+    },
+    {
+      "id": "BENCH-ORACLE-EVIDENCE-01",
+      "category": "oracle-evidence",
+      "status": "planned",
+      "fixtureRef": null,
+      "groundTruthRef": null,
+      "executionVerified": false
+    },
+    {
+      "id": "BENCH-ORACLE-EVIDENCE-02",
+      "category": "oracle-evidence",
+      "status": "planned",
+      "fixtureRef": null,
+      "groundTruthRef": null,
+      "executionVerified": false
+    },
+    {
+      "id": "BENCH-ORACLE-EVIDENCE-03",
+      "category": "oracle-evidence",
+      "status": "planned",
+      "fixtureRef": null,
+      "groundTruthRef": null,
+      "executionVerified": false
+    },
+    {
+      "id": "BENCH-ORACLE-EVIDENCE-04",
+      "category": "oracle-evidence",
+      "status": "planned",
+      "fixtureRef": null,
+      "groundTruthRef": null,
+      "executionVerified": false
+    }
+  ]
+}

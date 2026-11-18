@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "1.0",
+  "categories": [
+    "api.contract",
+    "api.idempotency",
+    "business.calculation",
+    "business.logic",
+    "input.boundary",
+    "state.transition",
+    "ui.api-consistency",
+    "ui.interaction"
+  ]
+}

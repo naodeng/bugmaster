@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:bugmaster:schema:feature-inventory:1.0",
+  "title": "BugMaster Feature Inventory",
+  "description": "A source-linked list of discovered features. Authorization and execution progress belong in separate ledgers.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "sourceRef", "features"],
+  "properties": {
+    "schemaVersion": {"const": "1.0"},
+    "sourceRef": {"type": "string", "minLength": 1},
+    "features": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/feature"}
+    }
+  },
+  "$defs": {
+    "reference": {"type": "string", "minLength": 1},
+    "feature": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "featureId",
+        "name",
+        "surface",
+        "discoveryStatus",
+        "observationKind",
+        "sourceRef",
+        "method",
+        "path",
+        "tags",
+        "parameterRefs",
+        "requestBodyRef",
+        "responseRefs",
+        "securityRef"
+      ],
+      "properties": {
+        "featureId": {
+          "type": "string",
+          "pattern": "^api-[a-f0-9]{16}$"
+        },
+        "name": {"type": "string", "minLength": 1},
+        "surface": {"const": "api"},
+        "discoveryStatus": {"const": "discovered"},
+        "observationKind": {"const": "openapi-declaration"},
+        "sourceRef": {"$ref": "#/$defs/reference"},
+        "method": {
+          "enum": ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT", "TRACE"]
+        },
+        "path": {"type": "string", "pattern": "^/"},
+        "operationId": {"type": "string", "minLength": 1},
+        "tags": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        },
+        "parameterRefs": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/reference"}
+        },
+        "requestBodyRef": {
+          "type": ["string", "null"],
+          "minLength": 1
+        },
+        "responseRefs": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/reference"}
+        },
+        "securityRef": {
+          "type": ["string", "null"],
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

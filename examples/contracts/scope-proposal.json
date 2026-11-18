@@ -1,0 +1,33 @@
+{
+  "schemaVersion": "1.0",
+  "scopeId": "scope-local-orders",
+  "revision": 1,
+  "environmentRef": "env-isolated-test",
+  "identityRef": "identity-test-account",
+  "targets": [
+    {
+      "targetRef": "https://orders.example.test/openapi.json",
+      "surface": "api",
+      "decision": "in_scope",
+      "approvalRef": "approval-scope-001"
+    },
+    {
+      "targetRef": "https://orders.example.test/admin",
+      "surface": "web",
+      "decision": "pending_authorization",
+      "reason": "Requires separate authorization."
+    },
+    {
+      "targetRef": "https://payments.example.test",
+      "surface": "web",
+      "decision": "out_of_scope",
+      "reason": "External payment service excluded by the user."
+    }
+  ],
+  "allowedRisks": ["R0", "R1"],
+  "actionBudget": {
+    "maxActions": 20,
+    "maxRequests": 60,
+    "maxDurationSeconds": 300
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "1.0",
+  "actionId": "action-readonly-001",
+  "sessionId": "session-local-orders-001",
+  "sequence": 1,
+  "status": "proposed",
+  "targetRef": "https://orders.example.test/openapi.json",
+  "surface": "api",
+  "method": "GET",
+  "parameterDigest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "intentDigest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "environmentRef": "env-isolated-test",
+  "scopeId": "scope-local-orders",
+  "scopeRevision": 1,
+  "risk": "R0",
+  "operationMutates": false,
+  "count": 1,
+  "createdAt": "2026-11-18T09:00:00Z"
+}

@@ -1,0 +1,42 @@
+{
+  "schemaVersion": "1.0",
+  "id": "BP-API-002",
+  "revision": "0.1.0",
+  "status": "candidate",
+  "title": "Same idempotency key causes duplicate side effects",
+  "category": "api.idempotency",
+  "applicability": {
+    "surfaces": [
+      "rest-api"
+    ],
+    "requiredConditions": []
+  },
+  "hypothesis": {
+    "statement": "Under some valid conditions, same idempotency key causes duplicate side effects.",
+    "falsifiable": true
+  },
+  "oracle": {
+    "type": "business-invariant",
+    "status": "needs-validation",
+    "requiredSource": true
+  },
+  "evidenceRequirements": [
+    "tool-execution",
+    "environment",
+    "observed-state"
+  ],
+  "falsePositiveChecks": [
+    "unverified-contract",
+    "test-data-contamination",
+    "environment-variance"
+  ],
+  "provenance": {
+    "origin": "original",
+    "sourceRefs": []
+  },
+  "evaluation": {
+    "status": "pending",
+    "positiveCaseIds": [],
+    "negativeCaseIds": []
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "schemaVersion": "1.0",
+  "id": "BP-BOUNDARY-001",
+  "revision": "0.1.0",
+  "status": "candidate",
+  "title": "Lower or upper bound processed incorrectly",
+  "category": "input.boundary",
+  "applicability": {
+    "surfaces": [
+      "rest-api"
+    ],
+    "requiredConditions": []
+  },
+  "hypothesis": {
+    "statement": "Under some valid conditions, lower or upper bound processed incorrectly.",
+    "falsifiable": true
+  },
+  "oracle": {
+    "type": "contract",
+    "status": "needs-validation",
+    "requiredSource": true
+  },
+  "evidenceRequirements": [
+    "tool-execution",
+    "environment",
+    "observed-state"
+  ],
+  "falsePositiveChecks": [
+    "unverified-contract",
+    "test-data-contamination",
+    "environment-variance"
+  ],
+  "provenance": {
+    "origin": "original",
+    "sourceRefs": []
+  },
+  "evaluation": {
+    "status": "pending",
+    "positiveCaseIds": [],
+    "negativeCaseIds": []
+  }
+}
