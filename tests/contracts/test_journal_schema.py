@@ -41,7 +41,7 @@ class JournalSchemaTests(unittest.TestCase):
         )
         journal.mark_dispatched("action-2", intent_digest="b" * 64)
         journal.record_outcome("action-2", "outcome_unknown")
-        journal.reconcile(
+        journal.record_reconciliation_claim(
             "action-2",
             outcome="not_executed",
             observation_ref="read-only-state-2",
@@ -68,7 +68,7 @@ class JournalSchemaTests(unittest.TestCase):
                     "action_prepared",
                     "action_dispatched",
                     "action_outcome",
-                    "action_reconciled",
+                    "action_reconciliation_claimed",
                 ],
             )
             for event in events:

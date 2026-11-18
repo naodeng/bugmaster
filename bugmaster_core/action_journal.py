@@ -72,6 +72,13 @@ def _require_action_id(action_id):
         raise JournalError("action ID must be a non-empty string")
 
 
+def _needs_reconciliation(state):
+    status = state["status"]
+    if status in ("prepared", "dispatched", "outcome_unknown", "reconciliation_claimed"):
+        return True
+    return status == "failed" and state["risk"] != "R0"
+
+
 def _entry_hash(event_without_hash):
     return hashlib.sha256(_canonical_bytes(event_without_hash)).hexdigest()
 
@@ -116,6 +123,7 @@ def _apply_event(states, event, corruption):
         states[action_id] = {
             "status": "prepared",
             "intentDigest": data["intentDigest"],
+            "risk": risk,
         }
         return
 
@@ -148,7 +156,7 @@ def _apply_event(states, event, corruption):
         state["status"] = outcome
         return
 
-    if event_type == "action_reconciled":
+    if event_type == "action_reconciliation_claimed":
         required = {"outcome", "observationRef", "observerRef", "basis"}
         if set(data) != required:
             raise error("reconciliation event fields are invalid")
@@ -161,12 +169,8 @@ def _apply_event(states, event, corruption):
         ):
             raise error("reconciliation requires observation and observer references")
         if data["basis"] != "authoritative-read-only":
-            raise error("reconciliation must use authoritative read-only state")
-        state["status"] = (
-            "reconciled_completed"
-            if data["outcome"] == "completed"
-            else "reconciled_not_executed"
-        )
+            raise error("reconciliation claim must cite a read-only basis")
+        state["status"] = "reconciliation_claimed"
         return
 
     raise error("journal event type is not supported")
@@ -251,7 +255,8 @@ class ActionJournal:
     A pending intent can be dispatched only by the same live instance that
     durably prepared it. A restarted instance requires reconciliation for any
     intent that lacks a recorded result, including an intent with no dispatch
-    marker. Reconciliation records references; it does not authenticate them.
+    marker. Reconciliation records are unverified claims and never unlock
+    dispatch; a trusted read-only verifier is not implemented here.
     """
 
     def __init__(self, path, session_id):
@@ -293,6 +298,14 @@ class ActionJournal:
             if created:
                 _fsync_directory(self.path.parent)
             events, states = _load_events(fd, self.session_id)
+            if event_type == "action_dispatched" and any(
+                other_id != action_id
+                and _needs_reconciliation(state)
+                for other_id, state in states.items()
+            ):
+                raise JournalError(
+                    "session has unresolved action outcomes; dispatch is blocked"
+                )
             event = {
                 "schemaVersion": "1.0",
                 "sessionId": self.session_id,
@@ -381,7 +394,7 @@ class ActionJournal:
         self._dispatched_in_process.remove(action_id)
         return event
 
-    def reconcile(
+    def record_reconciliation_claim(
         self,
         action_id,
         outcome,
@@ -397,9 +410,9 @@ class ActionJournal:
                 "reconciliation requires observation and observer references"
             )
         if basis != "authoritative-read-only":
-            raise JournalError("reconciliation must use authoritative read-only state")
+            raise JournalError("reconciliation claim must cite a read-only basis")
         return self._append(
-            "action_reconciled",
+            "action_reconciliation_claimed",
             action_id,
             {
                 "outcome": outcome,
@@ -415,12 +428,9 @@ class ActionJournal:
         state = states.get(action_id)
         if state is None:
             raise JournalError("action ID is not present in this session")
+        if _needs_reconciliation(state):
+            return "needs_reconciliation"
         return {
-            "prepared": "needs_reconciliation",
-            "dispatched": "needs_reconciliation",
-            "outcome_unknown": "needs_reconciliation",
             "completed": "terminal",
             "failed": "terminal",
-            "reconciled_completed": "reconciled_completed",
-            "reconciled_not_executed": "reconciled_not_executed",
         }[state["status"]]

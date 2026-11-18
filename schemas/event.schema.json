@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:bugmaster:schema:event:1.0",
   "title": "BugMaster Action Journal Event",
-  "description": "One append-only session event. Hashes support local integrity checks but do not prove source authenticity or event truth.",
+  "description": "One append-only session event. Reconciliation records are unverified claims until a trusted read-only verifier checks them. Hashes support local integrity checks but do not prove source authenticity or event truth.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -25,7 +25,7 @@
         "action_prepared",
         "action_dispatched",
         "action_outcome",
-        "action_reconciled"
+        "action_reconciliation_claimed"
       ]
     },
     "actionId": {"type": "string", "minLength": 1},
@@ -95,7 +95,7 @@
         }
       ]
     },
-    "reconciledData": {
+    "reconciliationClaimData": {
       "type": "object",
       "additionalProperties": false,
       "required": ["outcome", "observationRef", "observerRef", "basis"],
@@ -134,10 +134,10 @@
     },
     {
       "if": {
-        "properties": {"eventType": {"const": "action_reconciled"}},
+        "properties": {"eventType": {"const": "action_reconciliation_claimed"}},
         "required": ["eventType"]
       },
-      "then": {"properties": {"data": {"$ref": "#/$defs/reconciledData"}}
+      "then": {"properties": {"data": {"$ref": "#/$defs/reconciliationClaimData"}}
       }
     }
   ]

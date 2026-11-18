@@ -219,7 +219,7 @@ class ActionJournalRecoveryTests(unittest.TestCase):
             for operation in (
                 lambda: journal.mark_dispatched([], intent_digest="a" * 64),
                 lambda: journal.record_outcome([], "completed", "result-1"),
-                lambda: journal.reconcile(
+                lambda: journal.record_reconciliation_claim(
                     [],
                     outcome="completed",
                     observation_ref="state-1",
@@ -284,7 +284,7 @@ class ActionJournalRecoveryTests(unittest.TestCase):
             with self.assertRaises(JournalError):
                 journal.record_outcome("action-1", "completed", result_ref=" ")
             with self.assertRaises(JournalError):
-                journal.reconcile(
+                journal.record_reconciliation_claim(
                     "action-1",
                     outcome="maybe",
                     observation_ref="state-1",
@@ -292,7 +292,7 @@ class ActionJournalRecoveryTests(unittest.TestCase):
                     basis="authoritative-read-only",
                 )
             with self.assertRaises(JournalError):
-                journal.reconcile(
+                journal.record_reconciliation_claim(
                     "action-1",
                     outcome="completed",
                     observation_ref="state-1",
@@ -300,7 +300,7 @@ class ActionJournalRecoveryTests(unittest.TestCase):
                     basis="authoritative-read-only",
                 )
             with self.assertRaises(JournalError):
-                journal.reconcile(
+                journal.record_reconciliation_claim(
                     "action-1",
                     outcome="completed",
                     observation_ref="state-1",
@@ -428,7 +428,7 @@ class ActionJournalRecoveryTests(unittest.TestCase):
             return _event("action_outcome", sequence, data)
 
         def reconciled(data, sequence=2):
-            return _event("action_reconciled", sequence, data)
+            return _event("action_reconciliation_claimed", sequence, data)
 
         cases = (
             (
@@ -610,7 +610,7 @@ class ActionJournalRecoveryTests(unittest.TestCase):
                 recovered.recovery_status("action-1"), "needs_reconciliation"
             )
             with self.assertRaises(JournalError):
-                recovered.reconcile(
+                recovered.record_reconciliation_claim(
                     "action-1",
                     outcome="not_executed",
                     observation_ref="",
@@ -618,7 +618,9 @@ class ActionJournalRecoveryTests(unittest.TestCase):
                     basis="authoritative-read-only",
                 )
 
-            recovered.reconcile(
+            record_claim = getattr(recovered, "record_reconciliation_claim", None)
+            self.assertTrue(callable(record_claim), "unverified reconciliation must be recorded as a claim")
+            record_claim(
                 "action-1",
                 outcome="not_executed",
                 observation_ref="read-only-order-state-1",
@@ -626,7 +628,7 @@ class ActionJournalRecoveryTests(unittest.TestCase):
                 basis="authoritative-read-only",
             )
             self.assertEqual(
-                recovered.recovery_status("action-1"), "reconciled_not_executed"
+                recovered.recovery_status("action-1"), "needs_reconciliation"
             )
             with self.assertRaises(JournalError):
                 recovered.mark_dispatched("action-1", intent_digest="a" * 64)
@@ -638,6 +640,8 @@ class ActionJournalRecoveryTests(unittest.TestCase):
                 risk="R2",
                 approval_ref="approval-action-2",
             )
+            with self.assertRaises(JournalError):
+                recovered.mark_dispatched("action-2", intent_digest="b" * 64)
 
     def test_completed_action_has_terminal_recovery_state(self):
         ActionJournal, _, _ = _journal_types(self)
@@ -652,13 +656,19 @@ class ActionJournalRecoveryTests(unittest.TestCase):
             recovered = ActionJournal(path, session_id="session-1")
             self.assertEqual(recovered.recovery_status("action-1"), "terminal")
 
-    def test_failed_and_reconciled_completed_actions_have_non_replay_states(self):
+    def test_failed_read_only_action_is_terminal_but_claim_stays_blocked(self):
         ActionJournal, _, _ = _journal_types(self)
 
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "journal.jsonl"
             journal = ActionJournal(path, session_id="session-1")
-            _prepare_and_dispatch(journal)
+            journal.prepare(
+                action_id="action-1",
+                intent_digest="a" * 64,
+                scope_revision=1,
+                risk="R0",
+            )
+            journal.mark_dispatched("action-1", intent_digest="a" * 64)
             journal.record_outcome("action-1", "failed", result_ref="tool-error-1")
             journal.prepare(
                 action_id="action-2",
@@ -667,7 +677,7 @@ class ActionJournalRecoveryTests(unittest.TestCase):
                 risk="R0",
             )
             journal.mark_dispatched("action-2", intent_digest="b" * 64)
-            journal.reconcile(
+            journal.record_reconciliation_claim(
                 "action-2",
                 outcome="completed",
                 observation_ref="read-only-state-2",
@@ -678,8 +688,31 @@ class ActionJournalRecoveryTests(unittest.TestCase):
             recovered = ActionJournal(path, session_id="session-1")
             self.assertEqual(recovered.recovery_status("action-1"), "terminal")
             self.assertEqual(
-                recovered.recovery_status("action-2"), "reconciled_completed"
+                recovered.recovery_status("action-2"), "needs_reconciliation"
             )
+
+    def test_failed_mutating_action_requires_reconciliation_before_next_dispatch(self):
+        ActionJournal, _, JournalError = _journal_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "journal.jsonl"
+            journal = ActionJournal(path, session_id="session-1")
+            _prepare_and_dispatch(journal)
+            journal.record_outcome("action-1", "failed", result_ref="http-500-1")
+
+            recovered = ActionJournal(path, session_id="session-1")
+            self.assertEqual(
+                recovered.recovery_status("action-1"), "needs_reconciliation"
+            )
+            recovered.prepare(
+                action_id="action-2",
+                intent_digest="b" * 64,
+                scope_revision=1,
+                risk="R2",
+                approval_ref="approval-action-2",
+            )
+            with self.assertRaises(JournalError):
+                recovered.mark_dispatched("action-2", intent_digest="b" * 64)
 
     def test_restarted_session_cannot_turn_a_missing_result_into_a_completion_claim(self):
         ActionJournal, _, JournalError = _journal_types(self)
