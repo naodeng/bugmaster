@@ -30,3 +30,17 @@ class GateContractTests(unittest.TestCase):
             cases=[{'caseId':k,'featureId':'F','kind':k,'result':'passed','evidenceRef':'E'+k,'oracleRef':'O'} for k in ('happy','negative','edge')]
             matrix.write_text(json.dumps({'cases':cases}))
             self.assertEqual(validate_functional(ledger,matrix),[])
+
+class WorkflowCoverageGateTests(unittest.TestCase):
+    def test_contract_workflow_compares_covered_lines_to_statements(self):
+        workflow=(ROOT/'.github'/'workflows'/'contract.yml').read_text(encoding='utf-8')
+        coverage_steps=[
+            line.strip()
+            for line in workflow.splitlines()
+            if line.strip().startswith('- run: python -c') and 'coverage.json' in line
+        ]
+
+        self.assertEqual(len(coverage_steps),1)
+        self.assertIn("['covered_lines']",coverage_steps[0])
+        self.assertIn("['num_statements']",coverage_steps[0])
+        self.assertNotIn('percent_covered_lines',coverage_steps[0])
