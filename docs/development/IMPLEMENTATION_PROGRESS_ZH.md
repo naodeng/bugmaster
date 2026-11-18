@@ -24,7 +24,7 @@
 | W3 | 16 个 Bug Patterns | 候选规则 | 需适用/排除、Oracle、反例和真实对照 Eval |
 | W4 | 风险路由与有界自主探索 | 部分实现 | `scripts/discover_openapi.py` 可从本地 OpenAPI 3 JSON 输出稳定 ID 和 JSON Pointer 来源清单；URL/Browser 发现、风险路由与动态执行仍待实现 |
 | W5 | R0–R3 动作级授权 | 部分实现 | R0/R1 基础 helper 已 fail-closed；无可信网关时 R2 现在 fail-closed；真实网关、审批摘要和修订绑定仍待实现 |
-| W6 | Action Journal、Checkpoint 与安全恢复 | 部分实现 | 本地 append + fsync、POSIX 单操作锁、事件哈希链、状态转换、重启后阻止未决 Action 重放；Checkpoint 目前只有结构 Schema。调用者核对仅记录为未验证声明，R1/R2 失败响应仍保持会话派发阻断。可信只读核验、Session Revision/Checkpoint 持久化、八断点崩溃注入、工具层执行绑定及双宿主验证仍待实现 |
+| W6 | Action Journal、Checkpoint 与安全恢复 | 部分实现 | 本地 append + fsync、POSIX 单操作锁、事件哈希链、状态转换、重启后阻止未决 Action 重放；Checkpoint 有结构 Schema，Journal 可核验给定序号/哈希是否匹配有效前缀。调用者核对仅记录为未验证声明，R1/R2 失败响应仍保持会话派发阻断。Session Revision/Checkpoint 持久化、可信只读核验、审批与预算恢复核验、八断点崩溃注入、工具层执行绑定及双宿主验证仍待实现 |
 | W7 | Finding、跨入口去重与报告 | 待实现 | 需 Oracle、来源、E3+ 证据和剩余风险追踪 |
 | W8 | 回归建议 | 待实现 | 只输出建议，不自动修改/提交测试代码 |
 | W9 | 50 场景 Benchmark | 计划中 | 需真实运行、隔离 Ground Truth 和 G0–G3 对照 |
@@ -38,9 +38,9 @@
 | 品牌与 Skill 命名扫描 | PASS | `python3 scripts/check_branding.py`；命名契约包含 4 项 Skill ID 检查 |
 | Catalog/Registry | PASS | `python3 scripts/validate_catalog.py` |
 | Benchmark Manifest | PASS（结构） | `validate_benchmark.py` 明确提示场景未执行 |
-| 单元测试 | PASS，56/56 | Python 3.12 与默认 Python 3.9：`python -m unittest discover -s tests/unit -v` |
-| 契约测试 | PASS，55/55 | Python 3.12 + `jsonschema[format-nongpl]==4.26.0`：`python -m unittest discover -s tests/contracts -v` |
-| 当前核心模块行/分支覆盖率 | PASS，100% / 100% | `bugmaster_core`：432/432 语句、194/194 分支；不包括独立 `scripts/` 的生产脚本覆盖，也不等于业务功能覆盖 |
+| 单元测试 | PASS，60/60 | Python 3.12 与默认 Python 3.9：`python3 -m unittest discover -s tests/unit -q` |
+| 契约测试 | PASS，63/63 | Python 3.12 + `jsonschema[format-nongpl]==4.26.0`：`python3.12 -m unittest discover -s tests/contracts` |
+| 当前核心模块行/分支覆盖率 | PASS，100% / 100% | `bugmaster_core`：446/446 语句、206/206 分支；不包括独立 `scripts/` 的生产脚本覆盖，也不等于业务功能覆盖 |
 | 业务功能覆盖率 >60% | 未达成 | 目前没有真实业务执行证据 |
 | 核心 Happy / Negative / Edge | 未达成 | 需每个核心功能有三类实际通过证据 |
 | Release | No-Go | 全量功能、真实 Benchmark、双宿主和独立审批均未完成 |

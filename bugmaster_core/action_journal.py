@@ -422,6 +422,31 @@ class ActionJournal:
             },
         )
 
+    def matches_checkpoint_journal_anchor(self, sequence, head_hash):
+        """Return whether sequence and hash identify a valid journal prefix.
+
+        This checks journal integrity and checkpoint position only. It does not
+        validate a Session revision, authorization, or remaining action budget.
+        """
+        if (
+            isinstance(sequence, bool)
+            or not isinstance(sequence, int)
+            or sequence < 0
+        ):
+            return False
+        if sequence == 0:
+            if head_hash is not None:
+                return False
+        elif not _digest_matches(head_hash):
+            return False
+
+        events, _ = self._load_current()
+        if sequence > len(events):
+            return False
+        if sequence == 0:
+            return True
+        return hmac.compare_digest(events[sequence - 1]["entryHash"], head_hash)
+
     def recovery_status(self, action_id):
         _require_action_id(action_id)
         _, states = self._load_current()

@@ -772,6 +772,84 @@ class ActionJournalRecoveryTests(unittest.TestCase):
                 ActionJournal(path, session_id="session-1")
             self.assertEqual(path.read_bytes(), before)
 
+    def test_checkpoint_anchor_matches_a_journal_prefix_after_later_appends(self):
+        ActionJournal, _, _ = _journal_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "journal.jsonl"
+            journal = ActionJournal(path, session_id="session-1")
+            checkpoint_event = journal.prepare(
+                action_id="action-1",
+                intent_digest="a" * 64,
+                scope_revision=1,
+                risk="R0",
+            )
+            sequence = checkpoint_event["sequence"]
+            head_hash = checkpoint_event["entryHash"]
+
+            self.assertTrue(
+                journal.matches_checkpoint_journal_anchor(sequence, head_hash)
+            )
+            journal.mark_dispatched("action-1", intent_digest="a" * 64)
+            self.assertTrue(
+                ActionJournal(path, "session-1").matches_checkpoint_journal_anchor(
+                    sequence, head_hash
+                )
+            )
+
+    def test_empty_checkpoint_anchor_requires_zero_sequence_and_null_hash(self):
+        ActionJournal, _, _ = _journal_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            journal = ActionJournal(Path(directory) / "journal.jsonl", "session-1")
+
+            self.assertTrue(journal.matches_checkpoint_journal_anchor(0, None))
+            self.assertFalse(
+                journal.matches_checkpoint_journal_anchor(0, "a" * 64)
+            )
+
+    def test_checkpoint_anchor_rejects_mismatched_or_future_journal_positions(self):
+        ActionJournal, _, _ = _journal_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            journal = ActionJournal(
+                Path(directory) / "journal.jsonl", session_id="session-1"
+            )
+            event = journal.prepare(
+                action_id="action-1",
+                intent_digest="a" * 64,
+                scope_revision=1,
+                risk="R0",
+            )
+
+            self.assertFalse(
+                journal.matches_checkpoint_journal_anchor(
+                    event["sequence"], "b" * 64
+                )
+            )
+            self.assertFalse(
+                journal.matches_checkpoint_journal_anchor(2, "a" * 64)
+            )
+
+    def test_checkpoint_anchor_rejects_invalid_sequence_and_digest_values(self):
+        ActionJournal, _, _ = _journal_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            journal = ActionJournal(Path(directory) / "journal.jsonl", "session-1")
+
+            for sequence, head_hash in (
+                (True, None),
+                (-1, None),
+                (1, None),
+                (1, "invalid"),
+            ):
+                with self.subTest(sequence=sequence, head_hash=head_hash):
+                    self.assertFalse(
+                        journal.matches_checkpoint_journal_anchor(
+                            sequence, head_hash
+                        )
+                    )
+
     def test_completed_result_requires_a_tool_result_reference(self):
         ActionJournal, _, JournalError = _journal_types(self)
 

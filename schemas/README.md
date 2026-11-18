@@ -15,7 +15,7 @@ Schemas use JSON Schema Draft 2020-12. Contract tests check both the schema itse
 
 `approvalRef` and `enforcementRef` are structural references only. Validation does not establish who approved a scope, whether the record is authentic, current, unexpired, or bound to this exact scope revision. The trusted authorization gateway must verify those properties before dispatch. R2 also needs action-level approval and enforceable controls; R3 remains subject to separate security policy.
 
-The local Action Journal uses restrictive file permissions, a single-operation POSIX file lock, append + `fsync`, and conservative recovery states. Its event hashes do not prove provenance or truth. A prepared/dispatched action without a result remains blocked after restart. Caller-supplied read-only observations are stored only as unverified reconciliation claims and never unlock dispatch; R1/R2 failed outcomes also remain blocked. A trusted read-only verifier is not implemented yet.
+The local Action Journal uses restrictive file permissions, a single-operation POSIX file lock, append + `fsync`, and conservative recovery states. Its event hashes do not prove provenance or truth. A prepared/dispatched action without a result remains blocked after restart. Caller-supplied read-only observations are stored only as unverified reconciliation claims and never unlock dispatch; R1/R2 failed outcomes also remain blocked. `ActionJournal.matches_checkpoint_journal_anchor()` checks whether a checkpoint's sequence/hash matches a valid journal prefix. A trusted read-only verifier and durable checkpoint store are not implemented yet.
 
 ## Remaining contracts
 
