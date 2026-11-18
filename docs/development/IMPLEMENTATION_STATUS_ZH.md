@@ -10,7 +10,7 @@
 | 16 Patterns | 候选规则数据 | 未达到 Verified |
 | 50 Benchmark | Planned 列表 | 未执行，缺独立 Ground Truth 运行证据 |
 | 单元测试 | 56/56 通过 | Python 3.12 与默认 Python 3.9 均通过；`bugmaster_core` 为 432/432 语句、194/194 分支覆盖 |
-| Journal / Safe Resume | 部分实现 | 本地 append/fsync、事件状态校验、哈希链、重启后阻止未决 Action 重放；核对引用仅记录为未验证声明，仍阻断会话派发；无可信恢复验证器、HTTP/Browser 网关或审批真实性认证 |
+| Journal / Safe Resume | 部分实现 | 本地 append/fsync、事件状态校验、哈希链、重启后阻止未决 Action 重放；Checkpoint 只有结构 Schema。核对引用仅记录为未验证声明，仍阻断会话派发；无 Session revision/Checkpoint 持久化、可信恢复验证器、HTTP/Browser 网关或审批真实性认证 |
 | 业务功能覆盖 >60% | **未达成** | 缺真实业务执行证据 |
 | 核心 Happy/Negative/Edge | **未达成** | 核心功能矩阵只有待执行位置 |
 | API/Browser 自主探索 | **未完成** | 未建立真实执行闭环 |

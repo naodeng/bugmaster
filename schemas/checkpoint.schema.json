@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:bugmaster:schema:checkpoint:1.0",
+  "title": "BugMaster Session Checkpoint",
+  "description": "A structural anchor to an immutable session revision, a Scope revision, and a prefix of the append-only journal. Recovery must validate the referenced state and recheck current authorization and remaining budgets. Hashes prove integrity only, not source authenticity or event truth.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "checkpointId",
+    "sessionId",
+    "sessionRevision",
+    "scopeId",
+    "scopeRevision",
+    "journalSequence",
+    "journalHeadHash",
+    "createdAt"
+  ],
+  "properties": {
+    "schemaVersion": {"const": "1.0"},
+    "checkpointId": {"type": "string", "minLength": 1},
+    "sessionId": {"type": "string", "minLength": 1},
+    "sessionRevision": {"type": "integer", "minimum": 1},
+    "scopeId": {"type": "string", "minLength": 1},
+    "scopeRevision": {"type": "integer", "minimum": 1},
+    "journalSequence": {"type": "integer", "minimum": 0},
+    "journalHeadHash": {
+      "oneOf": [
+        {"type": "null"},
+        {"$ref": "#/$defs/sha256"}
+      ]
+    },
+    "createdAt": {"type": "string", "format": "date-time"}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {"journalSequence": {"const": 0}},
+        "required": ["journalSequence"]
+      },
+      "then": {
+        "properties": {"journalHeadHash": {"type": "null"}}
+      }
+    },
+    {
+      "if": {
+        "properties": {"journalSequence": {"minimum": 1}},
+        "required": ["journalSequence"]
+      },
+      "then": {
+        "properties": {"journalHeadHash": {"$ref": "#/$defs/sha256"}}
+      }
+    }
+  ]
+}
