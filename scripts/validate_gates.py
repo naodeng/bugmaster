@@ -23,4 +23,6 @@ def can_dispatch(action, approval, policy):
     return action.get('risk') in ('R0','R1') and policy.get('scopeValidated') is True
 
 def can_replay(action):
-    return action.get('outcome')=='reconciled-not-executed' and action.get('reconcilerVerified') is True and action.get('newAuthorizationValid') is True
+    # This helper has no trusted read-only reconciler or authorization gateway.
+    # Caller-supplied booleans cannot authorize replay of an unknown effect.
+    return False
