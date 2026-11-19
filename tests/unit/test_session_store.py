@@ -8,6 +8,7 @@ import tempfile
 import threading
 import tracemalloc
 import unittest
+from contextlib import contextmanager
 from pathlib import Path
 from unittest.mock import patch
 
@@ -2125,7 +2126,17 @@ class SessionStoreTests(unittest.TestCase):
                 module._canonical_bytes(second) + b"\n"
             )
 
-            with self.assertRaisesRegex(SessionCorruptionError, "head is missing"):
+            real_scandir = os.scandir
+
+            @contextmanager
+            def sorted_scandir(path):
+                with real_scandir(path) as entries:
+                    yield iter(sorted(entries, key=lambda entry: entry.name))
+
+            with patch(
+                "bugmaster_core.session_store.os.scandir",
+                side_effect=sorted_scandir,
+            ), self.assertRaisesRegex(SessionCorruptionError, "head is missing"):
                 store.create(first)
 
 
