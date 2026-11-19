@@ -146,6 +146,7 @@ class CheckpointStoreTests(unittest.TestCase):
             root = Path(directory)
             store = self.make_store(root / "store")
             store._ensure_directories()
+            store._lock_path.touch(mode=0o600)
             store._checkpoints_dir.symlink_to(
                 root / "missing-checkpoints", target_is_directory=True
             )
@@ -203,12 +204,54 @@ class CheckpointStoreTests(unittest.TestCase):
                 store.read("")
             self.assertFalse(root.exists())
 
+    def test_read_rejects_a_symlinked_parent_storage_directory(self):
+        _, _, CheckpointCorruptionError = _checkpoint_store_types(self)
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            actual = self.make_store(base / "actual")
+            actual.create(_valid_checkpoint())
+            linked = self.make_store(base / "linked")
+            linked.root.mkdir()
+            linked._sessions_dir.symlink_to(actual._sessions_dir, target_is_directory=True)
+
+            with self.assertRaises(CheckpointCorruptionError):
+                linked.read("checkpoint-1")
+
+    def test_read_only_reader_does_not_require_write_permission_on_lock(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = self.make_store(directory)
+            store.create(_valid_checkpoint())
+            os.chmod(store._lock_path, 0o400)
+
+            self.assertEqual(store.read("checkpoint-1"), _valid_checkpoint())
+            self.assertEqual(stat.S_IMODE(store._lock_path.stat().st_mode), 0o400)
+
+    def test_relative_root_is_fixed_when_the_store_is_created(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            original_cwd = Path.cwd()
+            first = base / "first"
+            second = base / "second"
+            first.mkdir()
+            second.mkdir()
+            try:
+                os.chdir(first)
+                store = self.make_store("checkpoint-data")
+                os.chdir(second)
+                store.create(_valid_checkpoint())
+            finally:
+                os.chdir(original_cwd)
+
+            self.assertTrue((first / "checkpoint-data" / "sessions").is_dir())
+            self.assertFalse((second / "checkpoint-data").exists())
+
     def test_read_rejects_invalid_checkpoint_storage_entries(self):
         _, _, CheckpointCorruptionError = _checkpoint_store_types(self)
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             store = self.make_store(root / "not-a-directory")
             store._ensure_directories()
+            store._lock_path.touch(mode=0o600)
             store._checkpoints_dir.write_text("file", encoding="utf-8")
             with self.assertRaises(CheckpointCorruptionError):
                 store.read("checkpoint-1")
@@ -217,6 +260,7 @@ class CheckpointStoreTests(unittest.TestCase):
             root = Path(directory)
             store = self.make_store(root)
             store._ensure_directories()
+            store._lock_path.touch(mode=0o600)
             store._checkpoints_dir.mkdir(mode=0o700)
             target = root / "target.json"
             target.write_text("{}", encoding="utf-8")
@@ -228,6 +272,7 @@ class CheckpointStoreTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             store = self.make_store(directory)
             store._ensure_directories()
+            store._lock_path.touch(mode=0o600)
             store._checkpoints_dir.mkdir(mode=0o700)
             (store._checkpoints_dir / store._checkpoint_filename("checkpoint-1")).mkdir()
             with self.assertRaises(CheckpointCorruptionError):

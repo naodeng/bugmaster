@@ -2,9 +2,16 @@
 
 import hashlib
 import os
+import stat
 from pathlib import Path
 
-from .action_journal import ActionJournal, JournalError, _fsync_directory, _nonempty
+from .action_journal import (
+    ActionJournal,
+    JournalCorruptionError,
+    JournalError,
+    _fsync_directory,
+    _nonempty,
+)
 
 
 class ActionJournalStoreError(JournalError):
@@ -31,7 +38,7 @@ class ActionJournalStore:
             raise ActionJournalStoreError(
                 "Journal identity is not valid UTF-8"
             ) from error
-        self._root = Path(root)
+        self._root = Path(root).absolute()
         self._session_id = session_id
         self._journal_id = journal_id
         self._journals_dir = self._root / "journals"
@@ -59,9 +66,76 @@ class ActionJournalStore:
         return self._journal_id
 
     def open(self):
-        """Return an ActionJournal reader/writer at the canonical local path."""
+        """Open an existing canonical Journal without creating or changing paths."""
+        for directory in (self.root, self._journals_dir, self._session_dir):
+            self._require_existing_directory(directory)
+        try:
+            file_stat = self.path.lstat()
+        except FileNotFoundError as error:
+            raise JournalCorruptionError("canonical journal file is missing") from error
+        except OSError as error:
+            raise ActionJournalStoreError("cannot inspect canonical Journal path") from error
+        if not stat.S_ISREG(file_stat.st_mode):
+            raise JournalCorruptionError("canonical journal path is not a regular file")
+        return ActionJournal(
+            self.path,
+            self.session_id,
+            self.journal_id,
+            require_existing=True,
+        )
+
+    def initialize(self):
+        """Create storage for a new Journal or reopen its canonical writer path."""
         self._ensure_directories()
-        return ActionJournal(self.path, self.session_id, self.journal_id)
+        flags = (
+            os.O_WRONLY
+            | os.O_CREAT
+            | os.O_EXCL
+            | getattr(os, "O_NOFOLLOW", 0)
+        )
+        try:
+            fd = os.open(str(self.path), flags, 0o600)
+        except FileExistsError:
+            pass
+        except OSError as error:
+            raise ActionJournalStoreError("cannot initialize canonical Journal") from error
+        else:
+            try:
+                if not stat.S_ISREG(os.fstat(fd).st_mode):
+                    raise JournalCorruptionError(
+                        "canonical journal path is not a regular file"
+                    )
+                os.fchmod(fd, 0o600)
+                os.fsync(fd)
+            except OSError as error:
+                raise ActionJournalStoreError(
+                    "cannot initialize canonical Journal"
+                ) from error
+            finally:
+                os.close(fd)
+            try:
+                _fsync_directory(self._session_dir)
+            except OSError as error:
+                raise ActionJournalStoreError(
+                    "cannot synchronize canonical Journal directory"
+                ) from error
+        return ActionJournal(
+            self.path,
+            self.session_id,
+            self.journal_id,
+            require_existing=True,
+        )
+
+    @staticmethod
+    def _require_existing_directory(directory):
+        try:
+            directory_stat = directory.lstat()
+        except FileNotFoundError as error:
+            raise JournalCorruptionError("canonical Journal storage path is missing") from error
+        except OSError as error:
+            raise ActionJournalStoreError("cannot inspect Journal storage path") from error
+        if not stat.S_ISDIR(directory_stat.st_mode):
+            raise ActionJournalStoreError("Journal storage path is not a real directory")
 
     def _ensure_directories(self):
         try:

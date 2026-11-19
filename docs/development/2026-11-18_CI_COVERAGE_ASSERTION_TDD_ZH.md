@@ -19,6 +19,28 @@ CI 必须以 Coverage JSON 的 `covered_lines` 和 `num_statements` 精确比较
 python3.12 -m unittest discover -s tests/contracts -p 'test_quality_gate.py' -v
 ```
 
+## 复审修复：空覆盖率报告必须拒绝
+
+**日期：** 2026-11-19
+**复审修复提交：** `e55df3e`
+
+### RED
+
+将原来的字段文本检查改为执行工作流中的实际 Python 命令，并分别验证完整、部分及空覆盖报告。修改生产配置前，定向测试在 `0/0` 报告上失败：该命令以退出码 `0` 接受了空统计。
+
+### GREEN / REFACTOR
+
+覆盖率门禁增加 `num_statements > 0` 条件。回归测试执行工作流命令本身：`100/100` 通过，`99/100` 与 `0/0` 均以非零退出码拒绝；测试不再只检查源文本中是否出现字段名。
+
+### VERIFY
+
+环境：macOS、Python 3.12.16；测试依赖 `jsonschema[format-nongpl]==4.26.0`、`coverage==7.13.3`。
+- 定向合同测试：5/5 PASS。
+- 全单元测试：56/56 PASS。
+- 全合同测试：64/64 PASS。
+- `git diff --check`：PASS。
+- 以上结果对应代码提交 `e55df3e`；本次未运行 GitHub Actions。
+
 结果：exit 1；5 项测试中 1 项按预期失败，旧工作流行缺少 `covered_lines`。测试选择器首次将 JSON 生成步骤和检查步骤都选中（2 行）；收窄到覆盖率检查命令后，RED 对准了错误字段。
 
 ## GREEN

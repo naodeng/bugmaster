@@ -4,7 +4,9 @@ import unittest
 import copy
 import json
 import os
+import stat
 from pathlib import Path
+from unittest.mock import patch
 
 
 def _journal_types(test_case):
@@ -953,6 +955,64 @@ class ActionJournalRecoveryTests(unittest.TestCase):
                 self.fail("ActionJournal must validate the persisted journal ID: {}".format(error))
             else:
                 self.fail("a different Journal ID must not load this event log")
+
+    def test_journal_id_may_contain_unicode_line_separator_characters(self):
+        ActionJournal, _, _ = _journal_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "journal.jsonl"
+            journal_id = "journal\u2028\u0085identity"
+            journal = ActionJournal(
+                path, session_id="session-1", journal_id=journal_id
+            )
+            first = journal.prepare("action-1", "a" * 64, 1, "R0")
+
+            reopened = ActionJournal(
+                path, session_id="session-1", journal_id=journal_id
+            )
+
+            self.assertEqual(
+                reopened.recovery_status("action-1"), "needs_reconciliation"
+            )
+            self.assertTrue(reopened.matches_prefix(1, first["entryHash"]))
+
+    def test_read_rejects_a_fifo_without_blocking(self):
+        ActionJournal, JournalCorruptionError, _ = _journal_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "journal.jsonl"
+            os.mkfifo(path)
+            real_open = os.open
+
+            def open_nonblocking_fifo(target, flags, *args, **kwargs):
+                if Path(target) == path:
+                    self.assertTrue(flags & os.O_NONBLOCK)
+                return real_open(target, flags, *args, **kwargs)
+
+            with patch("bugmaster_core.action_journal.os.open", side_effect=open_nonblocking_fifo):
+                with self.assertRaises(JournalCorruptionError):
+                    ActionJournal(path, "session-1")
+
+    def test_append_rejects_a_fifo_before_changing_its_mode_or_writing(self):
+        ActionJournal, JournalCorruptionError, _ = _journal_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "journal.jsonl"
+            journal = ActionJournal(path, "session-1")
+            os.mkfifo(path)
+            fifo_mode = stat.S_IMODE(path.stat().st_mode)
+            real_open = os.open
+
+            def open_nonblocking_fifo(target, flags, *args, **kwargs):
+                if Path(target) == path:
+                    self.assertTrue(flags & os.O_NONBLOCK)
+                return real_open(target, flags, *args, **kwargs)
+
+            with patch("bugmaster_core.action_journal.os.open", side_effect=open_nonblocking_fifo):
+                with self.assertRaises(JournalCorruptionError):
+                    journal.prepare("action-1", "a" * 64, 1, "R0")
+            self.assertTrue(stat.S_ISFIFO(path.lstat().st_mode))
+            self.assertEqual(stat.S_IMODE(path.stat().st_mode), fifo_mode)
 
     def test_journal_rejects_an_empty_explicit_journal_id(self):
         ActionJournal, _, JournalError = _journal_types(self)

@@ -24,7 +24,7 @@
 | W3 | 16 个 Bug Patterns | 候选规则 | 需适用/排除、Oracle、反例和真实对照 Eval |
 | W4 | 风险路由与有界自主探索 | 部分实现 | `scripts/discover_openapi.py` 可从本地 OpenAPI 3 JSON 输出稳定 ID 和 JSON Pointer 来源清单；URL/Browser 发现、风险路由与动态执行仍待实现 |
 | W5 | R0–R3 动作级授权 | 部分实现 | R0/R1 基础 helper 已 fail-closed；无可信网关时 R2 现在 fail-closed；真实网关、审批摘要和修订绑定仍待实现 |
-| W6 | Action Journal、Session/Checkpoint 持久化与安全恢复 | 部分实现 | `CheckpointReferenceValidator` 校验 Checkpoint、Session revision/Scope history、最新 Session `checkpointRefs`、Journal 前缀及 Session/Journal `journalId` 一致性（PR #6/#7）；PR #8 的 `ActionJournalStore` 按 Session/Journal ID 确定性解析路径并拒绝软链接/非普通文件；PR #9 的 `can_replay` 在可信只读 verifier 接入前 fail-closed；PR #10 提供只读待对账 Action ID 枚举，Journal、SessionStore 和 CheckpointStore 共 17 个子进程退出场景全部通过 Actions。外部事实真实性、可信只读恢复、预算对账、工具层执行绑定及双宿主验证仍待实现 |
+| W6 | Action Journal、Session/Checkpoint 持久化与安全恢复 | 部分实现 | `CheckpointReferenceValidator` 校验 Checkpoint、Session revision/Scope history、最新 Session `checkpointRefs`、Journal 前缀及 Session/Journal `journalId` 一致性（PR #6/#7，Actions PASS）；PR #8 的 `ActionJournalStore` 固定绝对根路径，使用显式 `initialize()` 创建新日志、只读 `open()` 读取已有规范日志并在缺失时失败关闭，同时拒绝软链接与非普通文件；PR #9 的 `can_replay()` 在可信只读 verifier 接入前 fail-closed；PR #10 提供只读待对账 Action ID 枚举，Journal、SessionStore 和 CheckpointStore 共 17 个子进程退出场景通过 Actions。事件真实性、可信只读恢复、预算对账、工具层执行绑定及双宿主验证仍待实现 |
 | W7 | Finding、跨入口去重与报告 | 待实现 | 需 Oracle、来源、E3+ 证据和剩余风险追踪 |
 | W8 | 回归建议 | 待实现 | 只输出建议，不自动修改/提交测试代码 |
 | W9 | 50 场景 Benchmark | 计划中 | 需真实运行、隔离 Ground Truth 和 G0–G3 对照 |

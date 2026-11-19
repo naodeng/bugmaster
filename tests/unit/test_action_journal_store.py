@@ -1,7 +1,10 @@
 import hashlib
+import os
+import stat
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 
 def _store_types(test_case):
@@ -67,7 +70,9 @@ class ActionJournalStoreTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             store = ActionJournalStore(root, "session-1", "journal-1")
-            journal = store.open()
+            store.initialize()
+            self.assertTrue(store.path.is_file())
+            journal = store.initialize()
             event = journal.prepare("action-1", "a" * 64, 1, "R0")
 
             reopened = ActionJournalStore(root, "session-1", "journal-1").open()
@@ -76,6 +81,87 @@ class ActionJournalStoreTests(unittest.TestCase):
             self.assertTrue(
                 reopened.matches_prefix(event["sequence"], event["entryHash"])
             )
+
+    def test_relative_root_is_fixed_when_the_store_is_constructed(self):
+        ActionJournalStore, _ = _store_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            first = base / "first"
+            second = base / "second"
+            first.mkdir()
+            second.mkdir()
+            original_cwd = Path.cwd()
+            try:
+                os.chdir(first)
+                store = ActionJournalStore("journal-data", "session-1", "journal-1")
+                expected_root = Path.cwd() / "journal-data"
+                os.chdir(second)
+                store.initialize()
+            finally:
+                os.chdir(original_cwd)
+
+            self.assertEqual(store.root, expected_root)
+            self.assertTrue(store.path.is_file())
+            self.assertFalse((second / "journal-data").exists())
+
+    def test_open_does_not_create_or_change_storage_paths(self):
+        ActionJournalStore, _ = _store_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            store = ActionJournalStore(directory, "session-1", "journal-1")
+            journal = store.initialize()
+            journal.prepare("action-1", "a" * 64, 1, "R0")
+            os.chmod(store._journals_dir, 0o500)
+            os.chmod(store._session_dir, 0o500)
+
+            reopened = store.open()
+
+            self.assertEqual(reopened.recovery_status("action-1"), "needs_reconciliation")
+            self.assertEqual(stat.S_IMODE(store._journals_dir.stat().st_mode), 0o500)
+            self.assertEqual(stat.S_IMODE(store._session_dir.stat().st_mode), 0o500)
+
+    def test_open_fails_closed_when_the_canonical_journal_is_missing(self):
+        ActionJournalStore, _ = _store_types(self)
+        from bugmaster_core.action_journal import ActionJournal, JournalCorruptionError
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            store = ActionJournalStore(root, "session-1", "journal-1")
+            store.path.parent.mkdir(parents=True)
+            legacy_path = root / "legacy-journal.jsonl"
+            legacy = ActionJournal(
+                legacy_path, "session-1", journal_id="journal-1"
+            )
+            legacy.prepare("action-1", "a" * 64, 1, "R0")
+            legacy_bytes = legacy_path.read_bytes()
+
+            with self.assertRaises(JournalCorruptionError):
+                store.open()
+
+            self.assertFalse(store.path.exists())
+            self.assertEqual(legacy_path.read_bytes(), legacy_bytes)
+
+    def test_open_fails_closed_if_the_canonical_journal_disappears(self):
+        ActionJournalStore, _ = _store_types(self)
+        from bugmaster_core.action_journal import JournalCorruptionError
+
+        with tempfile.TemporaryDirectory() as directory:
+            store = ActionJournalStore(directory, "session-1", "journal-1")
+            store.initialize()
+            real_open = os.open
+
+            def disappear_during_open(target, flags, *args, **kwargs):
+                if Path(target) == store.path:
+                    raise FileNotFoundError("journal disappeared")
+                return real_open(target, flags, *args, **kwargs)
+
+            with patch(
+                "bugmaster_core.action_journal.os.open",
+                side_effect=disappear_during_open,
+            ):
+                with self.assertRaises(JournalCorruptionError):
+                    store.open()
 
     def test_rejects_a_symlinked_journal_directory(self):
         ActionJournalStore, ActionJournalStoreError = _store_types(self)
@@ -119,7 +205,8 @@ class ActionJournalStoreTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             store = ActionJournalStore(root, "session-1", "journal-1")
-            store.open()
+            store.initialize()
+            store.path.unlink()
             outside = root / "outside.jsonl"
             outside.write_text("", encoding="utf-8")
             store.path.symlink_to(outside)
