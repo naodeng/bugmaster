@@ -2,7 +2,7 @@
 
 **日期：** 2026-11-19  
 **Workstream / 义务：** W6-01 Session Persistence；`F-RECOVERY`；`TDD-ACT-004`
-**风险：** R2；合并前需要独立质量审查。  
+**风险：** R3；合并前需要独立 Security Reviewer。
 **实现提交：** `7d2e1957dc417146ed9559e75f04e9c694a3ebbb`（初版存储提交 `2e2101015d0ab062ed7b9a7a0301ba729bb6679b`）；草稿 PR [#3](https://github.com/naodeng/bugmaster/pull/3)，叠加于 Session Schema PR #2，尚未合并。
 
 ## Oracle 与范围
@@ -18,6 +18,38 @@
 权限审查发现初版会把调用方拥有的根目录权限从 `0750` 改成 `0700`。新增 `test_store_does_not_change_caller_owned_root_permissions` 后实测失败（实际 `0700`，期望保留 `0750`），证明实现改动了调用方目录权限。
 
 读取历史的审查发现已存 revision 各自通过 Schema 校验仍不够：revision 1 的 `journalId` 被改写为另一个合法字符串后，`read_latest()` 未拒绝。新增 `test_read_fails_closed_when_persisted_history_breaks_immutable_identity`，先得到 `SessionCorruptionError not raised`，作为明确的 RED 证据。之后检查发现宽松测试 validator 下，重复或倒退的同一 Scope revision 会因数组长度增长而被当作新 Scope history；新增 `test_scope_history_rejects_duplicate_and_backward_revisions`，先得到 `SessionStoreError not raised`。
+
+## 复审修复：尾部截断、路径边界与只读读取
+
+**日期：** 2026-11-19
+**实现与测试提交：** `d2777e9`
+
+### RED
+
+先增加尾部 revision 缺失、复用 revision 号重置预算、悬空 revisions 软链接、会话目录软链接、只读锁权限及相对存储根工作目录变化的行为测试。实现前运行：
+
+```text
+python3.12 -m unittest discover -s tests/unit -p test_session_store.py -v
+```
+
+42 项中 5 项失败、1 项报错，分别暴露旧版本被当成最新、预算状态可回退、软链接路径被接受、只读锁不能读取和相对根随工作目录变化。
+
+### GREEN / REFACTOR
+
+每个 Session 写入独立 `session.head`，记录 Session ID、已提交 revision 和该 revision 的 SHA-256；读取会核对 head 与实际最新文件，尾部文件缺失或内容不符时失败关闭。读取先用 `lstat` 检查根目录及受控子目录，再以只读锁读取，不创建锁或改文件权限。构造 Store 时固定绝对根路径。
+
+复审补充了 head 丢失、head 与 revisions 不一致、head 损坏及发布失败清理用例；这些用例覆盖新的错误路径，不代表所有测试均在同一轮 RED 阶段新增。
+
+### VERIFY
+
+环境：macOS、Python 3.12.16；`jsonschema[format-nongpl]==4.26.0`、`coverage==7.13.3`。
+- SessionStore 定向单测：49/49 PASS。
+- 全单元测试：105/105 PASS。
+- 全合同测试：75/75 PASS。
+- `bugmaster_core` 行覆盖：832/832（100%）；分支覆盖：354/354（100%）。
+- `git diff --check`：PASS。
+
+head 记录可发现 revision 尾部文件单独丢失或修改；它不是外部签名，无法证明整个 Session 目录未被整体回滚或同时删除。
 
 ## GREEN / REFACTOR
 
