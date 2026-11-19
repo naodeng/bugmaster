@@ -51,6 +51,8 @@ Action Journal event schema v1.1 binds every event to both `sessionId` and `jour
 
 Persist action intent before dispatch, append journal events, and reconcile unknown effects with authoritative read-only state before allowing any replay. A prepared event without dispatched event does **not** prove non-execution. No trusted read-only reconciliation verifier is currently wired, so the replay helper denies all replay requests. Do not promise exactly-once effects for external systems. Session recovery cannot reset budgets or approvals.
 
+`ActionJournal.actions_needing_reconciliation()` returns the ordered action IDs whose locally recorded states remain unresolved. It is a diagnostic view only: it neither verifies external effects nor authorizes replay, and it fails closed if the Journal cannot be validated.
+
 ## Contract build order
 
 1. Define canonical schemas for Skill manifest, Pattern, Registry, Scope, Action, Approval, Oracle, Evidence, Finding, Session, Checkpoint, Review, Recommendation, Eval.
