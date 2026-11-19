@@ -1,11 +1,11 @@
 # BugMaster 工程实施进度矩阵
 
 **更新日期：** 2026-11-19
-**当前状态：** W6 本地 Action Journal 切片和 Checkpoint 结构契约在 fork `main`；CI 覆盖率修复 PR #1 已通过 Actions 但仍为草稿。Session 结构契约在独立分支 `codex/session-schema`，完整产品仍为 Release No-Go。
+**当前状态：** W6 Action Journal 与 Session revision 持久化均为局部切片；Session Schema PR #2 与 SessionStore PR #3 均为草稿且未合并。PR #3 最终代码提交 `7d2e195` 已通过 Actions Run `44443870587`；完整产品仍为 Release No-Go。
 
 ## 仓库审计摘要
 
-- 当前源仓库：`/Users/inaodeng/Code/bugmaster`；本轮隔离工作树为 `/Users/inaodeng/.codex/worktrees/session-contract/bugmaster`，分支 `codex/session-schema`，基于 `origin/main` 的 `bcf7e0c` 及通过 CI 修复 PR 的提交 `ac25f52`。
+- 当前源仓库：`/Users/inaodeng/Code/bugmaster`。Session Schema 工作树为 `/Users/inaodeng/.codex/worktrees/session-contract/bugmaster`，分支 `codex/session-schema`；本轮 SessionStore 工作树为 `/Users/inaodeng/.codex/worktrees/session-revision-store/bugmaster`，分支 `codex/session-revision-store`，基于 Schema 提交 `808be6d`，初版提交 `2e21010`、Scope 历史修正 `7d2e195`。
 - GitHub 上游：`AI-Native-QA-Lab/bugmaster`；个人项目 fork：`naodeng/bugmaster`。两者均为公开仓库，当前连接具有管理员权限。
 - 两个仓库的 About 描述与 13 个 topics 已同步；未设置官网链接。基线提交 `cef3cb5` 已推到 fork 的 `origin/main`，尚未向组织上游推送代码。
 - 当前代码来源：用户提供的 `/Users/inaodeng/Downloads/bugmaster 2/`（128 个文件）。该 v1.1 基线采用 11 个 Discovery / Validation / Reporting Skill ID；旧 v1.0 的 `hunt-*` 目录不导入。
@@ -24,7 +24,7 @@
 | W3 | 16 个 Bug Patterns | 候选规则 | 需适用/排除、Oracle、反例和真实对照 Eval |
 | W4 | 风险路由与有界自主探索 | 部分实现 | `scripts/discover_openapi.py` 可从本地 OpenAPI 3 JSON 输出稳定 ID 和 JSON Pointer 来源清单；URL/Browser 发现、风险路由与动态执行仍待实现 |
 | W5 | R0–R3 动作级授权 | 部分实现 | R0/R1 基础 helper 已 fail-closed；无可信网关时 R2 现在 fail-closed；真实网关、审批摘要和修订绑定仍待实现 |
-| W6 | Action Journal、Checkpoint 与安全恢复 | 部分实现 | 本地 append + fsync、POSIX 单操作锁、事件哈希链、状态转换、重启后阻止未决 Action 重放；Checkpoint 目前只有结构 Schema。调用者核对仅记录为未验证声明，R1/R2 失败响应仍保持会话派发阻断。可信只读核验、Session Revision/Checkpoint 持久化、八断点崩溃注入、工具层执行绑定及双宿主验证仍待实现 |
+| W6 | Action Journal、Session 持久化与安全恢复 | 部分实现 | Action Journal 有本地 append/fsync、POSIX 锁、事件哈希链和未决 Action 阻断；SessionStore 已实现不可变 revision 追加/读取与历史转换校验（PR #3，Actions PASS；Scope history 递增）；Checkpoint 仍只有结构 Schema。可信只读核验、预算与 Journal 对账、Checkpoint 持久化、八断点崩溃注入、工具层执行绑定及双宿主验证仍待实现 |
 | W7 | Finding、跨入口去重与报告 | 待实现 | 需 Oracle、来源、E3+ 证据和剩余风险追踪 |
 | W8 | 回归建议 | 待实现 | 只输出建议，不自动修改/提交测试代码 |
 | W9 | 50 场景 Benchmark | 计划中 | 需真实运行、隔离 Ground Truth 和 G0–G3 对照 |
@@ -38,17 +38,17 @@
 | 品牌与 Skill 命名扫描 | PASS | `python3 scripts/check_branding.py`；命名契约包含 4 项 Skill ID 检查 |
 | Catalog/Registry | PASS | `python3 scripts/validate_catalog.py` |
 | Benchmark Manifest | PASS（结构） | `validate_benchmark.py` 明确提示场景未执行 |
-| GitHub Actions | 两项 PR 检查通过（均为草稿） | 原 Run `44300382541` 因错误 JSON key 失败；PR #1 的 Run `44304702509` 在 `ac25f52` 全步骤通过；PR #2 的 Run `44438620887` 在 `cb7d566` 全步骤通过。Session R2 变更仍须独立质量审查后才能合并 |
-| 单元测试 | PASS，56/56 | Python 3.12 与默认 Python 3.9：`python -m unittest discover -s tests/unit -v` |
-| 契约测试 | PASS，73/73 | Python 3.12 + `jsonschema[format-nongpl]==4.26.0`：`python3.12 -m unittest discover -s tests/contracts -v`；包含 Session 9 项和 CI 工作流配置回归 1 项 |
-| 当前核心模块行/分支覆盖率 | PASS，100% / 100% | `bugmaster_core`：432/432 语句、194/194 分支；不包括独立 `scripts/` 的生产脚本覆盖，也不等于业务功能覆盖 |
+| GitHub Actions | 三项 PR 检查通过（均为草稿） | 原 Run `44300382541` 因错误 JSON key 失败；PR #1 的 Run `44304702509`、PR #2 的 Run `44438620887`、PR #3 代码提交的 Run `44442603260` 与最终修正 Run `44443870587` 均成功。PR #3 后续提交只同步中文过程记录，不改动代码；Session R2 变更仍须独立质量审查后才能合并 |
+| 单元测试 | PASS，92/92 | Python 3.12：`python3.12 -m unittest discover -s tests/unit -v`；其中 SessionStore 定向单测 36/36 |
+| 契约测试 | PASS，75/75 | Python 3.12 + `jsonschema[format-nongpl]==4.26.0`：`python3.12 -m unittest discover -s tests/contracts -v`；Session Schema 11 项含 2 项 Store 集成测试 |
+| 当前核心模块行/分支覆盖率 | PASS，100% / 100% | `bugmaster_core`：752/752 行、324/324 分支。`session_store.py` 为 320/320 行、130/130 分支。行/分支口径分开报告，不等于业务功能覆盖 |
 | 业务功能覆盖率 >60% | 未达成 | 目前没有真实业务执行证据 |
 | 核心 Happy / Negative / Edge | 未达成 | 需每个核心功能有三类实际通过证据 |
 | Release | No-Go | 全量功能、真实 Benchmark、双宿主和独立审批均未完成 |
 
-本轮使用生成的核心覆盖 JSON 运行 `python3.12 scripts/quality_gate.py --mode release --coverage /private/tmp/bugmaster-core-coverage.json`，结果仍为 No-Go：功能清单未冻结、真实功能覆盖未超过 60%，核心功能 Happy/Negative/Edge 执行矩阵缺证据。W6 本地状态机单测不作为真实业务功能执行证据。Benchmark 脚本仅验证清单结构，未运行 50 个场景。
+本轮使用生成的核心覆盖 JSON 运行 `python3.12 scripts/quality_gate.py --mode release --coverage /private/tmp/bugmaster-session-revision-coverage.json`，结果仍为 No-Go：功能清单未冻结、真实功能覆盖未超过 60%，核心功能 Happy/Negative/Edge 执行矩阵缺证据。W6 本地状态机单测不作为真实业务功能执行证据。Benchmark 脚本仅验证清单结构，未运行 50 个场景。
 
-初始验证的命令与实际输出记录在 [基线验证记录](2026-11-18_INITIAL_BASELINE_VERIFICATION_ZH.md)。Scope 风险 helper、本地 OpenAPI 静态发现 CLI、Scope/Approval/Action Schema、Session Schema 和 R2 缺少可信审批网关时拒绝派发的 RED/GREEN/REFACTOR/VERIFY 证据分别见 [范围与风险门禁 TDD 记录](2026-11-18_SCOPE_GATE_TDD_ZH.md)、[OpenAPI 发现 TDD 记录](2026-11-18_OPENAPI_DISCOVERY_TDD_ZH.md)、[Scope Schema TDD 记录](2026-11-18_SCOPE_SCHEMA_TDD_ZH.md)、[Approval 与 Action Schema TDD 记录](2026-11-18_APPROVAL_ACTION_SCHEMA_TDD_ZH.md)、[Session Schema TDD 记录](2026-11-19_SESSION_SCHEMA_TDD_ZH.md) 与 [R2 门禁 TDD 记录](2026-11-18_R2_GATE_TDD_ZH.md)。
+初始验证的命令与实际输出记录在 [基线验证记录](2026-11-18_INITIAL_BASELINE_VERIFICATION_ZH.md)。Scope 风险 helper、本地 OpenAPI 静态发现 CLI、Scope/Approval/Action Schema、Session Schema 和 R2 缺少可信审批网关时拒绝派发的 RED/GREEN/REFACTOR/VERIFY 证据分别见 [范围与风险门禁 TDD 记录](2026-11-18_SCOPE_GATE_TDD_ZH.md)、[OpenAPI 发现 TDD 记录](2026-11-18_OPENAPI_DISCOVERY_TDD_ZH.md)、[Scope Schema TDD 记录](2026-11-18_SCOPE_SCHEMA_TDD_ZH.md)、[Approval 与 Action Schema TDD 记录](2026-11-18_APPROVAL_ACTION_SCHEMA_TDD_ZH.md)、[Session Schema TDD 记录](2026-11-19_SESSION_SCHEMA_TDD_ZH.md) 与 [R2 门禁 TDD 记录](2026-11-18_R2_GATE_TDD_ZH.md) 和 [Session Revision 持久化 TDD 记录](2026-11-19_SESSION_REVISION_STORE_TDD_ZH.md)。
 
 11 个独立包的离线构建/闭包/摘要核验见 [Standalone 打包验证记录](2026-11-18_STANDALONE_PACKAGING_VERIFY_ZH.md)。
 
