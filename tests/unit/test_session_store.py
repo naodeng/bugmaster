@@ -77,6 +77,21 @@ class SessionStoreTests(unittest.TestCase):
             self.assertEqual(store.read_revision(1)["status"], "created")
             self.assertEqual(store.read_latest()["sessionId"], "session-1")
 
+    def test_long_session_id_keeps_the_persisted_head_readable(self):
+        session_id = "s" * 1000
+        with tempfile.TemporaryDirectory() as directory:
+            store = self.make_store(Path(directory), session_id)
+            first = _valid_session()
+            first["sessionId"] = session_id
+            first["journalId"] = "journal-long-session-id"
+
+            store.create(first)
+
+            self.assertEqual(store.read_latest(), first)
+            second = _next_revision(first, status="ready")
+            store.append_revision(second, expected_revision=1)
+            self.assertEqual(store.read_latest(), second)
+
     def test_append_keeps_previous_revision_immutable(self):
         _, _, _ = _session_store_types(self)
         with tempfile.TemporaryDirectory() as directory:
@@ -299,6 +314,16 @@ class SessionStoreTests(unittest.TestCase):
             )
 
             with self.assertRaises(SessionCorruptionError):
+                store.read_latest()
+
+    def test_read_rejects_an_oversized_head_before_reading_its_contents(self):
+        _, _, SessionCorruptionError = _session_store_types(self)
+        with tempfile.TemporaryDirectory() as directory:
+            store = self.make_store(directory)
+            store.create(_valid_session())
+            store._head_path.write_bytes(b"x" * (4 * 1024 * 1024 + 1025))
+
+            with self.assertRaisesRegex(SessionCorruptionError, "head is too large"):
                 store.read_latest()
 
     @unittest.skipUnless(os.name == "posix", "POSIX file permission contract")
