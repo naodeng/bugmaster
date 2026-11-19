@@ -49,7 +49,7 @@ Action Journal event schema v1.1 binds every event to both `sessionId` and `jour
 
 ## Checkpoint invariant
 
-Persist action intent before dispatch, append journal events, and reconcile unknown effects with authoritative read-only state before allowing any replay. A prepared event without dispatched event does **not** prove non-execution. Do not promise exactly-once effects for external systems. Session recovery cannot reset budgets or approvals.
+Persist action intent before dispatch, append journal events, and reconcile unknown effects with authoritative read-only state before allowing any replay. A prepared event without dispatched event does **not** prove non-execution. No trusted read-only reconciliation verifier is currently wired, so the replay helper denies all replay requests. Do not promise exactly-once effects for external systems. Session recovery cannot reset budgets or approvals.
 
 ## Contract build order
 

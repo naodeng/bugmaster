@@ -24,6 +24,8 @@ Schema 使用 JSON Schema Draft 2020-12。契约测试同时校验 Schema 本身
 
 Session Schema 保存结构化历史和计数；`SessionStore` 增加本地不可变 revision 持久化，并检查历史引用与计数是否单调变化。可信恢复验证器仍须验证审批引用真实性，将预算计数与不可变 Scope revision 和 Action Journal 对账，核对 Journal 绑定，并在恢复前重新核验当前授权。JSON Schema 不会比较已用计数与对应上限，可信 Session 恢复验证器尚未实现。
 
+当前没有可信只读 reconciliation verifier。`scripts/validate_gates.py` 在可信核验和当前授权门禁接入前拒绝所有重放；调用方提供的布尔字段不能解锁未知副作用。
+
 ## 尚未实现的契约
 
 Skill Manifest、Pattern、Catalog、Capability Registry、Recovery Decision、Oracle、Evidence、Finding、Review、Report、Regression Recommendation、Eval Manifest 和 Release Manifest 尚未实现。可从 [统一契约](../docs/en/03-contracts.md) 与 [中文统一契约](../docs/zh-CN/03-contracts.md) 中查阅状态和身份约束。当前部分 Schema 不能被视为完整契约套件已通过。

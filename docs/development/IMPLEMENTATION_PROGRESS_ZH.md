@@ -1,11 +1,11 @@
 # BugMaster 工程实施进度矩阵
 
 **更新日期：** 2026-11-19
-**当前状态：** W6 Action Journal、SessionStore、CheckpointStore、Checkpoint 跨存储引用校验、Journal 身份绑定与路径解析均为局部切片；PR #2–#8 均为草稿且未合并。PR #8 实现提交 `4bc2dc0` 已通过 Actions Run `44455794738`；完整产品仍为 Release No-Go。
+**当前状态：** W6 Action Journal、SessionStore、CheckpointStore、Checkpoint 跨存储引用校验、Journal 身份绑定、路径解析与 fail-closed replay gate 均为局部切片；PR #2–#9 均为草稿且未合并。PR #9 实现提交 `91e79ee` 已通过 Actions Run `44457678961`；完整产品仍为 Release No-Go。
 
 ## 仓库审计摘要
 
-- 当前源仓库：`/Users/inaodeng/Code/bugmaster`。Session Schema 工作树位于 `/Users/inaodeng/.codex/worktrees/session-contract/bugmaster`、分支 `codex/session-schema`；W6 存储工作树为 `/Users/inaodeng/.codex/worktrees/session-revision-store/bugmaster`，当前分支 `codex/journal-path-resolution`，基于 PR #7 的提交 `6f2bc1d`；PR #8 实现提交 `4bc2dc0`。SessionStore 的实现提交为 `2e21010` / `7d2e195`。
+- 当前源仓库：`/Users/inaodeng/Code/bugmaster`。Session Schema 工作树位于 `/Users/inaodeng/.codex/worktrees/session-contract/bugmaster`、分支 `codex/session-schema`；W6 存储工作树为 `/Users/inaodeng/.codex/worktrees/session-revision-store/bugmaster`，当前分支 `codex/replay-gate-fail-closed`，基于 PR #8 的提交 `99fe47e`；PR #9 实现提交 `91e79ee`。SessionStore 的实现提交为 `2e21010` / `7d2e195`。
 - GitHub 上游：`AI-Native-QA-Lab/bugmaster`；个人项目 fork：`naodeng/bugmaster`。两者均为公开仓库，当前连接具有管理员权限。
 - 两个仓库的 About 描述与 13 个 topics 已同步；未设置官网链接。基线提交 `cef3cb5` 已推到 fork 的 `origin/main`，尚未向组织上游推送代码。
 - 当前代码来源：用户提供的 `/Users/inaodeng/Downloads/bugmaster 2/`（128 个文件）。该 v1.1 基线采用 11 个 Discovery / Validation / Reporting Skill ID；旧 v1.0 的 `hunt-*` 目录不导入。
@@ -24,7 +24,7 @@
 | W3 | 16 个 Bug Patterns | 候选规则 | 需适用/排除、Oracle、反例和真实对照 Eval |
 | W4 | 风险路由与有界自主探索 | 部分实现 | `scripts/discover_openapi.py` 可从本地 OpenAPI 3 JSON 输出稳定 ID 和 JSON Pointer 来源清单；URL/Browser 发现、风险路由与动态执行仍待实现 |
 | W5 | R0–R3 动作级授权 | 部分实现 | R0/R1 基础 helper 已 fail-closed；无可信网关时 R2 现在 fail-closed；真实网关、审批摘要和修订绑定仍待实现 |
-| W6 | Action Journal、Session/Checkpoint 持久化与安全恢复 | 部分实现 | `CheckpointReferenceValidator` 校验 Checkpoint、Session revision/Scope history、最新 Session `checkpointRefs`、Journal 前缀及 Session/Journal `journalId` 一致性（PR #6/#7，Actions PASS）；PR #8 的 `ActionJournalStore` 按 Session/Journal ID 确定性解析路径并拒绝软链接/非普通文件（Actions PASS）；Journal 前缀 helper 在 PR #5。事件真实性、可信只读恢复、预算对账、八断点崩溃注入、工具层执行绑定及双宿主验证仍待实现 |
+| W6 | Action Journal、Session/Checkpoint 持久化与安全恢复 | 部分实现 | `CheckpointReferenceValidator` 校验 Checkpoint、Session revision/Scope history、最新 Session `checkpointRefs`、Journal 前缀及 Session/Journal `journalId` 一致性（PR #6/#7）；PR #8 的 `ActionJournalStore` 按 Session/Journal ID 确定性解析路径并拒绝软链接/非普通文件（Actions PASS）；PR #9 的 `can_replay` 在可信只读 verifier 接入前 fail-closed。事件真实性、可信只读恢复、预算对账、八断点崩溃注入、工具层执行绑定及双宿主验证仍待实现 |
 | W7 | Finding、跨入口去重与报告 | 待实现 | 需 Oracle、来源、E3+ 证据和剩余风险追踪 |
 | W8 | 回归建议 | 待实现 | 只输出建议，不自动修改/提交测试代码 |
 | W9 | 50 场景 Benchmark | 计划中 | 需真实运行、隔离 Ground Truth 和 G0–G3 对照 |
@@ -38,22 +38,22 @@
 | 品牌与 Skill 命名扫描 | PASS | `python3 scripts/check_branding.py`；命名契约包含 4 项 Skill ID 检查 |
 | Catalog/Registry | PASS | `python3 scripts/validate_catalog.py` |
 | Benchmark Manifest | PASS（结构） | `validate_benchmark.py` 明确提示场景未执行 |
-| GitHub Actions | PR #1–#8 实现检查通过（均为草稿） | 原 Run `44300382541` 因错误 JSON key 失败；PR #1/#2/#3/#4/#5/#6/#7/#8 最终代码 Run `44304702509` / `44438620887` / `44443870587` / `44446002412` / `44448388986` / `44450205158` / `44452742738` / `44455794738` 均成功。PR #3 文档同步 Run `44444315594`、ID 对齐 Run `44444585372` 也成功。PR #3 为 R2、PR #4–#8 为 R3，仍分别需要独立质量/安全审查 |
+| GitHub Actions | PR #1–#9 实现检查通过（均为草稿） | 原 Run `44300382541` 因错误 JSON key 失败；PR #1/#2/#3/#4/#5/#6/#7/#8/#9 最终代码 Run `44304702509` / `44438620887` / `44443870587` / `44446002412` / `44448388986` / `44450205158` / `44452742738` / `44455794738` / `44457678961` 均成功。PR #3 文档同步 Run `44444315594`、ID 对齐 Run `44444585372`，PR #7/#8 文档 Runs `44453393220` / `44456146768` / `44456483137` 均成功。PR #3 为 R2、PR #4–#9 为 R3，仍需独立质量/安全审查 |
 | 单元测试 | PASS，145/145 | Python 3.12；SessionStore 36/36、CheckpointStore 19/19、ActionJournal 定向测试 38/38、ActionJournalStore 10/10、CheckpointReferenceValidator 15/15 |
-| 契约测试 | PASS，77/77 | Python 3.12 + `jsonschema[format-nongpl]==4.26.0`：包含 SessionStore 与 CheckpointStore Schema 集成测试 |
-| 当前核心模块行/分支覆盖率 | PASS，100% / 100% | `bugmaster_core`：1060/1060 语句、428/428 分支；`session_store.py` 320/320 语句、130/130 分支；`checkpoint_store.py` 187/187 语句、60/60 分支；`action_journal.py` 301/301 语句、140/140 分支；`action_journal_store.py` 59/59 语句、10/10 分支；`checkpoint_reference_validator.py` 37/37 语句、20/20 分支。行/分支口径分开报告，不等于业务功能覆盖 |
+| 契约测试 | PASS，78/78 | Python 3.12 + `jsonschema[format-nongpl]==4.26.0`：包含 SessionStore、CheckpointStore Schema 集成测试及 replay gate 负例 |
+| 当前核心模块行/分支覆盖率 | PASS，100% / 100% | `bugmaster_core`：1060/1060 语句、428/428 分支；`session_store.py` 320/320 语句、130/130 分支；`checkpoint_store.py` 187/187 语句、60/60 分支；`action_journal.py` 301/301 语句、140/140 分支；`action_journal_store.py` 59/59 语句、10/10 分支；`checkpoint_reference_validator.py` 37/37 语句、20/20 分支。行/分支口径分开报告，不等于业务功能覆盖；replay gate helper 由合同测试单独覆盖 |
 | 业务功能覆盖率 >60% | 未达成 | 目前没有真实业务执行证据 |
 | 核心 Happy / Negative / Edge | 未达成 | 需每个核心功能有三类实际通过证据 |
 | Release | No-Go | 全量功能、真实 Benchmark、双宿主和独立审批均未完成 |
 
-本轮使用生成的核心覆盖 JSON 运行 `python3.12 scripts/quality_gate.py --mode release --coverage /private/tmp/bugmaster-reference-full-coverage.json`，结果仍为 No-Go：功能清单未冻结、真实功能覆盖未超过 60%，核心功能 Happy/Negative/Edge 执行矩阵缺证据。W6 本地状态机单测不作为真实业务功能执行证据。Benchmark 脚本仅验证清单结构，未运行 50 个场景。
+本轮使用生成的核心覆盖 JSON 运行 `python3.12 scripts/quality_gate.py --mode release --coverage /private/tmp/bugmaster-replay-gate-coverage.json`，结果仍为 No-Go：功能清单未冻结、真实功能覆盖未超过 60%，核心功能 Happy/Negative/Edge 执行矩阵缺证据。W6 本地状态机单测不作为真实业务功能执行证据。Benchmark 脚本仅验证清单结构，未运行 50 个场景。
 
-初始验证命令与实际输出见 [基线验证记录](2026-11-18_INITIAL_BASELINE_VERIFICATION_ZH.md)。各开发切片的 RED/GREEN/REFACTOR/VERIFY 证据见 [范围与风险门禁](2026-11-18_SCOPE_GATE_TDD_ZH.md)、[OpenAPI 发现](2026-11-18_OPENAPI_DISCOVERY_TDD_ZH.md)、[Scope Schema](2026-11-18_SCOPE_SCHEMA_TDD_ZH.md)、[Approval 与 Action Schema](2026-11-18_APPROVAL_ACTION_SCHEMA_TDD_ZH.md)、[Session Schema](2026-11-19_SESSION_SCHEMA_TDD_ZH.md)、[R2 门禁](2026-11-18_R2_GATE_TDD_ZH.md)、[Session Revision 持久化](2026-11-19_SESSION_REVISION_STORE_TDD_ZH.md)、[Checkpoint 持久化](2026-11-19_CHECKPOINT_STORE_TDD_ZH.md)、[Journal 前缀核验](2026-11-19_JOURNAL_PREFIX_MATCH_TDD_ZH.md)、[Checkpoint 跨存储引用校验](2026-11-19_CHECKPOINT_REFERENCE_VALIDATION_TDD_ZH.md)、[Journal 稳定身份绑定](2026-11-19_JOURNAL_ID_BINDING_TDD_ZH.md) 和 [Journal 路径解析](2026-11-19_JOURNAL_PATH_RESOLUTION_TDD_ZH.md)。
+初始验证命令与实际输出见 [基线验证记录](2026-11-18_INITIAL_BASELINE_VERIFICATION_ZH.md)。各开发切片的 RED/GREEN/REFACTOR/VERIFY 证据见 [范围与风险门禁](2026-11-18_SCOPE_GATE_TDD_ZH.md)、[OpenAPI 发现](2026-11-18_OPENAPI_DISCOVERY_TDD_ZH.md)、[Scope Schema](2026-11-18_SCOPE_SCHEMA_TDD_ZH.md)、[Approval 与 Action Schema](2026-11-18_APPROVAL_ACTION_SCHEMA_TDD_ZH.md)、[Session Schema](2026-11-19_SESSION_SCHEMA_TDD_ZH.md)、[R2 门禁](2026-11-18_R2_GATE_TDD_ZH.md)、[Session Revision 持久化](2026-11-19_SESSION_REVISION_STORE_TDD_ZH.md)、[Checkpoint 持久化](2026-11-19_CHECKPOINT_STORE_TDD_ZH.md)、[Journal 前缀核验](2026-11-19_JOURNAL_PREFIX_MATCH_TDD_ZH.md)、[Checkpoint 跨存储引用校验](2026-11-19_CHECKPOINT_REFERENCE_VALIDATION_TDD_ZH.md)、[Journal 稳定身份绑定](2026-11-19_JOURNAL_ID_BINDING_TDD_ZH.md)、[Journal 路径解析](2026-11-19_JOURNAL_PATH_RESOLUTION_TDD_ZH.md) 和 [回放门禁 fail-closed](2026-11-19_REPLAY_GATE_FAIL_CLOSED_TDD_ZH.md)。
 
 11 个独立包的离线构建/闭包/摘要核验见 [Standalone 打包验证记录](2026-11-18_STANDALONE_PACKAGING_VERIFY_ZH.md)。
 
 ## 执行顺序
 
 1. 运行基线静态检查、单元/契约测试与当前质量门禁，记录真实输出。
-2. 继续 W6：使 Journal 文件位置由 Session 身份与 `journalId` 确定性解析，再处理预算对账与可信只读恢复；每个切片先写并运行失败测试，再实现最小代码。
+2. 继续 W6：实现可信只读副作用对账与恢复授权；预算计数必须先有可验证的消费口径，不能从现有字段臆断计数时点；每个切片先写并运行失败测试，再实现最小代码。
 3. 每一轮更新本矩阵和独立中文 TDD 记录；不得将内部纵向切片作为缩水 MVP 对外发布。
