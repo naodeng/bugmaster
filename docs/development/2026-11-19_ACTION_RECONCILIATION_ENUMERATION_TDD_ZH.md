@@ -82,6 +82,8 @@ PYTHONDONTWRITEBYTECODE=1 python3.12 -m unittest discover -s tests/unit -p 'test
 
 本轮测试提交：`605297156e006e9b6f7f9aacccb4755bc820d62b`。其中包含测试、TDD 记录和进度状态更新；本地全量验证在该测试内容提交前运行，随后只修改了中文证据的命令和路径记录。
 
+合入 PR #8 覆盖边界测试后的全量验证基于提交 `301c7e79ab325a64d2bc935131900beb6bdc530d`：198 项单测、78 项契约和 1196/1196 语句、474/474 分支均通过。随后仅同步 PR #8 的中文证据提交 `0965dd876ccb00c90877fe483da7b4d8fd8c537c`；未再修改代码或测试，`git diff --check` 通过。GitHub Actions 将在该 head 推送后重跑。
+
 | 检查 | 命令 / 结果 |
 |---|---|
 | Journal/Session/Checkpoint 崩溃恢复 | `/private/tmp/bugmaster-review-venv/bin/python -m unittest tests.unit.test_action_journal_crash_recovery tests.unit.test_store_crash_recovery -v`：21/21 PASS；包含 10 个 Journal、5 个 Session、4 个 Checkpoint 进程退出点 |
