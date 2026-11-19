@@ -48,3 +48,19 @@
 ## 未覆盖能力
 
 没有验证 Checkpoint 与 SessionStore 中实际 Session revision 的一致性，没有核对 Checkpoint Journal head 对应的真实事件前缀，没有从 Checkpoint 恢复状态，也没有重新授权或预算对账。未运行崩溃断点注入、长时间多进程竞争、Windows、真实 API/Browser、双宿主或 50 个 Benchmark 场景。整体 Release 维持 **No-Go**；R3 变更需独立安全审查后再合并。
+
+## 交叉审核修复（PR #4）
+
+### RED
+
+新增 `tests/unit/test_checkpoint_store.py` 用例，先对原实现运行：22 项中 3 项失败，分别证实读取会沿 `sessions/` 符号链接访问另一存储根、只读锁文件不能按只读方式读取且读取会改权限、构造后切换工作目录会改变相对根路径解析。
+
+### GREEN / REFACTOR
+
+- `CheckpointStore` 在构造时将根路径转为绝对路径，避免进程工作目录变化后存储身份漂移。
+- 只读路径对根目录、`sessions/`、Session 目录和 `checkpoints/` 使用 `lstat` 校验；拒绝软链接及非目录路径。共享锁以只读方式打开并使用 `LOCK_SH`，不创建锁文件，也不更改其权限；写入路径仍以独占锁串行化并设置私有权限。
+- 手工构造损坏存储的测试夹具现在显式创建 Session 锁文件，保持测试符合持久化布局。
+
+### VERIFY
+
+实现提交：`af9a92c059eccaf0ffb3e2dac607b29a0ff2b848`。修复后证据：CheckpointStore 定向测试 22/22 PASS；全单元 127/127 PASS；全契约 77/77 PASS；`bugmaster_core` 行覆盖 1017/1017（100%）、分支覆盖 414/414（100%）；`git diff --check` PASS。运行环境为 macOS/POSIX、Python 3.12.16、coverage.py 7.13.3、`jsonschema[format-nongpl]==4.26.0`，测试依赖安装于 `/private/tmp/bugmaster-review-venv`。本次没有新增安全测试目录或报告；Release 门禁仍按上文记录为 No-Go。
