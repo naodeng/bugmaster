@@ -4,7 +4,7 @@
 **Workstream / 义务：** W1 数据契约、W6 安全恢复；`TDD-CON-014` / `F-RECOVERY` 的结构前置条件  
 **风险：** R2（Session 保存授权引用与预算计数，错误契约可能影响恢复边界）  
 **实现提交：** `aaa5564964c85f8d8a1f61fe693f11deea151eec`  
-**状态：** Session 结构 Schema 与 9 项契约测试本地通过；不包含 Session 持久化或可信恢复逻辑。远端 PR 检查待触发；独立质量审查前不得合并。
+**状态：** Session 结构 Schema 与 9 项契约测试本地通过；PR #2 Actions Run `44438620887` 在提交 `cb7d5661b887ed746e87a7ee95fb73ad8a7c9052` 全步骤通过。不包含 Session 持久化或可信恢复逻辑；独立质量审查前不得合并。
 
 ## 需求与 Oracle
 
@@ -45,6 +45,7 @@ PYTHONPATH=/private/tmp/bugmaster-jsonschema python3.12 -m unittest discover -s 
 | 全单元 | `python3.12 -m unittest discover -s tests/unit -v`：56/56 PASS |
 | 全契约 | `PYTHONPATH=/private/tmp/bugmaster-jsonschema python3.12 -m unittest discover -s tests/contracts -v`：73/73 PASS |
 | 品牌 / Catalog / Benchmark | `scripts/check_branding.py`、`scripts/validate_catalog.py`：PASS；`scripts/validate_benchmark.py`：结构 PASS，场景未执行 |
+| GitHub Actions | [Run `44438620887`](https://github.com/naodeng/bugmaster/actions/runs/44438620887)，提交 `cb7d5661b887ed746e87a7ee95fb73ad8a7c9052`：所有步骤 PASS，包括单测、契约、coverage JSON 精确行数断言、Catalog、Benchmark 结构和品牌扫描 |
 | Release Gate | `scripts/quality_gate.py --mode release --coverage /private/tmp/bugmaster-core-coverage.json`：按预期 NO-GO；功能清单未冻结、业务覆盖率未超过 60%、核心功能 Happy/Negative/Edge 证据缺失 |
 | 本地 Coverage 工具 | 当前隔离环境没有安装 `coverage` 模块；未修改 Python 生产代码。基线远端 Run `44304702509` 曾对 `bugmaster_core` 执行精确行覆盖率检查并通过；本分支新契约的远端运行待核验 |
 
