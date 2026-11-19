@@ -1,4 +1,5 @@
 import copy
+import fcntl
 import json
 import os
 import stat
@@ -584,6 +585,200 @@ class SessionStoreTests(unittest.TestCase):
             with self.assertRaises(SessionCorruptionError):
                 linked.read_latest()
 
+    def test_read_latest_uses_the_directory_that_owns_the_acquired_lock(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            store = self.make_store(base / "store")
+            original = _valid_session()
+            original["actionBudget"]["consumedActions"] = 12
+            store.create(original)
+
+            attacker_store = self.make_store(base / "attacker")
+            attacker = _valid_session()
+            attacker["actionBudget"]["consumedActions"] = 0
+            attacker_store.create(attacker)
+
+            sessions_dir = store._sessions_dir
+            moved_sessions_dir = base / "store-sessions"
+            real_flock = fcntl.flock
+            swapped = False
+
+            def swap_after_lock(fd, operation):
+                nonlocal swapped
+                real_flock(fd, operation)
+                if operation == fcntl.LOCK_SH and not swapped:
+                    sessions_dir.rename(moved_sessions_dir)
+                    sessions_dir.symlink_to(
+                        attacker_store._sessions_dir, target_is_directory=True
+                    )
+                    swapped = True
+
+            with patch("bugmaster_core.session_store.fcntl.flock", side_effect=swap_after_lock):
+                result = store.read_latest()
+
+            self.assertTrue(swapped)
+            self.assertEqual(result["actionBudget"]["consumedActions"], 12)
+
+    def test_head_binds_every_historical_revision(self):
+        _, _, SessionCorruptionError = _session_store_types(self)
+        with tempfile.TemporaryDirectory() as directory:
+            store = self.make_store(directory)
+            first = _valid_session()
+            first["actionBudget"]["consumedActions"] = 5
+            store.create(first)
+            second = _next_revision(
+                first,
+                status="ready",
+                actionBudget={"maxActions": 20, "consumedActions": 7},
+            )
+            store.append_revision(second, expected_revision=1)
+
+            revision_one = store._revisions_dir / "00000001.json"
+            rewritten = json.loads(revision_one.read_text(encoding="utf-8"))
+            rewritten["actionBudget"]["consumedActions"] = 0
+            revision_one.write_text(
+                json.dumps(
+                    rewritten, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+                ) + "\n",
+                encoding="utf-8",
+            )
+
+            with self.assertRaises(SessionCorruptionError):
+                store.read_latest()
+            with self.assertRaises(SessionCorruptionError):
+                store.read_revision(1)
+
+    def test_uncommitted_revision_after_head_write_failure_is_recoverable(self):
+        SessionStore, SessionStoreError, _ = _session_store_types(self)
+        with tempfile.TemporaryDirectory() as directory:
+            store = SessionStore(directory, "session-1", _accept_session)
+            first = _valid_session()
+            store.create(first)
+            second = _next_revision(first, status="ready")
+
+            def fail_head_write(*args, **kwargs):
+                raise SessionStoreError("head publication failed")
+
+            with patch.object(store, "_write_head_locked", side_effect=fail_head_write):
+                with self.assertRaises(SessionStoreError):
+                    store.append_revision(second, expected_revision=1)
+
+            self.assertEqual(store.read_latest(), first)
+            self.assertEqual(
+                store.append_revision(second, expected_revision=1), second
+            )
+            self.assertEqual(store.read_latest(), second)
+
+    def test_constructor_rejects_unresolvable_storage_root(self):
+        _, SessionStoreError, _ = _session_store_types(self)
+        with tempfile.TemporaryDirectory() as directory:
+            with patch.object(Path, "resolve", side_effect=RuntimeError("symlink loop")):
+                with self.assertRaises(SessionStoreError):
+                    self.make_store(Path(directory) / "store")
+
+    def test_parent_symlink_retarget_does_not_redirect_existing_store(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            first_target = base / "first-target"
+            second_target = base / "second-target"
+            first_target.mkdir()
+            second_target.mkdir()
+            alias = base / "alias"
+            alias.symlink_to(first_target, target_is_directory=True)
+            store = self.make_store(alias / "session-data")
+            store.create(_valid_session())
+
+            alias.unlink()
+            alias.symlink_to(second_target, target_is_directory=True)
+
+            self.assertEqual(store.read_latest(), _valid_session())
+            self.assertTrue((first_target / "session-data" / "sessions").is_dir())
+            self.assertFalse((second_target / "session-data").exists())
+
+    def test_read_lock_rejects_fifo_without_blocking(self):
+        _, SessionStoreError, _ = _session_store_types(self)
+        with tempfile.TemporaryDirectory() as directory:
+            store = self.make_store(directory)
+            store.create(_valid_session())
+            store._lock_path.unlink()
+            os.mkfifo(store._lock_path, 0o600)
+            real_open = os.open
+
+            def require_nonblocking_lock(path, flags, *args, **kwargs):
+                if path == "session.lock":
+                    self.assertTrue(flags & os.O_NONBLOCK)
+                return real_open(path, flags, *args, **kwargs)
+
+            with patch(
+                "bugmaster_core.session_store.os.open",
+                side_effect=require_nonblocking_lock,
+            ):
+                with self.assertRaises(SessionStoreError):
+                    store.read_latest()
+
+    def test_open_storage_returns_absent_when_sessions_or_session_directory_is_missing(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "root"
+            root.mkdir()
+            store = self.make_store(root)
+            self.assertIsNone(store.read_latest())
+
+            (root / "sessions").mkdir()
+            self.assertIsNone(store.read_latest())
+
+    def test_ensure_directories_creates_the_private_storage_tree(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = self.make_store(Path(directory) / "store")
+            store._ensure_directories()
+            self.assertTrue(store._revisions_dir.is_dir())
+
+    def test_read_rejects_nonregular_revision_file(self):
+        _, _, SessionCorruptionError = _session_store_types(self)
+        with tempfile.TemporaryDirectory() as directory:
+            store = self.make_store(directory)
+            store.create(_valid_session())
+            revision_one = store._revisions_dir / "00000001.json"
+            (store._revisions_dir / "00000002.json").symlink_to(revision_one)
+
+            with self.assertRaises(SessionCorruptionError):
+                store.read_latest()
+
+    def test_read_rejects_nonsequential_uncommitted_revision(self):
+        _, _, SessionCorruptionError = _session_store_types(self)
+        with tempfile.TemporaryDirectory() as directory:
+            store = self.make_store(directory)
+            store.create(_valid_session())
+            (store._revisions_dir / "00000003.json").write_bytes(b"{}\n")
+            os.chmod(store._revisions_dir / "00000003.json", 0o600)
+
+            with self.assertRaisesRegex(
+                SessionCorruptionError, "invalid uncommitted revisions"
+            ):
+                store.read_latest()
+
+    def test_read_rejects_uncommitted_revision_with_invalid_transition(self):
+        _, _, SessionCorruptionError = _session_store_types(self)
+        with tempfile.TemporaryDirectory() as directory:
+            store = self.make_store(directory)
+            first = _valid_session()
+            first["actionBudget"]["consumedActions"] = 5
+            store.create(first)
+            pending = _next_revision(
+                first,
+                status="ready",
+                actionBudget={"maxActions": 20, "consumedActions": 0},
+            )
+            payload = json.dumps(
+                pending, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+            ).encode("utf-8")
+            (store._revisions_dir / "00000002.json").write_bytes(payload + b"\n")
+            os.chmod(store._revisions_dir / "00000002.json", 0o600)
+
+            with self.assertRaisesRegex(
+                SessionCorruptionError, "uncommitted Session revision is inconsistent"
+            ):
+                store.read_latest()
+
     def test_read_only_reader_does_not_require_write_permission_on_lock(self):
         _, _, _ = _session_store_types(self)
         with tempfile.TemporaryDirectory() as directory:
@@ -679,7 +874,7 @@ class SessionStoreTests(unittest.TestCase):
             real_open = os.open
 
             def fail_head_open(path, flags, *args, **kwargs):
-                if Path(path) == store._head_path:
+                if path == "session.head":
                     raise OSError("head unavailable")
                 return real_open(path, flags, *args, **kwargs)
 
@@ -692,14 +887,14 @@ class SessionStoreTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             store = self.make_store(directory)
             store.create(_valid_session())
-            original_lstat = Path.lstat
+            real_open = os.open
 
-            def fail_revision_lstat(path):
-                if path == store._revisions_dir:
+            def fail_revision_open(path, flags, *args, **kwargs):
+                if path == "revisions":
                     raise OSError("revision path unavailable")
-                return original_lstat(path)
+                return real_open(path, flags, *args, **kwargs)
 
-            with patch.object(Path, "lstat", fail_revision_lstat):
+            with patch("bugmaster_core.session_store.os.open", side_effect=fail_revision_open):
                 with self.assertRaises(SessionCorruptionError):
                     store.read_latest()
 
@@ -709,11 +904,11 @@ class SessionStoreTests(unittest.TestCase):
             store = self.make_store(directory)
             real_replace = os.replace
 
-            def fail_head_replace(source, destination):
-                if Path(destination) == store._head_path:
-                    Path(source).unlink()
+            def fail_head_replace(source, destination, **kwargs):
+                if destination == "session.head":
+                    os.unlink(source, dir_fd=kwargs["src_dir_fd"])
                     raise OSError("head publication failed")
-                return real_replace(source, destination)
+                return real_replace(source, destination, **kwargs)
 
             with patch("bugmaster_core.session_store.os.replace", side_effect=fail_head_replace):
                 with self.assertRaises(SessionStoreError):
@@ -722,20 +917,30 @@ class SessionStoreTests(unittest.TestCase):
             self.assertEqual(list(store._session_dir.glob(".session-head-*")), [])
 
     def test_revision_head_mode_failure_cleans_up_open_file_and_temporary_file(self):
+        import bugmaster_core.session_store as session_store_module
+
         _, SessionStoreError, _ = _session_store_types(self)
         with tempfile.TemporaryDirectory() as directory:
             store = self.make_store(directory)
+            real_create_temp = session_store_module._create_temporary_file
             real_fchmod = os.fchmod
-            calls = 0
+            head_fds = set()
+
+            def track_temp_file(directory_fd, prefix):
+                fd, name = real_create_temp(directory_fd, prefix)
+                if prefix == ".session-head-":
+                    head_fds.add(fd)
+                return fd, name
 
             def fail_head_mode(fd, mode):
-                nonlocal calls
-                calls += 1
-                if calls == 3:
+                if fd in head_fds:
                     raise OSError("head mode unavailable")
                 return real_fchmod(fd, mode)
 
-            with patch("bugmaster_core.session_store.os.fchmod", side_effect=fail_head_mode):
+            with patch(
+                "bugmaster_core.session_store._create_temporary_file",
+                side_effect=track_temp_file,
+            ), patch("bugmaster_core.session_store.os.fchmod", side_effect=fail_head_mode):
                 with self.assertRaises(SessionStoreError):
                     store.create(_valid_session())
 
@@ -782,7 +987,7 @@ class SessionStoreTests(unittest.TestCase):
             real_open = os.open
 
             def fail_lock_open(path, flags, *args, **kwargs):
-                if Path(path) == store._lock_path:
+                if path == "session.lock":
                     raise OSError("lock unavailable")
                 return real_open(path, flags, *args, **kwargs)
 
@@ -813,14 +1018,19 @@ class SessionStoreTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             store = self.make_store(directory)
             store.create(_valid_session())
-            original_iterdir = Path.iterdir
+            revision_stat = store._revisions_dir.stat()
+            real_listdir = os.listdir
 
-            def fail_revision_listing(path):
-                if path == store._revisions_dir:
+            def fail_revision_listing(directory_fd):
+                directory_stat = os.fstat(directory_fd)
+                if (
+                    directory_stat.st_dev == revision_stat.st_dev
+                    and directory_stat.st_ino == revision_stat.st_ino
+                ):
                     raise OSError("listing failed")
-                return original_iterdir(path)
+                return real_listdir(directory_fd)
 
-            with patch.object(Path, "iterdir", fail_revision_listing):
+            with patch("bugmaster_core.session_store.os.listdir", side_effect=fail_revision_listing):
                 with self.assertRaises(SessionCorruptionError):
                     store.read_latest()
 
@@ -846,6 +1056,22 @@ class SessionStoreTests(unittest.TestCase):
                 with self.assertRaises(SessionCorruptionError):
                     store.read_latest()
 
+    def test_revision_stat_failure_is_reported_as_corruption(self):
+        _, _, SessionCorruptionError = _session_store_types(self)
+        with tempfile.TemporaryDirectory() as directory:
+            store = self.make_store(directory)
+            store.create(_valid_session())
+            real_stat = os.stat
+
+            def fail_revision_stat(path, *args, **kwargs):
+                if str(path).endswith(".json"):
+                    raise OSError("revision metadata unavailable")
+                return real_stat(path, *args, **kwargs)
+
+            with patch("bugmaster_core.session_store.os.stat", side_effect=fail_revision_stat):
+                with self.assertRaises(SessionCorruptionError):
+                    store.read_latest()
+
     def test_revision_open_failure_is_reported_as_corruption(self):
         _, _, SessionCorruptionError = _session_store_types(self)
         with tempfile.TemporaryDirectory() as directory:
@@ -854,7 +1080,7 @@ class SessionStoreTests(unittest.TestCase):
             real_open = os.open
 
             def fail_revision_open(path, flags, *args, **kwargs):
-                if Path(path).parent == store._revisions_dir:
+                if str(path).endswith(".json"):
                     raise OSError("revision unavailable")
                 return real_open(path, flags, *args, **kwargs)
 
@@ -868,17 +1094,25 @@ class SessionStoreTests(unittest.TestCase):
         _, SessionStoreError, SessionCorruptionError = _session_store_types(self)
         with tempfile.TemporaryDirectory() as directory:
             store = self.make_store(directory)
+            real_create_temp = session_store_module._create_temporary_file
             real_fchmod = os.fchmod
-            calls = 0
+            revision_fds = set()
+
+            def track_temp_file(directory_fd, prefix):
+                fd, name = real_create_temp(directory_fd, prefix)
+                if prefix == ".session-revision-":
+                    revision_fds.add(fd)
+                return fd, name
 
             def fail_revision_mode(fd, mode):
-                nonlocal calls
-                calls += 1
-                if calls == 2:
+                if fd in revision_fds:
                     raise OSError("cannot secure revision")
                 return real_fchmod(fd, mode)
 
-            with patch("bugmaster_core.session_store.os.fchmod", side_effect=fail_revision_mode):
+            with patch(
+                "bugmaster_core.session_store._create_temporary_file",
+                side_effect=track_temp_file,
+            ), patch("bugmaster_core.session_store.os.fchmod", side_effect=fail_revision_mode):
                 with self.assertRaises(SessionStoreError):
                     store.create(_valid_session())
             self.assertEqual(list(store._session_dir.glob(".session-revision-*")), [])
@@ -900,14 +1134,141 @@ class SessionStoreTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             store = self.make_store(directory)
 
-            def unlink_then_fail(source, _destination):
-                Path(source).unlink()
+            def unlink_then_fail(source, _destination, **kwargs):
+                os.unlink(source, dir_fd=kwargs["src_dir_fd"])
                 raise OSError("link failed after removing temporary file")
 
             with patch("bugmaster_core.session_store.os.link", side_effect=unlink_then_fail):
                 with self.assertRaises(SessionStoreError):
                     store.create(_valid_session())
             self.assertEqual(list(store._session_dir.glob(".session-revision-*")), [])
+
+    def test_directory_descriptor_helpers_fail_closed_on_open_errors_and_races(self):
+        import bugmaster_core.session_store as module
+
+        SessionStore, SessionStoreError, SessionCorruptionError = _session_store_types(self)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            real_open = os.open
+
+            def fail_anchor(path, flags, *args, **kwargs):
+                if path == root.anchor:
+                    raise OSError("root unavailable")
+                return real_open(path, flags, *args, **kwargs)
+
+            with patch("bugmaster_core.session_store.os.open", side_effect=fail_anchor):
+                with self.assertRaises(SessionStoreError):
+                    module._open_directory_path(
+                        root / "store",
+                        create=True,
+                        error_type=SessionStoreError,
+                        label="Session root",
+                    )
+
+            real_mkdir = os.mkdir
+
+            def create_before_mkdir_returns_error(name, mode=0o777, *, dir_fd=None):
+                real_mkdir(name, mode, dir_fd=dir_fd)
+                raise FileExistsError(name)
+
+            with patch(
+                "bugmaster_core.session_store.os.mkdir",
+                side_effect=create_before_mkdir_returns_error,
+            ):
+                fd = module._open_directory_path(
+                    root.resolve(strict=False) / "raced",
+                    create=True,
+                    error_type=SessionStoreError,
+                    label="Session root",
+                )
+                os.close(fd)
+
+            parent = root / "parent"
+            parent.mkdir()
+            parent_fd = os.open(parent, os.O_RDONLY | os.O_DIRECTORY)
+            try:
+                with patch(
+                    "bugmaster_core.session_store.os.mkdir",
+                    side_effect=create_before_mkdir_returns_error,
+                ):
+                    child_fd = module._open_child_directory(
+                        parent_fd,
+                        "raced-child",
+                        create=True,
+                        error_type=SessionStoreError,
+                        label="Session",
+                    )
+                    os.close(child_fd)
+
+                real_open_child = os.open
+                open_calls = 0
+
+                def fail_after_child_creation(name, flags, *args, **kwargs):
+                    nonlocal open_calls
+                    if name == "failed-child":
+                        open_calls += 1
+                        if open_calls == 1:
+                            raise FileNotFoundError(name)
+                        raise OSError("directory open failed")
+                    return real_open_child(name, flags, *args, **kwargs)
+
+                with patch(
+                    "bugmaster_core.session_store.os.open",
+                    side_effect=fail_after_child_creation,
+                ):
+                    with self.assertRaises(SessionStoreError):
+                        module._open_child_directory(
+                            parent_fd,
+                            "failed-child",
+                            create=True,
+                            error_type=SessionStoreError,
+                            label="Session",
+                        )
+
+                real_fchmod = os.fchmod
+
+                def fail_directory_mode(fd, mode):
+                    raise OSError("directory mode unavailable")
+
+                with patch("bugmaster_core.session_store.os.fchmod", side_effect=fail_directory_mode):
+                    with self.assertRaises(SessionCorruptionError):
+                        module._open_child_directory(
+                            parent_fd,
+                            "raced-child",
+                            create=True,
+                            error_type=SessionCorruptionError,
+                            label="Session",
+                            private=True,
+                        )
+                self.assertIsNotNone(real_fchmod)
+            finally:
+                os.close(parent_fd)
+
+    def test_temporary_file_name_collision_limit_fails(self):
+        import bugmaster_core.session_store as module
+
+        with tempfile.TemporaryDirectory() as directory:
+            directory_fd = os.open(directory, os.O_RDONLY | os.O_DIRECTORY)
+            try:
+                attempts = 0
+
+                def report_collision(path, flags, mode=0o777, *, dir_fd=None):
+                    nonlocal attempts
+                    attempts += 1
+                    raise FileExistsError(path)
+
+                with patch(
+                    "bugmaster_core.session_store.secrets.token_hex",
+                    return_value="repeat",
+                ), patch(
+                    "bugmaster_core.session_store.os.open",
+                    side_effect=report_collision,
+                ):
+                    with self.assertRaises(FileExistsError):
+                        module._create_temporary_file(directory_fd, ".tmp-")
+                self.assertEqual(attempts, 8)
+            finally:
+                os.close(directory_fd)
 
 
 if __name__ == "__main__":
