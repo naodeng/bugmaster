@@ -167,6 +167,32 @@ class SessionStoreTests(unittest.TestCase):
                 store.append_revision(second, expected_revision=1)
             self.assertEqual(store.read_latest(), first)
 
+    def test_scope_history_rejects_duplicate_and_backward_revisions(self):
+        _, SessionStoreError, _ = _session_store_types(self)
+        duplicate = _valid_session()
+        duplicate["approvalRefs"] = []
+        duplicate["scopeHistory"] = [
+            {"scopeId": "scope-1", "revision": 1},
+            {"scopeId": "scope-1", "revision": 1},
+        ]
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertRaises(SessionStoreError):
+                self.make_store(directory).create(duplicate)
+
+        with tempfile.TemporaryDirectory() as directory:
+            store = self.make_store(directory)
+            first = _valid_session()
+            first["approvalRefs"] = []
+            first["scopeHistory"] = [{"scopeId": "scope-1", "revision": 2}]
+            store.create(first)
+            backwards = _next_revision(
+                first,
+                scopeHistory=first["scopeHistory"]
+                + [{"scopeId": "scope-1", "revision": 1}],
+            )
+            with self.assertRaises(SessionStoreError):
+                store.append_revision(backwards, expected_revision=1)
+
     def test_scope_revision_history_cannot_be_removed_or_reordered(self):
         _, SessionStoreError, _ = _session_store_types(self)
         with tempfile.TemporaryDirectory() as directory:
@@ -427,6 +453,44 @@ class SessionStoreTests(unittest.TestCase):
             for revision in (True, 0, -1, "1"):
                 with self.subTest(revision=revision), self.assertRaises(SessionStoreError):
                     store.read_revision(revision)
+
+    def test_new_budget_counter_starts_at_zero_with_new_scope(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = self.make_store(directory)
+            first = _valid_session()
+            first["actionBudget"] = {}
+            store.create(first)
+            second = _next_revision(
+                first,
+                scopeHistory=first["scopeHistory"]
+                + [{"scopeId": "scope-2", "revision": 1}],
+                actionBudget={"maxActions": 10, "consumedActions": 0},
+            )
+
+            self.assertEqual(store.append_revision(second, expected_revision=1), second)
+            self.assertEqual(store.read_latest(), second)
+
+    def test_storage_falls_back_when_nofollow_open_flag_is_unavailable(self):
+        import bugmaster_core.session_store as session_store_module
+
+        real_hasattr = hasattr
+
+        def without_nofollow(value, name):
+            if value is session_store_module.os and name == "O_NOFOLLOW":
+                return False
+            return real_hasattr(value, name)
+
+        with tempfile.TemporaryDirectory() as directory:
+            store = self.make_store(directory)
+            document = _valid_session()
+            with patch.object(
+                session_store_module,
+                "hasattr",
+                side_effect=without_nofollow,
+                create=True,
+            ):
+                store.create(document)
+                self.assertEqual(store.read_latest(), document)
 
     def test_new_budget_counter_requires_new_scope_and_starts_at_zero(self):
         _, SessionStoreError, _ = _session_store_types(self)

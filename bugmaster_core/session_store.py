@@ -184,6 +184,7 @@ class SessionStore:
             raise error_type("Session action budget must be an object")
 
         scope_keys = set()
+        latest_scope_revisions = {}
         for reference in scope_history:
             if not isinstance(reference, dict):
                 raise error_type("Scope revision reference must be an object")
@@ -196,7 +197,15 @@ class SessionStore:
                 or scope_revision < 1
             ):
                 raise error_type("Scope revision reference is invalid")
-            scope_keys.add((scope_id, scope_revision))
+            scope_key = (scope_id, scope_revision)
+            previous_scope_revision = latest_scope_revisions.get(scope_id)
+            if scope_key in scope_keys or (
+                previous_scope_revision is not None
+                and scope_revision <= previous_scope_revision
+            ):
+                raise error_type("Scope revision history must be unique and chronological")
+            scope_keys.add(scope_key)
+            latest_scope_revisions[scope_id] = scope_revision
 
         for reference in approval_refs:
             if not isinstance(reference, dict):
