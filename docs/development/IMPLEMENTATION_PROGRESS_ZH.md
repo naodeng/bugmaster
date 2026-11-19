@@ -46,7 +46,7 @@
 | 核心 Happy / Negative / Edge | 未达成 | 需每个核心功能有三类实际通过证据 |
 | Release | No-Go | 全量功能、真实 Benchmark、双宿主和独立审批均未完成 |
 
-本轮使用生成的核心覆盖 JSON 运行 `python3.12 scripts/quality_gate.py --mode release --coverage /private/tmp/bugmaster-replay-gate-coverage.json`，结果仍为 No-Go：功能清单未冻结、真实功能覆盖未超过 60%，核心功能 Happy/Negative/Edge 执行矩阵缺证据。W6 本地状态机单测不作为真实业务功能执行证据。Benchmark 脚本仅验证清单结构，未运行 50 个场景。
+本轮使用 `/private/tmp/bugmaster-pr10-final-coverage.json` 运行 `scripts/quality_gate.py --mode release`，结果仍为 No-Go：功能清单未冻结、真实功能覆盖未超过 60%，核心功能 Happy/Negative/Edge 执行矩阵缺证据。W6 本地状态机单测不作为真实业务功能执行证据。Benchmark 脚本仅验证清单结构，未运行 50 个场景。
 
 初始验证命令与实际输出见 [基线验证记录](2026-11-18_INITIAL_BASELINE_VERIFICATION_ZH.md)。各开发切片的 RED/GREEN/REFACTOR/VERIFY 证据见 [范围与风险门禁](2026-11-18_SCOPE_GATE_TDD_ZH.md)、[OpenAPI 发现](2026-11-18_OPENAPI_DISCOVERY_TDD_ZH.md)、[Scope Schema](2026-11-18_SCOPE_SCHEMA_TDD_ZH.md)、[Approval 与 Action Schema](2026-11-18_APPROVAL_ACTION_SCHEMA_TDD_ZH.md)、[Session Schema](2026-11-19_SESSION_SCHEMA_TDD_ZH.md)、[R2 门禁](2026-11-18_R2_GATE_TDD_ZH.md)、[Session Revision 持久化](2026-11-19_SESSION_REVISION_STORE_TDD_ZH.md)、[Checkpoint 持久化](2026-11-19_CHECKPOINT_STORE_TDD_ZH.md)、[Journal 前缀核验](2026-11-19_JOURNAL_PREFIX_MATCH_TDD_ZH.md)、[Checkpoint 跨存储引用校验](2026-11-19_CHECKPOINT_REFERENCE_VALIDATION_TDD_ZH.md)、[Journal 稳定身份绑定](2026-11-19_JOURNAL_ID_BINDING_TDD_ZH.md)、[Journal 路径解析](2026-11-19_JOURNAL_PATH_RESOLUTION_TDD_ZH.md)、[回放门禁 fail-closed](2026-11-19_REPLAY_GATE_FAIL_CLOSED_TDD_ZH.md) 和 [Action 待对账枚举与进程崩溃注入](2026-11-19_ACTION_RECONCILIATION_ENUMERATION_TDD_ZH.md)。
 
