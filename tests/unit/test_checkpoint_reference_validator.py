@@ -90,7 +90,7 @@ class CheckpointReferenceValidatorTests(unittest.TestCase):
             root, session_id, _accept_document
         )
         journal_store = ActionJournalStore(root, session_id, "journal-session-1")
-        journal = journal_store.open()
+        journal = journal_store.initialize()
         session_store.create(_valid_session(session_id, journal_id))
         return checkpoint_store, session_store, journal_store, journal
 
@@ -260,9 +260,10 @@ class CheckpointReferenceValidatorTests(unittest.TestCase):
             with self.assertRaises(CheckpointReferenceError):
                 validator.validate("checkpoint-1")
 
-    def test_validator_resolves_journal_from_session_id_and_journal_id(self):
-        CheckpointReferenceError, CheckpointReferenceValidator = _reference_types(self)
+    def test_validator_ignores_a_caller_selected_noncanonical_journal_file(self):
+        _, CheckpointReferenceValidator = _reference_types(self)
         from bugmaster_core.action_journal import ActionJournal
+        from bugmaster_core.action_journal import JournalCorruptionError
         from bugmaster_core.checkpoint_store import CheckpointStore
         from bugmaster_core.session_store import SessionStore
         ActionJournalStore = _journal_store_type(self)
@@ -289,7 +290,7 @@ class CheckpointReferenceValidatorTests(unittest.TestCase):
                 checkpoint_store, session_store, store
             )
 
-            with self.assertRaises(CheckpointReferenceError):
+            with self.assertRaises(JournalCorruptionError):
                 validator.validate("checkpoint-1")
 
     def test_rejects_a_caller_selected_action_journal_instance(self):

@@ -263,7 +263,7 @@ class ActionJournal:
     dispatch; a trusted read-only verifier is not implemented here.
     """
 
-    def __init__(self, path, session_id, journal_id=None):
+    def __init__(self, path, session_id, journal_id=None, *, require_existing=False):
         if not _nonempty(session_id):
             raise JournalError("session ID must be a non-empty string")
         if journal_id is None:
@@ -273,6 +273,7 @@ class ActionJournal:
         self.path = Path(path)
         self.session_id = session_id
         self._journal_id = journal_id
+        self._require_existing = require_existing
         self._prepared_in_process = set()
         self._dispatched_in_process = set()
         self._load_current()
@@ -283,23 +284,34 @@ class ActionJournal:
         return self._journal_id
 
     def _load_current(self):
-        flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+        flags = (
+            os.O_RDONLY
+            | getattr(os, "O_NOFOLLOW", 0)
+            | getattr(os, "O_NONBLOCK", 0)
+        )
         try:
             fd = os.open(str(self.path), flags)
         except FileNotFoundError:
+            if self._require_existing:
+                raise JournalCorruptionError("canonical journal file is missing")
             return [], {}
         except OSError as error:
             raise JournalCorruptionError(
                 "cannot safely open the persisted journal"
             ) from error
+        locked = False
         try:
             if not stat.S_ISREG(os.fstat(fd).st_mode):
                 raise JournalCorruptionError("journal file is not a regular file")
-            fcntl.flock(fd, fcntl.LOCK_EX)
+            fcntl.flock(fd, fcntl.LOCK_SH)
+            locked = True
             return _load_events(fd, self.session_id, self.journal_id)
         finally:
-            fcntl.flock(fd, fcntl.LOCK_UN)
-            os.close(fd)
+            try:
+                if locked:
+                    fcntl.flock(fd, fcntl.LOCK_UN)
+            finally:
+                os.close(fd)
 
     def matches_prefix(self, sequence, head_hash):
         """Return whether sequence and hash identify a validated journal prefix.
@@ -324,7 +336,12 @@ class ActionJournal:
     def _append(self, event_type, action_id, data):
         self.path.parent.mkdir(parents=True, exist_ok=True)
         created = False
-        flags = os.O_RDWR | os.O_APPEND | getattr(os, "O_NOFOLLOW", 0)
+        flags = (
+            os.O_RDWR
+            | os.O_APPEND
+            | getattr(os, "O_NOFOLLOW", 0)
+            | getattr(os, "O_NONBLOCK", 0)
+        )
         try:
             fd = os.open(
                 str(self.path), flags | os.O_CREAT | os.O_EXCL, 0o600
@@ -333,8 +350,12 @@ class ActionJournal:
         except FileExistsError:
             fd = os.open(str(self.path), flags)
 
+        locked = False
         try:
+            if not stat.S_ISREG(os.fstat(fd).st_mode):
+                raise JournalCorruptionError("journal file is not a regular file")
             fcntl.flock(fd, fcntl.LOCK_EX)
+            locked = True
             os.fchmod(fd, 0o600)
             if created:
                 _fsync_directory(self.path.parent)
@@ -367,8 +388,11 @@ class ActionJournal:
             os.fsync(fd)
             return event
         finally:
-            fcntl.flock(fd, fcntl.LOCK_UN)
-            os.close(fd)
+            try:
+                if locked:
+                    fcntl.flock(fd, fcntl.LOCK_UN)
+            finally:
+                os.close(fd)
 
     def prepare(
         self, action_id, intent_digest, scope_revision, risk, approval_ref=None
