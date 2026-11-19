@@ -164,3 +164,11 @@ python -m unittest \
 | GitHub Actions / GitHub 常规 CodeX Review / GitHub Security Review | 本地最终差异尚未推送；推送后须对新 head 重新核实 Actions、常规 review 与 Security review，再决定合并 |
 
 这份本地复审结论不替代新远端 head 的 CI、GitHub review 状态或 Release 级审计。PR #3 保持未合并，直到新 head 的远端门禁与安全审查复核完成。
+
+## GitHub Linux 覆盖率诊断跟进
+
+**日期：** 2026-11-19
+
+PR #3 head `5d398bb761233453c94cfa4d53d932a56e17e866` 的 Actions [Run 44533110359](https://github.com/naodeng/bugmaster/actions/runs/44533110359) 中，156 项单测和 75 项合同测试均通过；Ubuntu 26.04 / Python 3.12 的单元行覆盖率为 1,044/1,045（99.90%），因此 CI 按 100% 门槛失败。macOS 上相同 1,045 行全部覆盖，当前差异表明有一处平台执行路径尚未覆盖。
+
+为让下一次 CI 失败能直接给出文件和未覆盖行，先扩展 `WorkflowCoverageGateTests`，断言失败报告包含缺失行；旧 workflow 在新测试下得到预期 RED。随后更新合同 workflow 的失败信息以输出 `coverage.json` 中各文件的 `missing_lines`，不改变 100% 门槛。`python -m unittest tests.contracts.test_quality_gate -v`：5/5 PASS；`git diff --check`：PASS。该诊断变更推送后，需先从 Ubuntu CI 获取确切行号，再补对应行为测试/执行路径；PR #3 暂不合并。
