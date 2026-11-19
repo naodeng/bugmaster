@@ -89,6 +89,13 @@ elif scenario == "completed-outcome":
     dispatch()
     exit_after_fsync()
     journal.record_outcome("action-1", "completed", "result-1")
+elif scenario == "enumeration":
+    journal.prepare("action-terminal", digest, 1, "R0")
+    journal.mark_dispatched("action-terminal", digest)
+    journal.record_outcome("action-terminal", "completed", "result-terminal")
+    for action_id in ("action-z", "action-a", "action-m"):
+        journal.prepare(action_id, digest, 1, "R0")
+    os._exit(71)
 else:
     raise AssertionError("unknown crash scenario: " + scenario)
 
@@ -184,18 +191,19 @@ class ActionJournalCrashRecoveryTests(unittest.TestCase):
             )
             self._assert_needs_reconciliation(journal_path)
 
-    def test_recovery_can_enumerate_actions_that_need_reconciliation(self):
+    def test_recovery_enumerates_every_unresolved_id_in_journal_order(self):
         from bugmaster_core.action_journal import ActionJournal
 
         with tempfile.TemporaryDirectory() as directory:
             journal_path = self._run_crashed_worker(
-                Path(directory), "dispatched-after-fsync"
+                Path(directory), "enumeration"
             )
             recovered = ActionJournal(
                 journal_path, session_id="session-1", journal_id="journal-1"
             )
             self.assertEqual(
-                recovered.actions_needing_reconciliation(), ("action-1",)
+                recovered.actions_needing_reconciliation(),
+                ("action-z", "action-a", "action-m"),
             )
 
     def test_terminal_action_is_not_listed_for_reconciliation(self):

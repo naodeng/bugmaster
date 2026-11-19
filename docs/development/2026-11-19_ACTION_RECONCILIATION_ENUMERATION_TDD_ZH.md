@@ -5,8 +5,8 @@
 **风险：** R3（恢复诊断；不授权执行）  
 **实现提交：** `8129838d0165115a78bf7435f1cdced7fa3de601`  
 **崩溃注入测试提交：** `72157f7e9d8df73f324d8432555d16e3ac1ef988`
-**PR：** [#10](https://github.com/naodeng/bugmaster/pull/10)，基于 Draft PR #9  
-**状态：** 只读待对账 Action 枚举，以及 Journal/SessionStore/CheckpointStore 进程崩溃注入已本地和 Actions 验证；可信外部核验、恢复授权与真实 API/Browser 执行仍未实现。
+**PR：** [#10](https://github.com/naodeng/bugmaster/pull/10)，基于 PR #9  
+**状态：** 本地交叉审核修复已验证；新提交推送后仍需等待 GitHub Actions。只读待对账 Action 枚举，以及 Journal/SessionStore/CheckpointStore 进程崩溃注入不提供可信外部核验、恢复授权或真实 API/Browser 执行。
 
 ## 需求与边界
 
@@ -63,3 +63,32 @@ PYTHONDONTWRITEBYTECODE=1 python3.12 -m unittest discover -s tests/unit -p 'test
 ## 后续门禁
 
 本切片只让恢复流程枚举本地尚待核查的 Action。它不提供 trusted read-only observer、授权网关、预算与 Journal 对账或安全恢复执行；这些能力仍需真实宿主/目标集成及独立 R3 Security Review。业务功能覆盖、核心三类真实执行证据、50 个 Benchmark、双宿主与 Release 均未因此通过。
+
+## 交叉审核修复补充（2026-11-19）
+
+第二轮跨角色审核复查 PR #1–#10 的当前实现，并逐条核对 PR 评论和可执行测试。PR #3 的 P1「修订目录丢失后静默重建并重置预算」与 PR #4 的 P2「只读读取跟随软链接」均已在对应上游切片修复；PR #1 的覆盖率门禁现拒绝 0/0；PR #7 按 LF 分隔 JSONL，保留合法的 U+2028/U+0085 ID；PR #8 的规范 Journal 缺失会失败关闭，读取器不再创建/改权限，且 FIFO 在非阻塞打开后按非普通文件拒绝。
+
+本 PR 的额外复查发现两处验证缺口。第一，崩溃测试使用 no-op Schema validator 和缺少必需字段的最小文档，不能证明真实契约有效；第二，枚举测试只断言一个未决 ID，截断结果仍可能通过。按 RED 顺序改为加载仓库中版本化 Session/Checkpoint Schema、使用完整有效文档，并断言三个未决 ID 的完整顺序元组。SessionStore 新增「revision 已写入但 `session.head` 尚未提交」的失败关闭断言，以及「head 与目录已同步后」可读回的提交点崩溃断言。
+
+### RED
+
+- 第一次以真实 Schema 校验 Session fixture 时失败：缺少规范生命周期字段；补齐字段、时间戳和预算数据后才通过。
+- PR #3 的 head 锚点进入叠加分支后，两个旧崩溃断言在无 head 的场景收到 `SessionCorruptionError: Session revision head is missing`，证明原先“revision 已链接即可读取”的预期错误；更新为验证缺失提交标记时失败关闭，并增加 head 已提交后的恢复用例。
+- 原枚举恢复场景只包含一个未决 Action，无法识别返回列表被截断；现在先写入多个未决 ID，并断言完整、有序的结果。
+
+### GREEN / VERIFY
+
+环境：隔离克隆 `/private/tmp/bugmaster-review-fixes-20261119`，分支 `codex/recovery-observation`，Python 3.12；测试依赖位于 `/private/tmp/bugmaster-review-venv`。验证的是本地提交，GitHub Actions 尚待推送后运行。
+
+| 检查 | 命令 / 结果 |
+|---|---|
+| Journal/Session/Checkpoint 崩溃恢复 | `/private/tmp/bugmaster-review-venv/bin/python -m unittest tests.unit.test_action_journal_crash_recovery tests.unit.test_store_crash_recovery -v`：21/21 PASS；包含 10 个 Journal、5 个 Session、4 个 Checkpoint 进程退出点 |
+| ActionJournal 与 ActionJournalStore | `/private/tmp/bugmaster-review-venv/bin/python -m unittest tests.unit.test_action_journal tests.unit.test_action_journal_store -v`：64/64 PASS |
+| 全单元与覆盖数据 | `PYTHONDONTWRITEBYTECODE=1 /private/tmp/bugmaster-review-venv/bin/python -m coverage run --branch --source=bugmaster_core --data-file=/private/tmp/bugmaster-pr10-final.coverage -m unittest discover -s tests/unit`：198/198 PASS；`PYTHONDONTWRITEBYTECODE=1 /private/tmp/bugmaster-review-venv/bin/python -m coverage json --data-file=/private/tmp/bugmaster-pr10-final.coverage -o /private/tmp/bugmaster-pr10-final-coverage.json` 生成质量门禁输入 |
+| 全契约 | `PYTHONDONTWRITEBYTECODE=1 /private/tmp/bugmaster-review-venv/bin/python -m unittest discover -s tests/contracts -v`：78/78 PASS |
+| 行 / 分支覆盖 | `PYTHONDONTWRITEBYTECODE=1 /private/tmp/bugmaster-review-venv/bin/python -m coverage report --data-file=/private/tmp/bugmaster-pr10-final.coverage --include='bugmaster_core/*'`：1196/1196 语句、474/474 分支，均为 100%；无排除项 |
+| 品牌 / Catalog / Benchmark | `/private/tmp/bugmaster-review-venv/bin/python scripts/check_branding.py`、`/private/tmp/bugmaster-review-venv/bin/python scripts/validate_catalog.py`、`/private/tmp/bugmaster-review-venv/bin/python scripts/validate_benchmark.py` 均 PASS；Benchmark 仅结构检查，场景未执行 |
+| 发布门禁 | `PYTHONDONTWRITEBYTECODE=1 /private/tmp/bugmaster-review-venv/bin/python scripts/quality_gate.py --mode release --coverage /private/tmp/bugmaster-pr10-final-coverage.json` 按预期 NO-GO：义务清单未冻结，真实功能覆盖与核心 Happy/Negative/Edge 证据缺失 |
+| 补丁格式 | `git diff --check`：PASS |
+
+崩溃模拟仍只覆盖应用进程 `os._exit`；不代表断电、内核崩溃、文件系统失效、真实外部副作用或 Windows 行为。分支推送后需等待 CI，并由独立 R3 Security Reviewer 审核。

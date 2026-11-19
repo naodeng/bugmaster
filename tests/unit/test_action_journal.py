@@ -92,6 +92,22 @@ def _matches_prefix(test_case, journal, sequence, head_hash):
 
 
 class ActionJournalRecoveryTests(unittest.TestCase):
+    def test_reader_fails_closed_when_journal_open_is_denied(self):
+        ActionJournal, JournalCorruptionError, _ = _journal_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "journal.jsonl"
+            real_open = os.open
+
+            def deny_journal_open(target, flags, *args, **kwargs):
+                if Path(target) == path:
+                    raise PermissionError("open denied")
+                return real_open(target, flags, *args, **kwargs)
+
+            with patch("bugmaster_core.action_journal.os.open", deny_journal_open):
+                with self.assertRaises(JournalCorruptionError):
+                    ActionJournal(path, session_id="session-1")
+
     def test_restart_blocks_replaying_an_action_with_unknown_result(self):
         ActionJournal, _, JournalError = _journal_types(self)
 

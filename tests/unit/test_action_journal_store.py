@@ -163,6 +163,128 @@ class ActionJournalStoreTests(unittest.TestCase):
                 with self.assertRaises(JournalCorruptionError):
                     store.open()
 
+    def test_open_reports_canonical_path_inspection_errors(self):
+        ActionJournalStore, ActionJournalStoreError = _store_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            store = ActionJournalStore(directory, "session-1", "journal-1")
+            store.initialize()
+            real_lstat = Path.lstat
+
+            def fail_canonical_inspection(path, *args, **kwargs):
+                if path == store.path:
+                    raise PermissionError("inspection denied")
+                return real_lstat(path, *args, **kwargs)
+
+            with patch.object(Path, "lstat", fail_canonical_inspection):
+                with self.assertRaises(ActionJournalStoreError):
+                    store.open()
+
+    def test_initialize_reports_canonical_file_open_errors(self):
+        ActionJournalStore, ActionJournalStoreError = _store_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            store = ActionJournalStore(directory, "session-1", "journal-1")
+            store._ensure_directories()
+            real_open = os.open
+
+            def fail_canonical_open(target, flags, *args, **kwargs):
+                if Path(target) == store.path:
+                    raise PermissionError("creation denied")
+                return real_open(target, flags, *args, **kwargs)
+
+            with patch("bugmaster_core.action_journal_store.os.open", fail_canonical_open):
+                with self.assertRaises(ActionJournalStoreError):
+                    store.initialize()
+
+    def test_initialize_rejects_a_non_regular_file_descriptor(self):
+        ActionJournalStore, _ = _store_types(self)
+        from bugmaster_core.action_journal import JournalCorruptionError
+
+        with tempfile.TemporaryDirectory() as directory:
+            store = ActionJournalStore(directory, "session-1", "journal-1")
+            store._ensure_directories()
+            directory_fd = os.open(directory, os.O_RDONLY)
+            real_open = os.open
+
+            def return_directory_for_canonical_path(target, flags, *args, **kwargs):
+                if Path(target) == store.path:
+                    return directory_fd
+                return real_open(target, flags, *args, **kwargs)
+
+            with patch(
+                "bugmaster_core.action_journal_store.os.open",
+                return_directory_for_canonical_path,
+            ):
+                with self.assertRaises(JournalCorruptionError):
+                    store.initialize()
+
+    def test_initialize_reports_file_sync_errors(self):
+        ActionJournalStore, ActionJournalStoreError = _store_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            store = ActionJournalStore(directory, "session-1", "journal-1")
+            store._ensure_directories()
+            with patch("bugmaster_core.action_journal_store.os.fsync", side_effect=OSError):
+                with self.assertRaises(ActionJournalStoreError):
+                    store.initialize()
+
+    def test_initialize_reports_directory_sync_errors(self):
+        ActionJournalStore, ActionJournalStoreError = _store_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            store = ActionJournalStore(directory, "session-1", "journal-1")
+            store._ensure_directories()
+            with patch(
+                "bugmaster_core.action_journal_store._fsync_directory",
+                side_effect=OSError,
+            ):
+                with self.assertRaises(ActionJournalStoreError):
+                    store.initialize()
+
+    def test_initialize_reports_storage_root_creation_errors(self):
+        ActionJournalStore, ActionJournalStoreError = _store_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            store = ActionJournalStore(
+                Path(directory) / "uncreated" / "journal-data", "session-1", "journal-1"
+            )
+            real_mkdir = Path.mkdir
+
+            def fail_root_creation(path, *args, **kwargs):
+                if path == store.root:
+                    raise PermissionError("creation denied")
+                return real_mkdir(path, *args, **kwargs)
+
+            with patch.object(Path, "mkdir", fail_root_creation):
+                with self.assertRaises(ActionJournalStoreError):
+                    store.initialize()
+
+    def test_initialize_rejects_a_symlinked_storage_root(self):
+        ActionJournalStore, ActionJournalStoreError = _store_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            parent = Path(directory)
+            outside = parent / "outside"
+            outside.mkdir()
+            root = parent / "linked-root"
+            root.symlink_to(outside, target_is_directory=True)
+
+            with self.assertRaises(ActionJournalStoreError):
+                ActionJournalStore(root, "session-1", "journal-1").initialize()
+
+    def test_initialize_rejects_a_symlinked_journal_directory(self):
+        ActionJournalStore, ActionJournalStoreError = _store_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            outside = root / "outside"
+            outside.mkdir()
+            (root / "journals").symlink_to(outside, target_is_directory=True)
+
+            with self.assertRaises(ActionJournalStoreError):
+                ActionJournalStore(root, "session-1", "journal-1").initialize()
+
     def test_rejects_a_symlinked_journal_directory(self):
         ActionJournalStore, ActionJournalStoreError = _store_types(self)
 

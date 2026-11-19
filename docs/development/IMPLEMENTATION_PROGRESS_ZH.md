@@ -1,11 +1,11 @@
 # BugMaster 工程实施进度矩阵
 
 **更新日期：** 2026-11-19
-**当前状态：** W6 Action Journal、SessionStore、CheckpointStore、跨存储引用校验、Journal 身份绑定、路径解析、fail-closed replay gate、待对账 Action 只读枚举和 17 个进程崩溃注入点均为局部切片；PR #2–#10 均为草稿且未合并。PR #10 最新代码提交 `72157f7` 已通过 Actions Run `44472202033`；完整产品仍为 Release No-Go。
+**当前状态：** W6 Action Journal、SessionStore、CheckpointStore、跨存储引用校验、Journal 身份绑定、路径解析、fail-closed replay gate、待对账 Action 只读枚举和 19 个进程崩溃注入点均为局部切片。GitHub 实时核对的 PR #1–#10 全部 open、ready、未合并；本地已修复 PR 评论与交叉审核发现，当前 198 项单测、78 项契约测试和 `bugmaster_core` 100% 行/分支覆盖通过，修复提交待推送和 Actions 复核。完整产品仍为 Release No-Go。
 
 ## 仓库审计摘要
 
-- 当前源仓库：`/Users/inaodeng/Code/bugmaster`。本轮实现工作树位于 `/Users/inaodeng/.codex/worktrees/session-contract/bugmaster`、分支 `codex/recovery-observation`，基于 PR #9 的 `codex/replay-gate-fail-closed`。另有 W6 工作树 `/Users/inaodeng/.codex/worktrees/session-revision-store/bugmaster`。PR #10 实现提交 `8129838`；SessionStore 的实现提交为 `2e21010` / `7d2e195`。
+- 当前源仓库：`/Users/inaodeng/Code/bugmaster`。前一轮实现工作树为 `/Users/inaodeng/.codex/worktrees/session-contract/bugmaster`；本轮交叉审核修复在隔离克隆 `/private/tmp/bugmaster-review-fixes-20261119`、分支 `codex/recovery-observation` 完成，基于 PR #9 的 `codex/replay-gate-fail-closed`。另有 W6 工作树 `/Users/inaodeng/.codex/worktrees/session-revision-store/bugmaster`。PR #10 原实现提交 `8129838`；SessionStore 审查修复提交 `d2777e9` / `73dbf6f`。
 - GitHub 上游：`AI-Native-QA-Lab/bugmaster`；个人项目 fork：`naodeng/bugmaster`。两者均为公开仓库，当前连接具有管理员权限。
 - 两个仓库的 About 描述与 13 个 topics 已同步；未设置官网链接。基线提交 `cef3cb5` 已推到 fork 的 `origin/main`，尚未向组织上游推送代码。
 - 当前代码来源：用户提供的 `/Users/inaodeng/Downloads/bugmaster 2/`（128 个文件）。该 v1.1 基线采用 11 个 Discovery / Validation / Reporting Skill ID；旧 v1.0 的 `hunt-*` 目录不导入。
@@ -24,7 +24,7 @@
 | W3 | 16 个 Bug Patterns | 候选规则 | 需适用/排除、Oracle、反例和真实对照 Eval |
 | W4 | 风险路由与有界自主探索 | 部分实现 | `scripts/discover_openapi.py` 可从本地 OpenAPI 3 JSON 输出稳定 ID 和 JSON Pointer 来源清单；URL/Browser 发现、风险路由与动态执行仍待实现 |
 | W5 | R0–R3 动作级授权 | 部分实现 | R0/R1 基础 helper 已 fail-closed；无可信网关时 R2 现在 fail-closed；真实网关、审批摘要和修订绑定仍待实现 |
-| W6 | Action Journal、Session/Checkpoint 持久化与安全恢复 | 部分实现 | `CheckpointReferenceValidator` 校验 Checkpoint、Session revision/Scope history、最新 Session `checkpointRefs`、Journal 前缀及 Session/Journal `journalId` 一致性（PR #6/#7，Actions PASS）；PR #8 的 `ActionJournalStore` 固定绝对根路径，使用显式 `initialize()` 创建新日志、只读 `open()` 读取已有规范日志并在缺失时失败关闭，同时拒绝软链接与非普通文件；PR #9 的 `can_replay()` 在可信只读 verifier 接入前 fail-closed；PR #10 提供只读待对账 Action ID 枚举，Journal、SessionStore 和 CheckpointStore 共 17 个子进程退出场景通过 Actions。事件真实性、可信只读恢复、预算对账、工具层执行绑定及双宿主验证仍待实现 |
+| W6 | Action Journal、Session/Checkpoint 持久化与安全恢复 | 部分实现 | PR #3 的 `session.head` 锚点拒绝缺失修订历史和预算重置；PR #4 只读 Checkpoint 读取拒绝软链接且不改写权限；PR #8 的 `ActionJournalStore` 固定绝对根路径，显式 `initialize()` 创建日志，只读 `open()` 对规范日志缺失失败关闭，并拒绝软链接/FIFO；PR #7 的 JSONL 解析保留合法 Unicode 行分隔符；PR #10 枚举所有待对账 Action，使用真实 Schema fixture 验证崩溃恢复。Journal、SessionStore 和 CheckpointStore 共 19 个进程退出场景本地 PASS。以上修复尚待推送后的 Actions；事件真实性、可信只读恢复、预算对账、工具层执行绑定及双宿主验证仍待实现 |
 | W7 | Finding、跨入口去重与报告 | 待实现 | 需 Oracle、来源、E3+ 证据和剩余风险追踪 |
 | W8 | 回归建议 | 待实现 | 只输出建议，不自动修改/提交测试代码 |
 | W9 | 50 场景 Benchmark | 计划中 | 需真实运行、隔离 Ground Truth 和 G0–G3 对照 |
@@ -38,10 +38,10 @@
 | 品牌与 Skill 命名扫描 | PASS | `python3 scripts/check_branding.py`；命名契约包含 4 项 Skill ID 检查 |
 | Catalog/Registry | PASS | `python3 scripts/validate_catalog.py` |
 | Benchmark Manifest | PASS（结构） | `validate_benchmark.py` 明确提示场景未执行 |
-| GitHub Actions | PR #1–#10 实现检查通过（均为草稿） | PR #10 最新代码 Run `44472202033` 全步骤成功；此前 PR #1–#9 Runs 见 [状态表](IMPLEMENTATION_STATUS_ZH.md)。PR #9 文档 Run `44458130721` 全步骤成功。PR #3 为 R2、PR #4–#10 为 R3，仍需独立质量/安全审查 |
-| 单元测试 | PASS，164/164 | Python 3.12；SessionStore 36/36、CheckpointStore 19/19、ActionJournal 定向测试 38/38、Journal 崩溃/恢复 11/11、Session/Checkpoint 崩溃注入 8/8、ActionJournalStore 10/10、CheckpointReferenceValidator 15/15 |
+| GitHub Actions | 历史提交 PASS；本轮修复 NOT_RUN | PR #1–#10 当前均为 open、ready、未合并。原 PR #10 Run `44472202033` 成功；本地交叉审核修复待推送并重跑 Actions。PR #1–#2 为 R2，PR #3–#10 为 R3，仍需独立质量/安全审查 |
+| 单元测试 | PASS，198/198 | Python 3.12；ActionJournal/Store 定向 64/64，Journal/Session/Checkpoint 崩溃恢复 21/21，CheckpointReferenceValidator 15/15 |
 | 契约测试 | PASS，78/78 | Python 3.12 + `jsonschema[format-nongpl]==4.26.0`：包含 SessionStore、CheckpointStore Schema 集成测试及 replay gate 负例 |
-| 当前核心模块行/分支覆盖率 | PASS，100% / 100% | `bugmaster_core`：1063/1063 语句、428/428 分支；`session_store.py` 320/320 语句、130/130 分支；`checkpoint_store.py` 187/187 语句、60/60 分支；`action_journal.py` 304/304 语句、140/140 分支；`action_journal_store.py` 59/59 语句、10/10 分支；`checkpoint_reference_validator.py` 37/37 语句、20/20 分支。行/分支口径分开报告，不等于业务功能覆盖；replay gate helper 由合同测试单独覆盖 |
+| 当前核心模块行/分支覆盖率 | PASS，100% / 100% | `bugmaster_core`：1196/1196 语句、474/474 分支；`session_store.py` 400/400 语句、160/160 分支；`checkpoint_store.py` 185/185 语句、60/60 分支；`action_journal.py` 317/317 语句、148/148 分支；`action_journal_store.py` 101/101 语句、18/18 分支；`checkpoint_reference_validator.py` 37/37 语句、20/20 分支。行/分支口径分开报告，不等于业务功能覆盖；replay gate helper 由合同测试单独覆盖 |
 | 业务功能覆盖率 >60% | 未达成 | 目前没有真实业务执行证据 |
 | 核心 Happy / Negative / Edge | 未达成 | 需每个核心功能有三类实际通过证据 |
 | Release | No-Go | 全量功能、真实 Benchmark、双宿主和独立审批均未完成 |
