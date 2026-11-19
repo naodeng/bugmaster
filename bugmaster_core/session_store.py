@@ -199,8 +199,11 @@ class SessionStore:
         if normalized["revision"] != 1:
             raise SessionStoreError("a new Session must start at revision 1")
         with self._locked() as storage:
+            recovered_initial = self._recover_initial_revision_locked(storage)
             revisions = self._read_revisions_locked(storage, recover_pending=True)
             if revisions:
+                if recovered_initial and revisions == [normalized]:
+                    return normalized
                 raise SessionStoreError("Session already has a stored revision")
             history_digest = _advance_history_digest(_EMPTY_HISTORY_DIGEST, payload)
             head_payload = self._head_payload(1, payload, history_digest)
@@ -608,6 +611,23 @@ class SessionStore:
         for revision in revisions:
             digest = _advance_history_digest(digest, _canonical_bytes(revision))
         return digest
+
+    def _recover_initial_revision_locked(self, storage):
+        if self._read_head_locked(storage) is not None or storage["revisions_fd"] is None:
+            return False
+        try:
+            entries = os.listdir(storage["revisions_fd"])
+        except OSError as error:
+            raise SessionCorruptionError("cannot list Session revisions") from error
+        if entries != ["00000001.json"]:
+            return False
+        document, payload = self._read_revision_file(
+            storage, "00000001.json", expected_revision=1
+        )
+        history_digest = _advance_history_digest(_EMPTY_HISTORY_DIGEST, payload)
+        head_payload = self._head_payload(1, payload, history_digest)
+        self._write_head_locked(storage, head_payload)
+        return True
 
     def _head_payload(self, revision, payload, history_digest):
         head = {
