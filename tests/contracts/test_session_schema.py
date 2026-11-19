@@ -1,5 +1,6 @@
 import copy
 import json
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -95,6 +96,39 @@ class SessionSchemaTests(unittest.TestCase):
         session = copy.deepcopy(self.valid_session())
         session["approvedByModel"] = True
         self.assert_invalid(session)
+
+    def test_session_store_persists_schema_valid_document(self):
+        try:
+            from bugmaster_core.session_store import SessionStore
+        except ImportError:
+            self.fail("SessionStore must persist the versioned Session contract")
+
+        with tempfile.TemporaryDirectory() as directory:
+            store = SessionStore(
+                directory, "session-1", self.validator.validate
+            )
+            session = self.valid_session()
+            self.assertEqual(store.create(session), session)
+            self.assertEqual(store.read_latest(), session)
+
+    def test_session_store_rejects_schema_invalid_document_before_writing(self):
+        try:
+            from bugmaster_core.session_store import (
+                SessionStore,
+                SessionStoreError,
+            )
+        except ImportError:
+            self.fail("SessionStore must reject invalid Session documents")
+
+        with tempfile.TemporaryDirectory() as directory:
+            store = SessionStore(
+                directory, "session-1", self.validator.validate
+            )
+            session = self.valid_session()
+            session["approvedByModel"] = True
+            with self.assertRaises(SessionStoreError):
+                store.create(session)
+            self.assertEqual(list(Path(directory).iterdir()), [])
 
 
 if __name__ == "__main__":

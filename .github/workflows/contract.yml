@@ -18,7 +18,7 @@ jobs:
       - run: python -m unittest discover -s tests/contracts -v
       - run: python -m coverage run --source=bugmaster_core -m unittest discover -s tests/unit
       - run: python -m coverage json -o coverage.json
-      - run: python -c "import json; t=json.load(open('coverage.json'))['totals']; assert t['num_statements'] > 0 and t['covered_lines'] == t['num_statements'], t"
+      - run: python -c "import json; d=json.load(open('coverage.json')); t=d['totals']; missing={path:report['missing_lines'] for path, report in d.get('files', {}).items() if report.get('missing_lines')}; assert t['num_statements'] > 0 and t['covered_lines'] == t['num_statements'], {**t, 'uncovered_lines':missing}"
       - run: python scripts/validate_catalog.py
       - run: python scripts/validate_benchmark.py
       - run: python scripts/check_branding.py
