@@ -51,3 +51,13 @@ GitHub Actions 对该提交执行行覆盖门禁；本地分支覆盖报告为 1
 ## 后续缺口
 
 当前 `CheckpointReferenceValidator` 仍接收调用方构造的 ActionJournal，故无法证明文件路径由 Session `journalId` 唯一解析。恢复授权、动作级审批真实性、预算与 Journal 消费对账、权威只读副作用 reconciliation、文件系统故障注入、工具层执行绑定及八个崩溃断点仍未实现。没有运行真实 API/Browser、Windows、双宿主或 50 个 Benchmark 场景。PR #7 保持草稿；整体 Release 仍为 **No-Go**。
+
+## 交叉审核修复（PR #7）
+
+### RED
+
+新增真实文件重开用例，使用合法的稳定 `journalId="journal\u2028\u0085identity"` 写入事件，再实例化新的读取器验证恢复状态和前缀。旧版 `str.splitlines()` 将 JSON 字符串中的 U+2028、U+0085 当作记录分隔符，定向测试在读取器构造时失败，报 `JournalCorruptionError: journal contains invalid JSON`（39 项中 1 项错误）。
+
+### GREEN / VERIFY
+
+改为按 JSONL 实际分隔符 LF 拆分记录，且去掉已由完整性检查确认的最终 LF；Unicode 行分隔字符留在 JSON 字符串内部。实现提交 `17359297f6e5388468498f545a9465360cdc4754`。修复后 ActionJournal 定向测试 39/39 PASS，Event Schema 契约 2/2 PASS，`git diff --check` PASS。全量测试和覆盖率将在后续集成修复完成后重跑并记录。

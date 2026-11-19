@@ -192,7 +192,7 @@ def _load_events(fd, session_id, journal_id):
     events = []
     states = {}
     previous_hash = _ZERO_HASH
-    for expected_sequence, line in enumerate(text.splitlines(), start=1):
+    for expected_sequence, line in enumerate(text[:-1].split("\n"), start=1):
         if not line:
             raise JournalCorruptionError("journal contains an empty event line")
         try:
