@@ -331,15 +331,15 @@ class SessionStore:
             raise SessionStoreError("cannot prepare Session storage directories") from error
 
     @staticmethod
-    def _existing_directory(directory, label):
+    def _existing_directory(directory, label, error_type=SessionCorruptionError):
         try:
             directory_stat = directory.lstat()
         except FileNotFoundError:
             return False
         except OSError as error:
-            raise SessionCorruptionError("cannot inspect {} path".format(label)) from error
+            raise error_type("cannot inspect {} path".format(label)) from error
         if not stat.S_ISDIR(directory_stat.st_mode):
-            raise SessionCorruptionError("{} path is not a real directory".format(label))
+            raise error_type("{} path is not a real directory".format(label))
         return True
 
     def _ensure_private_directory(self, directory):
