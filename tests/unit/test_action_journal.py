@@ -954,6 +954,26 @@ class ActionJournalRecoveryTests(unittest.TestCase):
             else:
                 self.fail("a different Journal ID must not load this event log")
 
+    def test_journal_id_may_contain_unicode_line_separator_characters(self):
+        ActionJournal, _, _ = _journal_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "journal.jsonl"
+            journal_id = "journal\u2028\u0085identity"
+            journal = ActionJournal(
+                path, session_id="session-1", journal_id=journal_id
+            )
+            first = journal.prepare("action-1", "a" * 64, 1, "R0")
+
+            reopened = ActionJournal(
+                path, session_id="session-1", journal_id=journal_id
+            )
+
+            self.assertEqual(
+                reopened.recovery_status("action-1"), "needs_reconciliation"
+            )
+            self.assertTrue(reopened.matches_prefix(1, first["entryHash"]))
+
     def test_journal_rejects_an_empty_explicit_journal_id(self):
         ActionJournal, _, JournalError = _journal_types(self)
 
