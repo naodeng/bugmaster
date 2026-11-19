@@ -75,6 +75,48 @@ head 记录可发现 revision 尾部文件单独丢失或修改；它不是外�
 | GitHub Actions | [Run 44443870587](https://github.com/naodeng/bugmaster/actions/runs/44443870587)：最终代码提交 `7d2e1957dc417146ed9559e75f04e9c694a3ebbb`，结论 success、所有步骤通过。初版提交 `2e2101015d0ab062ed7b9a7a0301ba729bb6679b` 的 Run `44442603260` 也成功 |
 | Diff 空白 | `git diff --check`：PASS |
 
+## CodeX Security Review 修复：目录竞态、历史完整性与追加恢复
+
+**日期：** 2026-11-19
+
+**Workstream / 义务：** W6-01 Session Persistence；`F-RECOVERY`；`TDD-ACT-004`
+**复审：** PR #3 当前 head `73dbf6fad5a26ea539f04a991c35bd8948af9234` 的 CodeX review 留下 3 项未解决发现；修复提交及新 head、Security Review、GitHub Actions 结果待推送后补录。
+
+### RED
+
+先加入三个行为测试，再针对原实现运行：
+
+```text
+python -m unittest \
+  tests.unit.test_session_store.SessionStoreTests.test_read_latest_uses_the_directory_that_owns_the_acquired_lock \
+  tests.unit.test_session_store.SessionStoreTests.test_head_binds_every_historical_revision \
+  tests.unit.test_session_store.SessionStoreTests.test_uncommitted_revision_after_head_write_failure_is_recoverable -v
+```
+
+3 项中 2 项失败、1 项报错：锁定后替换 `sessions` 目录会读到攻击者的预算（预期 12，实际 0）；改写早期 revision 后没有被 head 检出；head 发布失败留下的下一 revision 使后续读取报 `SessionCorruptionError`，重试无法恢复。
+
+### GREEN / REFACTOR
+
+- 根目录、`sessions`、Session 和 `revisions` 均通过目录描述符逐级打开；锁、head、revision 读取及发布都相对已打开的目录描述符完成。这样替换路径名或软链接不会把已锁定的 Store 操作重定向到另一目录。读锁使用 `O_NONBLOCK` 后再检查文件类型，避免 FIFO 在检查前阻塞。
+- `session.head` 除最新 revision 摘要外，再绑定从 revision 1 开始的规范化完整历史摘要。读取任一历史版本都会重新计算整条摘要链，早期内容被改写时失败关闭。
+- 追加若已发布一个连续、合法的下一 revision，但 head 发布失败，读取仍返回最后已提交版本；下一次追加校验这唯一的待提交 revision 后清理并重试。缺号、多余、非法或状态转换不合法的文件仍失败关闭。
+
+### VERIFY（本地；远端结果待补）
+
+环境：macOS、Python 3.12.16；coverage.py 7.13.3；测试依赖位于 `/private/tmp/bugmaster-review-venv`。
+
+| 检查 | 结果 |
+|---|---|
+| SessionStore 单元 | `PYTHONDONTWRITEBYTECODE=1 /private/tmp/bugmaster-review-venv/bin/python -m unittest tests.unit.test_session_store -v`：63/63 PASS |
+| 全单元及覆盖率采集 | `PYTHONDONTWRITEBYTECODE=1 /private/tmp/bugmaster-review-venv/bin/python -m coverage run --branch --source=bugmaster_core --data-file=/private/tmp/session-pr3-final.coverage -m unittest discover -s tests/unit`：119/119 PASS |
+| 全合同 | `PYTHONDONTWRITEBYTECODE=1 /private/tmp/bugmaster-review-venv/bin/python -m unittest discover -s tests/contracts -v`：75/75 PASS |
+| `bugmaster_core` 行覆盖 | 938/938（100%） |
+| `bugmaster_core` 分支覆盖 | 372/372（100%） |
+| `git diff --check` | PASS |
+| CodeX Security Review / GitHub Actions | 待推送至新 head 后复核；未据本地结果推断远端通过 |
+
+本修复只保护相对于当前 head 可重算的存储历史完整性，不引入外部签名或防止整个存储目录被回滚；已有文档中关于 Session/Journal 对账、审批真实性及 Release No-Go 的范围说明仍适用。
+
 ## 未覆盖的产品能力
 
 100% 单元行覆盖不是业务功能覆盖，也不是 BLK-03 完成证据。Checkpoint 持久化、崩溃断点注入、Windows 实现、进程/主机恢复、Approval 真实性验证、预算与 Journal 对账、可信只读核验及恢复授权仍未实现或未验证。未执行任何真实 API/Browser 目标测试、50 个 Benchmark 场景或双宿主验证。完整 Release 维持 **No-Go**；本 PR 不得在缺少独立 R2 质量审查时合并。
