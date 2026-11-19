@@ -17,6 +17,8 @@ from pathlib import Path
 
 _REVISION_FILE = re.compile(r"^([0-9]{8,})\.json$")
 _MAX_SESSION_BYTES = 4 * 1024 * 1024
+# A head contains the bounded Session ID and a small fixed amount of metadata.
+_MAX_HEAD_BYTES = _MAX_SESSION_BYTES + 1024
 _IMMUTABLE_FIELDS = (
     "schemaVersion",
     "sessionId",
@@ -200,9 +202,10 @@ class SessionStore:
             revisions = self._read_revisions_locked(storage, recover_pending=True)
             if revisions:
                 raise SessionStoreError("Session already has a stored revision")
-            self._write_revision_locked(storage, 1, payload)
             history_digest = _advance_history_digest(_EMPTY_HISTORY_DIGEST, payload)
-            self._write_head_locked(storage, 1, payload, history_digest)
+            head_payload = self._head_payload(1, payload, history_digest)
+            self._write_revision_locked(storage, 1, payload)
+            self._write_head_locked(storage, head_payload)
         return normalized
 
     def append_revision(self, document, expected_revision):
@@ -226,10 +229,11 @@ class SessionStore:
             self._validate_transition(current, normalized)
             history_digest = self._history_digest(revisions)
             history_digest = _advance_history_digest(history_digest, payload)
-            self._write_revision_locked(storage, normalized["revision"], payload)
-            self._write_head_locked(
-                storage, normalized["revision"], payload, history_digest
+            head_payload = self._head_payload(
+                normalized["revision"], payload, history_digest
             )
+            self._write_revision_locked(storage, normalized["revision"], payload)
+            self._write_head_locked(storage, head_payload)
         return normalized
 
     def read_latest(self):
@@ -605,6 +609,15 @@ class SessionStore:
             digest = _advance_history_digest(digest, _canonical_bytes(revision))
         return digest
 
+    def _head_payload(self, revision, payload, history_digest):
+        head = {
+            "sessionId": self.session_id,
+            "revision": revision,
+            "revisionDigest": hashlib.sha256(payload).hexdigest(),
+            "historyDigest": history_digest,
+        }
+        return _canonical_bytes(head) + b"\n"
+
     def _read_head_locked(self, storage):
         flags = (
             os.O_RDONLY
@@ -623,7 +636,7 @@ class SessionStore:
             head_stat = os.fstat(fd)
             if not stat.S_ISREG(head_stat.st_mode) or stat.S_IMODE(head_stat.st_mode) != 0o600:
                 raise SessionCorruptionError("Session revision head permissions are invalid")
-            if head_stat.st_size > 1024:
+            if head_stat.st_size > _MAX_HEAD_BYTES:
                 raise SessionCorruptionError("Session revision head is too large")
             raw = bytearray()
             while True:
@@ -732,14 +745,7 @@ class SessionStore:
                 except FileNotFoundError:
                     pass
 
-    def _write_head_locked(self, storage, revision, payload, history_digest):
-        head = {
-            "sessionId": self.session_id,
-            "revision": revision,
-            "revisionDigest": hashlib.sha256(payload).hexdigest(),
-            "historyDigest": history_digest,
-        }
-        encoded = _canonical_bytes(head) + b"\n"
+    def _write_head_locked(self, storage, encoded):
         fd, temporary_name = _create_temporary_file(
             storage["session_fd"], ".session-head-"
         )
