@@ -1,0 +1,123 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:bugmaster:schema:session:1.0",
+  "title": "BugMaster Session Revision",
+  "description": "A versioned session record. Approval references are not authorization; scope history, budget counters, journal, and checkpoint references must be reconciled by a trusted recovery flow before any action is dispatched.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "sessionId",
+    "revision",
+    "status",
+    "projectRef",
+    "hostRef",
+    "environmentRef",
+    "createdAt",
+    "updatedAt",
+    "scopeHistory",
+    "approvalRefs",
+    "actionBudget",
+    "journalId",
+    "checkpointRefs"
+  ],
+  "properties": {
+    "schemaVersion": {"const": "1.0"},
+    "sessionId": {"type": "string", "minLength": 1},
+    "revision": {"type": "integer", "minimum": 1},
+    "status": {
+      "enum": [
+        "created",
+        "ready",
+        "running",
+        "paused",
+        "recovering",
+        "completed",
+        "failed",
+        "blocked",
+        "cancelled"
+      ]
+    },
+    "projectRef": {"type": "string", "minLength": 1},
+    "hostRef": {"type": "string", "minLength": 1},
+    "environmentRef": {"type": "string", "minLength": 1},
+    "createdAt": {"type": "string", "format": "date-time"},
+    "updatedAt": {"type": "string", "format": "date-time"},
+    "scopeHistory": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/scopeRevisionRef"},
+      "description": "Chronological references to the Scope revisions used by this session; the latest reference represents the current scope revision."
+    },
+    "approvalRefs": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/approvalRef"},
+      "description": "References to separately stored approval records. A reference does not prove identity, authenticity, validity, or authorization."
+    },
+    "actionBudget": {"$ref": "#/$defs/actionBudget"},
+    "journalId": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Identity of the session's append-only Action Journal; journal events must independently bind to this session."
+    },
+    "checkpointRefs": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1},
+      "description": "References to structural Checkpoints. They do not authorize resume or prove that journal and session contents are authentic."
+    }
+  },
+  "$defs": {
+    "scopeRevisionRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scopeId", "revision"],
+      "properties": {
+        "scopeId": {"type": "string", "minLength": 1},
+        "revision": {"type": "integer", "minimum": 1}
+      }
+    },
+    "approvalRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["approvalId", "scopeId", "scopeRevision"],
+      "properties": {
+        "approvalId": {"type": "string", "minLength": 1},
+        "scopeId": {"type": "string", "minLength": 1},
+        "scopeRevision": {"type": "integer", "minimum": 1}
+      }
+    },
+    "actionBudget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["maxActions", "consumedActions"],
+      "properties": {
+        "maxActions": {"type": "integer", "minimum": 0},
+        "consumedActions": {"type": "integer", "minimum": 0},
+        "maxRequests": {"type": "integer", "minimum": 0},
+        "consumedRequests": {"type": "integer", "minimum": 0},
+        "maxDurationSeconds": {"type": "integer", "minimum": 0},
+        "consumedDurationSeconds": {"type": "integer", "minimum": 0}
+      },
+      "allOf": [
+        {
+          "if": {"required": ["maxRequests"]},
+          "then": {"required": ["consumedRequests"]}
+        },
+        {
+          "if": {"required": ["consumedRequests"]},
+          "then": {"required": ["maxRequests"]}
+        },
+        {
+          "if": {"required": ["maxDurationSeconds"]},
+          "then": {"required": ["consumedDurationSeconds"]}
+        },
+        {
+          "if": {"required": ["consumedDurationSeconds"]},
+          "then": {"required": ["maxDurationSeconds"]}
+        }
+      ]
+    }
+  }
+}
