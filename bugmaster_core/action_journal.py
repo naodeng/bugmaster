@@ -10,6 +10,7 @@ import hmac
 import json
 import os
 import re
+import stat
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -282,11 +283,18 @@ class ActionJournal:
         return self._journal_id
 
     def _load_current(self):
+        flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
         try:
-            fd = os.open(str(self.path), os.O_RDONLY)
+            fd = os.open(str(self.path), flags)
         except FileNotFoundError:
             return [], {}
+        except OSError as error:
+            raise JournalCorruptionError(
+                "cannot safely open the persisted journal"
+            ) from error
         try:
+            if not stat.S_ISREG(os.fstat(fd).st_mode):
+                raise JournalCorruptionError("journal file is not a regular file")
             fcntl.flock(fd, fcntl.LOCK_EX)
             return _load_events(fd, self.session_id, self.journal_id)
         finally:
@@ -316,7 +324,7 @@ class ActionJournal:
     def _append(self, event_type, action_id, data):
         self.path.parent.mkdir(parents=True, exist_ok=True)
         created = False
-        flags = os.O_RDWR | os.O_APPEND
+        flags = os.O_RDWR | os.O_APPEND | getattr(os, "O_NOFOLLOW", 0)
         try:
             fd = os.open(
                 str(self.path), flags | os.O_CREAT | os.O_EXCL, 0o600

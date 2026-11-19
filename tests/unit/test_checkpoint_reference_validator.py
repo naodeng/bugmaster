@@ -12,7 +12,7 @@ def _reference_types(test_case):
         )
     except ImportError as error:
         test_case.fail(
-            "checkpoint references must be validated across the real local stores: {}".format(
+            "checkpoint references need real local-store validation: {}".format(
                 error
             )
         )
@@ -21,6 +21,18 @@ def _reference_types(test_case):
 
 def _accept_document(_document):
     return None
+
+
+def _journal_store_type(test_case):
+    try:
+        from bugmaster_core.action_journal_store import ActionJournalStore
+    except ImportError as error:
+        test_case.fail(
+            "Checkpoint validation needs a stable-ID Journal store: {}".format(
+                error
+            )
+        )
+    return ActionJournalStore
 
 
 def _valid_session(session_id="session-1", journal_id="journal-session-1"):
@@ -65,7 +77,7 @@ class CheckpointReferenceValidatorTests(unittest.TestCase):
         session_root=None,
         journal_id="journal-session-1",
     ):
-        from bugmaster_core.action_journal import ActionJournal
+        from bugmaster_core.action_journal_store import ActionJournalStore
         from bugmaster_core.checkpoint_store import CheckpointStore
         from bugmaster_core.session_store import SessionStore
 
@@ -77,11 +89,10 @@ class CheckpointReferenceValidatorTests(unittest.TestCase):
         checkpoint_store = CheckpointStore(
             root, session_id, _accept_document
         )
-        journal = ActionJournal(
-            root / "journals" / "journal-1.jsonl", session_id
-        )
+        journal_store = ActionJournalStore(root, session_id, "journal-session-1")
+        journal = journal_store.open()
         session_store.create(_valid_session(session_id, journal_id))
-        return checkpoint_store, session_store, journal
+        return checkpoint_store, session_store, journal_store, journal
 
     @staticmethod
     def register_checkpoint(checkpoint_store, session_store, checkpoint):
@@ -110,7 +121,9 @@ class CheckpointReferenceValidatorTests(unittest.TestCase):
         _, CheckpointReferenceValidator = _reference_types(self)
 
         with tempfile.TemporaryDirectory() as directory:
-            checkpoint_store, session_store, journal = self.make_context(directory)
+            checkpoint_store, session_store, journal_store, journal = self.make_context(
+                directory
+            )
             event = journal.prepare("action-1", "a" * 64, 1, "R0")
             checkpoint = _valid_checkpoint(
                 journalSequence=event["sequence"],
@@ -118,7 +131,7 @@ class CheckpointReferenceValidatorTests(unittest.TestCase):
             )
             self.register_checkpoint(checkpoint_store, session_store, checkpoint)
             validator = CheckpointReferenceValidator(
-                checkpoint_store, session_store, journal
+                checkpoint_store, session_store, journal_store
             )
 
             self.assertEqual(validator.validate("checkpoint-1"), checkpoint)
@@ -127,11 +140,13 @@ class CheckpointReferenceValidatorTests(unittest.TestCase):
         _, CheckpointReferenceValidator = _reference_types(self)
 
         with tempfile.TemporaryDirectory() as directory:
-            checkpoint_store, session_store, journal = self.make_context(directory)
+            checkpoint_store, session_store, journal_store, _ = self.make_context(
+                directory
+            )
             checkpoint = _valid_checkpoint()
             self.register_checkpoint(checkpoint_store, session_store, checkpoint)
             validator = CheckpointReferenceValidator(
-                checkpoint_store, session_store, journal
+                checkpoint_store, session_store, journal_store
             )
 
             self.assertEqual(validator.validate("checkpoint-1"), checkpoint)
@@ -140,9 +155,11 @@ class CheckpointReferenceValidatorTests(unittest.TestCase):
         CheckpointReferenceError, CheckpointReferenceValidator = _reference_types(self)
 
         with tempfile.TemporaryDirectory() as directory:
-            checkpoint_store, session_store, journal = self.make_context(directory)
+            checkpoint_store, session_store, journal_store, _ = self.make_context(
+                directory
+            )
             validator = CheckpointReferenceValidator(
-                checkpoint_store, session_store, journal
+                checkpoint_store, session_store, journal_store
             )
 
             with self.assertRaises(CheckpointReferenceError):
@@ -152,11 +169,13 @@ class CheckpointReferenceValidatorTests(unittest.TestCase):
         CheckpointReferenceError, CheckpointReferenceValidator = _reference_types(self)
 
         with tempfile.TemporaryDirectory() as directory:
-            checkpoint_store, session_store, journal = self.make_context(directory)
+            checkpoint_store, session_store, journal_store, _ = self.make_context(
+                directory
+            )
             checkpoint = _valid_checkpoint(sessionRevision=3)
             self.register_checkpoint(checkpoint_store, session_store, checkpoint)
             validator = CheckpointReferenceValidator(
-                checkpoint_store, session_store, journal
+                checkpoint_store, session_store, journal_store
             )
 
             with self.assertRaises(CheckpointReferenceError):
@@ -166,11 +185,13 @@ class CheckpointReferenceValidatorTests(unittest.TestCase):
         CheckpointReferenceError, CheckpointReferenceValidator = _reference_types(self)
 
         with tempfile.TemporaryDirectory() as directory:
-            checkpoint_store, session_store, journal = self.make_context(directory)
+            checkpoint_store, session_store, journal_store, _ = self.make_context(
+                directory
+            )
             checkpoint = _valid_checkpoint(scopeId="scope-2")
             self.register_checkpoint(checkpoint_store, session_store, checkpoint)
             validator = CheckpointReferenceValidator(
-                checkpoint_store, session_store, journal
+                checkpoint_store, session_store, journal_store
             )
 
             with self.assertRaises(CheckpointReferenceError):
@@ -180,10 +201,12 @@ class CheckpointReferenceValidatorTests(unittest.TestCase):
         CheckpointReferenceError, CheckpointReferenceValidator = _reference_types(self)
 
         with tempfile.TemporaryDirectory() as directory:
-            checkpoint_store, session_store, journal = self.make_context(directory)
+            checkpoint_store, session_store, journal_store, _ = self.make_context(
+                directory
+            )
             checkpoint_store.create(_valid_checkpoint())
             validator = CheckpointReferenceValidator(
-                checkpoint_store, session_store, journal
+                checkpoint_store, session_store, journal_store
             )
 
             with self.assertRaises(CheckpointReferenceError):
@@ -193,7 +216,9 @@ class CheckpointReferenceValidatorTests(unittest.TestCase):
         CheckpointReferenceError, CheckpointReferenceValidator = _reference_types(self)
 
         with tempfile.TemporaryDirectory() as directory:
-            checkpoint_store, session_store, journal = self.make_context(directory)
+            checkpoint_store, session_store, journal_store, _ = self.make_context(
+                directory
+            )
             self.register_checkpoint(
                 checkpoint_store, session_store, _valid_checkpoint()
             )
@@ -206,7 +231,7 @@ class CheckpointReferenceValidatorTests(unittest.TestCase):
 
             session_store.read_revision = remove_session_after_read
             validator = CheckpointReferenceValidator(
-                checkpoint_store, session_store, journal
+                checkpoint_store, session_store, journal_store
             )
 
             try:
@@ -220,46 +245,96 @@ class CheckpointReferenceValidatorTests(unittest.TestCase):
         CheckpointReferenceError, CheckpointReferenceValidator = _reference_types(self)
 
         with tempfile.TemporaryDirectory() as directory:
-            checkpoint_store, session_store, journal = self.make_context(directory)
+            checkpoint_store, session_store, journal_store, journal = self.make_context(
+                directory
+            )
             journal.prepare("action-1", "a" * 64, 1, "R0")
             checkpoint = _valid_checkpoint(
                 journalSequence=1, journalHeadHash="b" * 64
             )
             self.register_checkpoint(checkpoint_store, session_store, checkpoint)
             validator = CheckpointReferenceValidator(
-                checkpoint_store, session_store, journal
+                checkpoint_store, session_store, journal_store
             )
 
             with self.assertRaises(CheckpointReferenceError):
                 validator.validate("checkpoint-1")
 
-    def test_rejects_storage_components_for_different_sessions(self):
+    def test_validator_resolves_journal_from_session_id_and_journal_id(self):
         CheckpointReferenceError, CheckpointReferenceValidator = _reference_types(self)
+        from bugmaster_core.action_journal import ActionJournal
+        from bugmaster_core.checkpoint_store import CheckpointStore
+        from bugmaster_core.session_store import SessionStore
+        ActionJournalStore = _journal_store_type(self)
 
         with tempfile.TemporaryDirectory() as directory:
-            checkpoint_store, session_store, _ = self.make_context(directory)
-            from bugmaster_core.action_journal import ActionJournal
+            root = Path(directory)
+            session_store = SessionStore(root, "session-1", _accept_document)
+            checkpoint_store = CheckpointStore(root, "session-1", _accept_document)
+            session_store.create(_valid_session())
 
-            other_journal = ActionJournal(
-                Path(directory) / "other-journal.jsonl", "session-2"
+            # A matching ID at a caller-selected path must be ignored.
+            supplied_elsewhere = ActionJournal(
+                root / "caller-selected.jsonl", "session-1", "journal-session-1"
+            )
+            event = supplied_elsewhere.prepare("action-1", "a" * 64, 1, "R0")
+            checkpoint = _valid_checkpoint(
+                journalSequence=event["sequence"],
+                journalHeadHash=event["entryHash"],
+            )
+            self.register_checkpoint(checkpoint_store, session_store, checkpoint)
+
+            store = ActionJournalStore(root, "session-1", "journal-session-1")
+            validator = CheckpointReferenceValidator(
+                checkpoint_store, session_store, store
+            )
+
+            with self.assertRaises(CheckpointReferenceError):
+                validator.validate("checkpoint-1")
+
+    def test_rejects_a_caller_selected_action_journal_instance(self):
+        CheckpointReferenceError, CheckpointReferenceValidator = _reference_types(self)
+        from bugmaster_core.action_journal import ActionJournal
+
+        with tempfile.TemporaryDirectory() as directory:
+            checkpoint_store, session_store, _, _ = self.make_context(directory)
+            caller_selected = ActionJournal(
+                Path(directory) / "caller-selected.jsonl",
+                "session-1",
+                "journal-session-1",
             )
 
             with self.assertRaises(CheckpointReferenceError):
                 CheckpointReferenceValidator(
-                    checkpoint_store, session_store, other_journal
+                    checkpoint_store, session_store, caller_selected
+                )
+
+    def test_rejects_storage_components_for_different_sessions(self):
+        CheckpointReferenceError, CheckpointReferenceValidator = _reference_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            checkpoint_store, session_store, _, _ = self.make_context(directory)
+            ActionJournalStore = _journal_store_type(self)
+            other_journal_store = ActionJournalStore(
+                directory, "session-2", "journal-session-2"
+            )
+
+            with self.assertRaises(CheckpointReferenceError):
+                CheckpointReferenceValidator(
+                    checkpoint_store, session_store, other_journal_store
                 )
 
     def test_rejects_session_journal_id_that_differs_from_the_bound_journal(self):
         CheckpointReferenceError, CheckpointReferenceValidator = _reference_types(self)
 
         with tempfile.TemporaryDirectory() as directory:
-            checkpoint_store, session_store, journal = self.make_context(
+            checkpoint_store, session_store, journal_store, journal = self.make_context(
                 directory, journal_id="journal-wrong"
             )
             checkpoint = _valid_checkpoint()
             self.register_checkpoint(checkpoint_store, session_store, checkpoint)
             validator = CheckpointReferenceValidator(
-                checkpoint_store, session_store, journal
+                checkpoint_store, session_store, journal_store
             )
 
             with self.assertRaises(CheckpointReferenceError):
@@ -267,7 +342,7 @@ class CheckpointReferenceValidatorTests(unittest.TestCase):
 
     def test_rejects_session_and_checkpoint_stores_with_different_roots(self):
         CheckpointReferenceError, CheckpointReferenceValidator = _reference_types(self)
-        from bugmaster_core.action_journal import ActionJournal
+        ActionJournalStore = _journal_store_type(self)
         from bugmaster_core.checkpoint_store import CheckpointStore
         from bugmaster_core.session_store import SessionStore
 
@@ -279,18 +354,22 @@ class CheckpointReferenceValidatorTests(unittest.TestCase):
             session_store = SessionStore(
                 root / "sessions", "session-1", _accept_document
             )
-            journal = ActionJournal(root / "journal.jsonl", "session-1")
+            journal_store = ActionJournalStore(
+                root, "session-1", "journal-session-1"
+            )
 
             with self.assertRaises(CheckpointReferenceError):
                 CheckpointReferenceValidator(
-                    checkpoint_store, session_store, journal
+                    checkpoint_store, session_store, journal_store
                 )
 
     def test_accepts_checkpoint_anchored_before_later_scope_history(self):
         _, CheckpointReferenceValidator = _reference_types(self)
 
         with tempfile.TemporaryDirectory() as directory:
-            checkpoint_store, session_store, journal = self.make_context(directory)
+            checkpoint_store, session_store, journal_store, _ = self.make_context(
+                directory
+            )
             checkpoint = _valid_checkpoint()
             self.register_checkpoint(checkpoint_store, session_store, checkpoint)
             self.append_session_revision(
@@ -301,7 +380,7 @@ class CheckpointReferenceValidatorTests(unittest.TestCase):
                 ],
             )
             validator = CheckpointReferenceValidator(
-                checkpoint_store, session_store, journal
+                checkpoint_store, session_store, journal_store
             )
 
             self.assertEqual(validator.validate("checkpoint-1"), checkpoint)
@@ -311,7 +390,9 @@ class CheckpointReferenceValidatorTests(unittest.TestCase):
         from bugmaster_core.action_journal import JournalCorruptionError
 
         with tempfile.TemporaryDirectory() as directory:
-            checkpoint_store, session_store, journal = self.make_context(directory)
+            checkpoint_store, session_store, journal_store, journal = self.make_context(
+                directory
+            )
             event = journal.prepare("action-1", "a" * 64, 1, "R0")
             checkpoint = _valid_checkpoint(
                 journalSequence=event["sequence"],
@@ -321,7 +402,7 @@ class CheckpointReferenceValidatorTests(unittest.TestCase):
             with journal.path.open("ab") as stream:
                 stream.write(b"{broken-json}\n")
             validator = CheckpointReferenceValidator(
-                checkpoint_store, session_store, journal
+                checkpoint_store, session_store, journal_store
             )
 
             with self.assertRaises(JournalCorruptionError):

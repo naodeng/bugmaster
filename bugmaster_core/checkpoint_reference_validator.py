@@ -2,6 +2,8 @@
 
 from pathlib import Path
 
+from .action_journal_store import ActionJournalStore
+
 
 class CheckpointReferenceError(ValueError):
     """A Checkpoint reference is absent or inconsistent with stored records."""
@@ -10,29 +12,37 @@ class CheckpointReferenceError(ValueError):
 class CheckpointReferenceValidator:
     """Validate local references without authorizing or performing resume.
 
-    The stores must share one local root and Session identity. Callers provide
-    the ActionJournal instance associated with that Session; this validator
-    checks its Session identity and hash-chain prefix, but does not establish
-    journal ID-to-path provenance or event truth.
+    The stores must share one local root and Session identity. The validator
+    resolves the Journal through its deterministic Session/Journal ID mapping;
+    it does not establish event authenticity or external truth.
     """
 
-    def __init__(self, checkpoint_store, session_store, journal):
+    def __init__(self, checkpoint_store, session_store, journal_store):
+        if not isinstance(journal_store, ActionJournalStore):
+            raise CheckpointReferenceError(
+                "Checkpoint validation requires a deterministic Journal store"
+            )
         session_ids = (
             checkpoint_store.session_id,
             session_store.session_id,
-            journal.session_id,
+            journal_store.session_id,
         )
         if len(set(session_ids)) != 1:
             raise CheckpointReferenceError(
                 "Checkpoint, Session, and Journal must belong to one Session"
             )
-        if Path(checkpoint_store.root).absolute() != Path(session_store.root).absolute():
+        roots = {
+            Path(checkpoint_store.root).absolute(),
+            Path(session_store.root).absolute(),
+            Path(journal_store.root).absolute(),
+        }
+        if len(roots) != 1:
             raise CheckpointReferenceError(
-                "Checkpoint and Session stores must share one storage root"
+                "Checkpoint, Session, and Journal stores must share one storage root"
             )
         self.checkpoint_store = checkpoint_store
         self.session_store = session_store
-        self.journal = journal
+        self.journal_store = journal_store
 
     def validate(self, checkpoint_id):
         """Return a Checkpoint whose local Session, Scope, and Journal anchors match."""
@@ -62,11 +72,12 @@ class CheckpointReferenceValidator:
             raise CheckpointReferenceError(
                 "Latest Session revision does not reference the Checkpoint"
             )
-        if self.journal.journal_id != latest_session["journalId"]:
+        if self.journal_store.journal_id != latest_session["journalId"]:
             raise CheckpointReferenceError(
-                "Session Journal ID does not match the supplied Journal"
+                "Session Journal ID does not match the Journal store"
             )
-        if not self.journal.matches_prefix(
+        journal = self.journal_store.open()
+        if not journal.matches_prefix(
             checkpoint["journalSequence"], checkpoint["journalHeadHash"]
         ):
             raise CheckpointReferenceError(
