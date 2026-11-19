@@ -92,6 +92,23 @@ class SessionStoreTests(unittest.TestCase):
             store.append_revision(second, expected_revision=1)
             self.assertEqual(store.read_latest(), second)
 
+    def test_create_recovers_initial_revision_after_head_publication_failure(self):
+        _, SessionStoreError, _ = _session_store_types(self)
+        with tempfile.TemporaryDirectory() as directory:
+            store = self.make_store(directory)
+            first = _valid_session()
+
+            with patch.object(
+                store,
+                "_write_head_locked",
+                side_effect=SessionStoreError("head publication failed"),
+            ):
+                with self.assertRaises(SessionStoreError):
+                    store.create(first)
+
+            self.assertEqual(store.create(first), first)
+            self.assertEqual(store.read_latest(), first)
+
     def test_append_keeps_previous_revision_immutable(self):
         _, _, _ = _session_store_types(self)
         with tempfile.TemporaryDirectory() as directory:
@@ -1043,21 +1060,30 @@ class SessionStoreTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             store = self.make_store(directory)
             store.create(_valid_session())
+            store._head_path.unlink()
             revision_stat = store._revisions_dir.stat()
             real_listdir = os.listdir
 
-            def fail_revision_listing(directory_fd):
-                directory_stat = os.fstat(directory_fd)
-                if (
-                    directory_stat.st_dev == revision_stat.st_dev
-                    and directory_stat.st_ino == revision_stat.st_ino
-                ):
-                    raise OSError("listing failed")
-                return real_listdir(directory_fd)
+            for failing_call in (1, 2):
+                calls = 0
 
-            with patch("bugmaster_core.session_store.os.listdir", side_effect=fail_revision_listing):
-                with self.assertRaises(SessionCorruptionError):
-                    store.read_latest()
+                def fail_revision_listing(directory_fd):
+                    nonlocal calls
+                    directory_stat = os.fstat(directory_fd)
+                    if (
+                        directory_stat.st_dev == revision_stat.st_dev
+                        and directory_stat.st_ino == revision_stat.st_ino
+                    ):
+                        calls += 1
+                        if calls == failing_call:
+                            raise OSError("listing failed")
+                    return real_listdir(directory_fd)
+
+                with patch(
+                    "bugmaster_core.session_store.os.listdir",
+                    side_effect=fail_revision_listing,
+                ), self.assertRaises(SessionCorruptionError):
+                    store.create(_valid_session())
 
     def test_revision_file_corruption_forms_fail_closed(self):
         _, _, SessionCorruptionError = _session_store_types(self)
