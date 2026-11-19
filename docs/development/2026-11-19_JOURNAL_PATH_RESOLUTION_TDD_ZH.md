@@ -88,6 +88,7 @@ PR #8 首次推送后 Actions Run [44486235780](https://github.com/naodeng/bugma
 ### VERIFY
 
 - 隔离克隆：`/private/tmp/bugmaster-review-fixes-20261119`；分支：`codex/journal-path-resolution`；Python 3.12；coverage.py 7.13.3；测试依赖位于 `/private/tmp/bugmaster-review-venv`。
+- 测试修复提交：`af71416ba5eea6c2dca1869d4714063bda9ba225`。
 - `PYTHONDONTWRITEBYTECODE=1 /private/tmp/bugmaster-review-venv/bin/python -m coverage run --branch --source=bugmaster_core --data-file=/private/tmp/bugmaster-pr8-final.coverage -m unittest discover -s tests/unit`：177/177 PASS。
 - `PYTHONDONTWRITEBYTECODE=1 /private/tmp/bugmaster-review-venv/bin/python -m unittest discover -s tests/contracts`：77/77 PASS。
 - `coverage report --data-file=/private/tmp/bugmaster-pr8-final.coverage --include='bugmaster_core/*'`：1193/1193 语句、474/474 分支，均为 100%。
