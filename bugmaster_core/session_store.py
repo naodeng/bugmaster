@@ -16,6 +16,7 @@ from pathlib import Path
 
 
 _REVISION_FILE = re.compile(r"^([0-9]{8,})\.json$")
+_TEMPORARY_FILE = re.compile(r"^\.(?:session-head|session-revision)-[a-f0-9]{32}$")
 _MAX_SESSION_BYTES = 4 * 1024 * 1024
 # A head contains the bounded Session ID and a small fixed amount of metadata.
 _MAX_HEAD_BYTES = _MAX_SESSION_BYTES + 1024
@@ -67,7 +68,20 @@ def _write_all(fd, payload):
         offset += written
 
 
-def _fsync_directory(directory_fd):
+def _fsync_directory(directory):
+    flags = (
+        os.O_RDONLY
+        | getattr(os, "O_DIRECTORY", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+    )
+    directory_fd = os.open(directory, flags)
+    try:
+        os.fsync(directory_fd)
+    finally:
+        os.close(directory_fd)
+
+
+def _fsync_directory_fd(directory_fd):
     os.fsync(directory_fd)
 
 
@@ -91,11 +105,20 @@ def _open_directory_path(path, *, create, error_type, label):
                     os.mkdir(component, mode=0o700, dir_fd=current_fd)
                 except FileExistsError:
                     pass
-                else:
-                    _fsync_directory(current_fd)
-                next_fd = os.open(component, flags, dir_fd=current_fd)
+                except OSError as error:
+                    raise error_type("cannot create {} path".format(label)) from error
+                try:
+                    next_fd = os.open(component, flags, dir_fd=current_fd)
+                except OSError as error:
+                    raise error_type("cannot inspect {} path".format(label)) from error
             except OSError as error:
                 raise error_type("cannot inspect {} path".format(label)) from error
+            if create:
+                try:
+                    _fsync_directory_fd(current_fd)
+                except OSError as error:
+                    os.close(next_fd)
+                    raise error_type("cannot sync {} path".format(label)) from error
             os.close(current_fd)
             current_fd = next_fd
         result = current_fd
@@ -117,8 +140,8 @@ def _open_child_directory(parent_fd, name, *, create, error_type, label, private
             os.mkdir(name, mode=0o700, dir_fd=parent_fd)
         except FileExistsError:
             pass
-        else:
-            _fsync_directory(parent_fd)
+        except OSError as error:
+            raise error_type("cannot create {} directory".format(label)) from error
         try:
             fd = os.open(name, flags, dir_fd=parent_fd)
         except OSError as error:
@@ -131,6 +154,12 @@ def _open_child_directory(parent_fd, name, *, create, error_type, label, private
     except OSError as error:
         os.close(fd)
         raise error_type("cannot secure {} directory".format(label)) from error
+    if create:
+        try:
+            _fsync_directory_fd(parent_fd)
+        except OSError as error:
+            os.close(fd)
+            raise error_type("cannot sync {} directory".format(label)) from error
     return fd
 
 
@@ -182,7 +211,11 @@ class SessionStore:
         if raw_root.is_symlink():
             raise SessionStoreError("Session root must be a real directory")
         try:
-            self.root = raw_root.resolve(strict=False)
+            self.root = (
+                raw_root.resolve(strict=False)
+                if raw_root.name == ".."
+                else raw_root.parent.resolve(strict=False) / raw_root.name
+            )
         except (OSError, RuntimeError) as error:
             raise SessionStoreError("cannot resolve Session storage root") from error
         self.session_id = session_id
@@ -199,10 +232,12 @@ class SessionStore:
         if normalized["revision"] != 1:
             raise SessionStoreError("a new Session must start at revision 1")
         with self._locked() as storage:
-            recovered_initial = self._recover_initial_revision_locked(storage)
-            revisions = self._read_revisions_locked(storage, recover_pending=True)
-            if revisions:
-                if recovered_initial and revisions == [normalized]:
+            recovered_initial = self._recover_initial_revision_locked(
+                storage, expected_payload=payload
+            )
+            history = self._read_revisions_locked(storage, recover_pending=True)
+            if history["count"]:
+                if recovered_initial and history["count"] == 1 and history["latest"] == normalized:
                     return normalized
                 raise SessionStoreError("Session already has a stored revision")
             history_digest = _advance_history_digest(_EMPTY_HISTORY_DIGEST, payload)
@@ -223,14 +258,14 @@ class SessionStore:
         if normalized["revision"] != expected_revision + 1:
             raise SessionStoreError("new Session revision must follow expected revision")
         with self._locked() as storage:
-            revisions = self._read_revisions_locked(storage, recover_pending=True)
-            if not revisions:
+            history = self._read_revisions_locked(storage, recover_pending=True)
+            if not history["count"]:
                 raise SessionStoreError("Session has no initial revision")
-            current = revisions[-1]
+            current = history["latest"]
             if current["revision"] != expected_revision:
                 raise SessionStoreError("expected Session revision is stale")
             self._validate_transition(current, normalized)
-            history_digest = self._history_digest(revisions)
+            history_digest = history["history_digest"]
             history_digest = _advance_history_digest(history_digest, payload)
             head_payload = self._head_payload(
                 normalized["revision"], payload, history_digest
@@ -242,18 +277,20 @@ class SessionStore:
     def read_latest(self):
         """Return the latest validated revision, or None if no Session exists."""
         with self._locked(create_directories=False) as storage:
-            revisions = self._read_revisions_locked(storage) if storage else []
-        return revisions[-1] if revisions else None
+            history = self._read_revisions_locked(storage) if storage else None
+        return history["latest"] if history else None
 
     def read_revision(self, revision):
         """Return one validated revision, or None if that revision is absent."""
         if isinstance(revision, bool) or not isinstance(revision, int) or revision < 1:
             raise SessionStoreError("revision must be a positive integer")
         with self._locked(create_directories=False) as storage:
-            revisions = self._read_revisions_locked(storage) if storage else []
-        if revision > len(revisions):
-            return None
-        return revisions[revision - 1]
+            history = (
+                self._read_revisions_locked(storage, requested_revision=revision)
+                if storage
+                else None
+            )
+        return history["requested"] if history else None
 
     def _validate_document(self, document, *, persisted=False):
         error_type = SessionCorruptionError if persisted else SessionStoreError
@@ -267,7 +304,7 @@ class SessionStore:
         self._validate_references_and_budgets(document, error_type)
         try:
             payload = _canonical_bytes(document)
-        except (TypeError, ValueError, UnicodeEncodeError) as error:
+        except (TypeError, ValueError, UnicodeEncodeError, RecursionError) as error:
             raise error_type("Session document is not valid JSON data") from error
         if len(payload) > _MAX_SESSION_BYTES:
             raise error_type("Session document exceeds the storage size limit")
@@ -395,33 +432,110 @@ class SessionStore:
             yield None
             return
 
-        flags = os.O_RDWR | os.O_CREAT if create_directories else os.O_RDONLY
+        flags = os.O_RDWR if create_directories else os.O_RDONLY
         flags |= getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
         fd = None
         acquired = False
         try:
             try:
-                if create_directories:
-                    fd = os.open(
-                        "session.lock",
-                        flags,
-                        0o600,
-                        dir_fd=storage["session_fd"],
+                fd = os.open(
+                    "session.lock",
+                    flags,
+                    dir_fd=storage["session_fd"],
+                )
+            except FileNotFoundError as error:
+                try:
+                    with os.scandir(storage["session_fd"]) as entries:
+                        names = {entry.name for entry in entries}
+                except OSError as scan_error:
+                    raise error_type(
+                        "cannot inspect Session directory without its lock"
+                    ) from scan_error
+                empty_uninitialized_session = not names
+                if names == {"revisions"}:
+                    revisions_fd = _open_child_directory(
+                        storage["session_fd"],
+                        "revisions",
+                        create=False,
+                        error_type=error_type,
+                        label="Session revisions",
                     )
+                    if revisions_fd is not None:
+                        try:
+                            with os.scandir(revisions_fd) as entries:
+                                empty_uninitialized_session = next(entries, None) is None
+                        except OSError as scan_error:
+                            raise error_type(
+                                "cannot inspect Session revisions without its lock"
+                            ) from scan_error
+                        finally:
+                            os.close(revisions_fd)
+                if "session.lock" in names:
+                    try:
+                        fd = os.open(
+                            "session.lock",
+                            flags,
+                            dir_fd=storage["session_fd"],
+                        )
+                    except OSError as open_error:
+                        raise error_type("cannot open Session lock") from open_error
+                elif not empty_uninitialized_session:
+                    try:
+                        fd = os.open(
+                            "session.lock",
+                            flags,
+                            dir_fd=storage["session_fd"],
+                        )
+                    except FileNotFoundError as missing_lock_error:
+                        raise SessionCorruptionError(
+                            "Session lock is missing"
+                        ) from missing_lock_error
+                    except OSError as open_error:
+                        raise error_type("cannot open Session lock") from open_error
+                elif not create_directories:
+                    yield None
+                    return
                 else:
-                    fd = os.open(
-                        "session.lock",
-                        flags,
-                        dir_fd=storage["session_fd"],
-                    )
+                    try:
+                        fd = os.open(
+                            "session.lock",
+                            flags | os.O_CREAT | os.O_EXCL,
+                            0o600,
+                            dir_fd=storage["session_fd"],
+                        )
+                    except FileExistsError:
+                        try:
+                            fd = os.open(
+                                "session.lock",
+                                flags,
+                                dir_fd=storage["session_fd"],
+                            )
+                        except OSError as open_error:
+                            raise SessionStoreError(
+                                "cannot open Session lock"
+                            ) from open_error
+                    except OSError as create_error:
+                        raise SessionStoreError(
+                            "cannot create Session lock"
+                        ) from create_error
             except OSError as error:
-                raise SessionStoreError("cannot open Session lock") from error
+                raise error_type("cannot open Session lock") from error
             if not stat.S_ISREG(os.fstat(fd).st_mode):
                 raise SessionStoreError("Session lock is not a regular file")
             if create_directories:
                 os.fchmod(fd, 0o600)
             fcntl.flock(fd, fcntl.LOCK_EX if create_directories else fcntl.LOCK_SH)
             acquired = True
+            if create_directories:
+                self._cleanup_temporary_files_locked(storage["session_fd"])
+            storage["revisions_fd"] = _open_child_directory(
+                storage["session_fd"],
+                "revisions",
+                create=create_directories,
+                error_type=error_type,
+                label="Session revisions",
+                private=True,
+            )
             yield storage
         except OSError as error:
             raise SessionStoreError("Session storage lock failed") from error
@@ -468,21 +582,11 @@ class SessionStore:
                 self._close_fds(opened)
                 return None
             opened.append(session_fd)
-            revisions_fd = _open_child_directory(
-                session_fd,
-                "revisions",
-                create=create_directories,
-                error_type=error_type,
-                label="Session revisions",
-                private=True,
-            )
-            if revisions_fd is not None:
-                opened.append(revisions_fd)
             return {
                 "root_fd": root_fd,
                 "sessions_fd": sessions_fd,
                 "session_fd": session_fd,
-                "revisions_fd": revisions_fd,
+                "revisions_fd": None,
             }
         except BaseException:
             self._close_fds(opened)
@@ -509,81 +613,136 @@ class SessionStore:
 
     def _ensure_directories(self):
         storage = self._open_storage_directories(True, SessionStoreError)
-        self._close_storage_directories(storage)
+        try:
+            revisions_fd = _open_child_directory(
+                storage["session_fd"],
+                "revisions",
+                create=True,
+                error_type=SessionStoreError,
+                label="Session revisions",
+                private=True,
+            )
+            os.close(revisions_fd)
+        finally:
+            self._close_storage_directories(storage)
 
-    def _read_revisions_locked(self, storage, *, recover_pending=False):
+    def _cleanup_temporary_files_locked(self, session_fd):
+        removed = False
+        try:
+            with os.scandir(session_fd) as entries:
+                for entry in entries:
+                    if _TEMPORARY_FILE.fullmatch(entry.name) is None:
+                        continue
+                    if not stat.S_ISREG(entry.stat(follow_symlinks=False).st_mode):
+                        raise SessionStoreError(
+                            "Session temporary file is not a regular file"
+                        )
+                    os.unlink(entry.name, dir_fd=session_fd)
+                    removed = True
+        except OSError as error:
+            raise SessionStoreError("cannot clean interrupted Session writes") from error
+        if removed:
+            _fsync_directory_fd(session_fd)
+
+    def _read_revisions_locked(
+        self, storage, *, recover_pending=False, requested_revision=None
+    ):
         head = self._read_head_locked(storage)
         revisions_fd = storage["revisions_fd"]
+        if revisions_fd is None:
+            if head is not None:
+                raise SessionCorruptionError("Session head exists without revisions")
+            return {
+                "count": 0,
+                "latest": None,
+                "requested": None,
+                "history_digest": _EMPTY_HISTORY_DIGEST,
+            }
+
+        entry_count = 0
+        pending_name = None
         try:
-            entries = os.listdir(revisions_fd) if revisions_fd is not None else []
+            with os.scandir(revisions_fd) as entries:
+                for entry in entries:
+                    match = _REVISION_FILE.fullmatch(entry.name)
+                    if match is None:
+                        raise SessionCorruptionError(
+                            "Session revision directory has an invalid entry"
+                        )
+                    revision = int(match.group(1))
+                    if revision < 1 or entry.name != "{:08d}.json".format(revision):
+                        raise SessionCorruptionError(
+                            "Session revision directory has an invalid entry"
+                        )
+                    try:
+                        file_stat = entry.stat(follow_symlinks=False)
+                    except OSError as error:
+                        raise SessionCorruptionError(
+                            "cannot inspect Session revision"
+                        ) from error
+                    if not stat.S_ISREG(file_stat.st_mode):
+                        raise SessionCorruptionError(
+                            "Session revision directory has an invalid entry"
+                        )
+                    entry_count += 1
+                    if head is not None and revision > head["revision"]:
+                        if (
+                            pending_name is not None
+                            or revision != head["revision"] + 1
+                        ):
+                            raise SessionCorruptionError(
+                                "Session has invalid uncommitted revisions"
+                            )
+                        pending_name = entry.name
         except OSError as error:
             raise SessionCorruptionError("cannot list Session revisions") from error
 
-        revision_files = []
-        for name in entries:
-            match = _REVISION_FILE.fullmatch(name)
-            if match is None or revisions_fd is None:
-                raise SessionCorruptionError("Session revision directory has an invalid entry")
-            try:
-                file_stat = os.stat(
-                    name, dir_fd=revisions_fd, follow_symlinks=False
-                )
-            except OSError as error:
-                raise SessionCorruptionError("cannot inspect Session revision") from error
-            if not stat.S_ISREG(file_stat.st_mode):
-                raise SessionCorruptionError("Session revision directory has an invalid entry")
-            revision_files.append((int(match.group(1)), name))
-        revision_files.sort(key=lambda pair: pair[0])
-
-        if not revision_files:
+        if entry_count == 0:
             if head is not None:
                 raise SessionCorruptionError("Session head exists without revisions")
-            return []
+            return {
+                "count": 0,
+                "latest": None,
+                "requested": None,
+                "history_digest": _EMPTY_HISTORY_DIGEST,
+            }
         if head is None:
             raise SessionCorruptionError("Session revision head is missing")
 
         committed_revision = head["revision"]
-        committed_files = [
-            item for item in revision_files if item[0] <= committed_revision
-        ]
-        pending_files = [
-            item for item in revision_files if item[0] > committed_revision
-        ]
-        revisions = []
+        committed_count = entry_count - (1 if pending_name is not None else 0)
+        if committed_count != committed_revision:
+            raise SessionCorruptionError("Session revision sequence has a gap")
+
+        previous = None
+        latest = None
+        requested = None
         history_digest = _EMPTY_HISTORY_DIGEST
-        expected_revision = 1
-        for revision, name in committed_files:
-            if revision != expected_revision:
-                raise SessionCorruptionError("Session revision sequence has a gap")
+        for revision in range(1, committed_revision + 1):
+            filename = "{:08d}.json".format(revision)
             document, payload = self._read_revision_file(
-                storage, name, expected_revision
+                storage, filename, revision
             )
-            if revisions:
+            if previous is not None:
                 try:
-                    self._validate_transition(revisions[-1], document)
+                    self._validate_transition(previous, document)
                 except SessionStoreError as error:
                     raise SessionCorruptionError(
                         "persisted Session revision history is inconsistent"
                     ) from error
-            revisions.append(document)
             history_digest = _advance_history_digest(history_digest, payload)
-            expected_revision += 1
-        if expected_revision != committed_revision + 1:
-            raise SessionCorruptionError("Session revision sequence has a gap")
+            if revision == requested_revision:
+                requested = document
+            previous = latest = document
 
         pending_name_to_remove = None
-        if pending_files:
-            if (
-                len(pending_files) != 1
-                or pending_files[0][0] != committed_revision + 1
-            ):
-                raise SessionCorruptionError("Session has invalid uncommitted revisions")
-            pending_revision, pending_name = pending_files[0]
+        if pending_name is not None:
+            pending_revision = committed_revision + 1
             pending_document, _ = self._read_revision_file(
                 storage, pending_name, pending_revision
             )
             try:
-                self._validate_transition(revisions[-1], pending_document)
+                self._validate_transition(latest, pending_document)
             except SessionStoreError as error:
                 raise SessionCorruptionError(
                     "uncommitted Session revision is inconsistent"
@@ -591,7 +750,6 @@ class SessionStore:
             if recover_pending:
                 pending_name_to_remove = pending_name
 
-        latest = revisions[-1]
         expected_digest = hashlib.sha256(_canonical_bytes(latest)).hexdigest()
         if (
             head["revisionDigest"] != expected_digest
@@ -602,30 +760,36 @@ class SessionStore:
             )
         if pending_name_to_remove is not None:
             os.unlink(pending_name_to_remove, dir_fd=revisions_fd)
-            _fsync_directory(revisions_fd)
-        return revisions
+            _fsync_directory_fd(revisions_fd)
+        return {
+            "count": committed_revision,
+            "latest": latest,
+            "requested": requested,
+            "history_digest": history_digest,
+        }
 
-    @staticmethod
-    def _history_digest(revisions):
-        digest = _EMPTY_HISTORY_DIGEST
-        for revision in revisions:
-            digest = _advance_history_digest(digest, _canonical_bytes(revision))
-        return digest
-
-    def _recover_initial_revision_locked(self, storage):
+    def _recover_initial_revision_locked(self, storage, *, expected_payload):
         if self._read_head_locked(storage) is not None or storage["revisions_fd"] is None:
             return False
         try:
-            entries = os.listdir(storage["revisions_fd"])
+            with os.scandir(storage["revisions_fd"]) as entries:
+                first_entry = next(entries, None)
+                if first_entry is None or first_entry.name != "00000001.json":
+                    return False
+                if next(entries, None) is not None:
+                    return False
         except OSError as error:
             raise SessionCorruptionError("cannot list Session revisions") from error
-        if entries != ["00000001.json"]:
-            return False
         document, payload = self._read_revision_file(
             storage, "00000001.json", expected_revision=1
         )
+        if payload != expected_payload:
+            raise SessionStoreError(
+                "interrupted initial revision differs from create request"
+            )
         history_digest = _advance_history_digest(_EMPTY_HISTORY_DIGEST, payload)
         head_payload = self._head_payload(1, payload, history_digest)
+        _fsync_directory_fd(storage["revisions_fd"])
         self._write_head_locked(storage, head_payload)
         return True
 
@@ -670,7 +834,7 @@ class SessionStore:
             raise SessionCorruptionError("Session revision head is incomplete")
         try:
             head = json.loads(bytes(raw[:-1]).decode("utf-8"))
-        except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        except (UnicodeDecodeError, ValueError, RecursionError) as error:
             raise SessionCorruptionError("Session revision head is invalid JSON") from error
         if (
             not isinstance(head, dict)
@@ -720,7 +884,7 @@ class SessionStore:
             raise SessionCorruptionError("persisted Session revision is incomplete")
         try:
             document = json.loads(bytes(raw[:-1]).decode("utf-8"))
-        except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        except (UnicodeDecodeError, ValueError, RecursionError) as error:
             raise SessionCorruptionError("persisted Session revision is invalid JSON") from error
         payload, normalized = self._validate_document(document, persisted=True)
         if bytes(raw[:-1]) != payload:
@@ -750,10 +914,10 @@ class SessionStore:
                 )
             except FileExistsError as error:
                 raise SessionCorruptionError("Session revision file already exists") from error
-            _fsync_directory(storage["revisions_fd"])
+            _fsync_directory_fd(storage["revisions_fd"])
             os.unlink(temporary_name, dir_fd=storage["session_fd"])
             temporary_name = None
-            _fsync_directory(storage["session_fd"])
+            _fsync_directory_fd(storage["session_fd"])
         except OSError as error:
             raise SessionStoreError("cannot durably write Session revision") from error
         finally:
@@ -782,7 +946,7 @@ class SessionStore:
                 dst_dir_fd=storage["session_fd"],
             )
             temporary_name = None
-            _fsync_directory(storage["session_fd"])
+            _fsync_directory_fd(storage["session_fd"])
         except OSError as error:
             raise SessionStoreError("cannot durably update Session revision head") from error
         finally:
