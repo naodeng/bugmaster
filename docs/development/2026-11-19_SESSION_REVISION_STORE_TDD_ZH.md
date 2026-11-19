@@ -80,7 +80,7 @@ head 记录可发现 revision 尾部文件单独丢失或修改；它不是外�
 **日期：** 2026-11-19
 
 **Workstream / 义务：** W6-01 Session Persistence；`F-RECOVERY`；`TDD-ACT-004`
-**复审：** PR #3 当前 head `73dbf6fad5a26ea539f04a991c35bd8948af9234` 的 CodeX review 留下 3 项未解决发现；修复提交及新 head、Security Review、GitHub Actions 结果待推送后补录。
+**复审：** PR #3 head `73dbf6fad5a26ea539f04a991c35bd8948af9234` 的 CodeX review 留下 3 项发现，修复后 head `cccf6cd39cec59320f4ee54115741abdf52bb037` 的复审又发现超长 Session ID 会生成不可读 head。四项现已在本地修复；最后一轮变更、新 head、Security Review 与 GitHub Actions 结果待推送后补录。
 
 ### RED
 
@@ -95,11 +95,14 @@ python -m unittest \
 
 3 项中 2 项失败、1 项报错：锁定后替换 `sessions` 目录会读到攻击者的预算（预期 12，实际 0）；改写早期 revision 后没有被 head 检出；head 发布失败留下的下一 revision 使后续读取报 `SessionCorruptionError`，重试无法恢复。
 
+随后 CodeX 对新 head 的常规复审发现：长度为 1,000 的 Session ID 可通过 Schema 与 Store 校验，但产生的 `session.head` 超过读取上限。新增 `test_long_session_id_keeps_the_persisted_head_readable` 后先得到 `SessionCorruptionError: Session revision head is too large`，随后再实现修复。
+
 ### GREEN / REFACTOR
 
 - 根目录、`sessions`、Session 和 `revisions` 均通过目录描述符逐级打开；锁、head、revision 读取及发布都相对已打开的目录描述符完成。这样替换路径名或软链接不会把已锁定的 Store 操作重定向到另一目录。读锁使用 `O_NONBLOCK` 后再检查文件类型，避免 FIFO 在检查前阻塞。
 - `session.head` 除最新 revision 摘要外，再绑定从 revision 1 开始的规范化完整历史摘要。读取任一历史版本都会重新计算整条摘要链，早期内容被改写时失败关闭。
 - 追加若已发布一个连续、合法的下一 revision，但 head 发布失败，读取仍返回最后已提交版本；下一次追加校验这唯一的待提交 revision 后清理并重试。缺号、多余、非法或状态转换不合法的文件仍失败关闭。
+- 将 head 读取上限设为 Session 最大文档体积加固定元数据余量；head 只重复有界的 `sessionId` 和定长摘要。该上限与 Store 可接受的 Session 文档大小一致，长度 1,000 的 ID 可创建、读取并追加；超出上限的持久化 head 仍在读取正文前拒绝。
 
 ### VERIFY（本地；远端结果待补）
 
@@ -107,13 +110,13 @@ python -m unittest \
 
 | 检查 | 结果 |
 |---|---|
-| SessionStore 单元 | `PYTHONDONTWRITEBYTECODE=1 /private/tmp/bugmaster-review-venv/bin/python -m unittest tests.unit.test_session_store -v`：63/63 PASS |
-| 全单元及覆盖率采集 | `PYTHONDONTWRITEBYTECODE=1 /private/tmp/bugmaster-review-venv/bin/python -m coverage run --branch --source=bugmaster_core --data-file=/private/tmp/session-pr3-final.coverage -m unittest discover -s tests/unit`：119/119 PASS |
+| SessionStore 单元 | `PYTHONDONTWRITEBYTECODE=1 /private/tmp/bugmaster-review-venv/bin/python -m unittest tests.unit.test_session_store`：65/65 PASS |
+| 全单元及覆盖率采集 | `PYTHONDONTWRITEBYTECODE=1 /private/tmp/bugmaster-review-venv/bin/python -m coverage run --branch --source=bugmaster_core --data-file=/private/tmp/session-pr3-final-v3.coverage -m unittest discover -s tests/unit`：121/121 PASS |
 | 全合同 | `PYTHONDONTWRITEBYTECODE=1 /private/tmp/bugmaster-review-venv/bin/python -m unittest discover -s tests/contracts -v`：75/75 PASS |
-| `bugmaster_core` 行覆盖 | 938/938（100%） |
+| `bugmaster_core` 行覆盖 | 942/942（100%） |
 | `bugmaster_core` 分支覆盖 | 372/372（100%） |
 | `git diff --check` | PASS |
-| CodeX Security Review / GitHub Actions | 待推送至新 head 后复核；未据本地结果推断远端通过 |
+| 远端状态 | Actions [Run 44517138792](https://github.com/naodeng/bugmaster/actions/runs/44517138792) 在上一 head `cccf6cd` 通过；其后的 CodeX 常规复审发现超长 head 问题并已本地修复。最终 head 的 CodeX 复审、Security Review 与 Actions 待推送后复核 |
 
 本修复只保护相对于当前 head 可重算的存储历史完整性，不引入外部签名或防止整个存储目录被回滚；已有文档中关于 Session/Journal 对账、审批真实性及 Release No-Go 的范围说明仍适用。
 
