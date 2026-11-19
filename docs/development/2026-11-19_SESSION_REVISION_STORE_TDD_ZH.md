@@ -1,7 +1,7 @@
 # W6 Session Revision 持久化 TDD 记录
 
 **日期：** 2026-11-19  
-**Workstream / 义务：** W6-01 Session Persistence；`F-RECOVERY`；`TDD-FS-003`  
+**Workstream / 义务：** W6-01 Session Persistence；`F-RECOVERY`；`TDD-ACT-004`
 **风险：** R2；合并前需要独立质量审查。  
 **实现提交：** `7d2e1957dc417146ed9559e75f04e9c694a3ebbb`（初版存储提交 `2e2101015d0ab062ed7b9a7a0301ba729bb6679b`）；草稿 PR [#3](https://github.com/naodeng/bugmaster/pull/3)，叠加于 Session Schema PR #2，尚未合并。
 
