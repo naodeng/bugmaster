@@ -92,4 +92,4 @@ PR #8 首次推送后 Actions Run [44486235780](https://github.com/naodeng/bugma
 - `PYTHONDONTWRITEBYTECODE=1 /private/tmp/bugmaster-review-venv/bin/python -m coverage run --branch --source=bugmaster_core --data-file=/private/tmp/bugmaster-pr8-final.coverage -m unittest discover -s tests/unit`：177/177 PASS。
 - `PYTHONDONTWRITEBYTECODE=1 /private/tmp/bugmaster-review-venv/bin/python -m unittest discover -s tests/contracts`：77/77 PASS。
 - `coverage report --data-file=/private/tmp/bugmaster-pr8-final.coverage --include='bugmaster_core/*'`：1193/1193 语句、474/474 分支，均为 100%。
-- 当前 PR #8 head 的 Actions 重跑待提交后确认；Release 仍为 No-Go。该门禁是单元代码行覆盖，不是业务功能覆盖。
+- 修复后 PR #8 Actions [Run 44487177211](https://github.com/naodeng/bugmaster/actions/runs/44487177211) 通过；单元与契约检查、行覆盖门禁及静态结构检查成功。Release 仍为 No-Go。该门禁是单元代码行覆盖，不是业务功能覆盖。
