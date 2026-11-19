@@ -1,7 +1,7 @@
 # BugMaster 工程实施进度矩阵
 
 **更新日期：** 2026-11-19
-**当前状态：** W6 Action Journal 与 Session revision 持久化均为局部切片；Session Schema PR #2 与 SessionStore PR #3 均为草稿且未合并。PR #3 最终代码提交 `7d2e195` 已通过 Actions Run `44443870587`；完整产品仍为 Release No-Go。
+**当前状态：** W6 Action Journal 与 Session revision 持久化均为局部切片；Session Schema PR #2 已合并，SessionStore PR #3 已改为目标 `main` 并开放审查。PR #3 当前代码 head `583ee36` 的 Actions Run `44535874005` 通过；CodeX 常规复审与独立安全/工程角色复核均无待修复发现。完整产品仍为 Release No-Go。
 
 ## 仓库审计摘要
 
@@ -24,7 +24,7 @@
 | W3 | 16 个 Bug Patterns | 候选规则 | 需适用/排除、Oracle、反例和真实对照 Eval |
 | W4 | 风险路由与有界自主探索 | 部分实现 | `scripts/discover_openapi.py` 可从本地 OpenAPI 3 JSON 输出稳定 ID 和 JSON Pointer 来源清单；URL/Browser 发现、风险路由与动态执行仍待实现 |
 | W5 | R0–R3 动作级授权 | 部分实现 | R0/R1 基础 helper 已 fail-closed；无可信网关时 R2 现在 fail-closed；真实网关、审批摘要和修订绑定仍待实现 |
-| W6 | Action Journal、Session 持久化与安全恢复 | 部分实现 | Action Journal 有本地 append/fsync、POSIX 锁、事件哈希链和未决 Action 阻断；SessionStore 已实现不可变 revision 追加/读取与历史转换校验（PR #3，Actions PASS；Scope history 递增）；Checkpoint 仍只有结构 Schema。可信只读核验、预算与 Journal 对账、Checkpoint 持久化、八断点崩溃注入、工具层执行绑定及双宿主验证仍待实现 |
+| W6 | Action Journal、Session 持久化与安全恢复 | 部分实现 | Action Journal 有本地 append/fsync、POSIX 锁、事件哈希链和未决 Action 阻断；SessionStore 已实现不可变 revision 追加/读取、完整历史摘要、崩溃恢复与历史转换校验（PR #3，R3，目标 `main`，Actions Run `44535874005` PASS；Scope history 递增）；Checkpoint 仍只有结构 Schema。可信只读核验、预算与 Journal 对账、Checkpoint 持久化、八断点崩溃注入、工具层执行绑定及双宿主验证仍待实现 |
 | W7 | Finding、跨入口去重与报告 | 待实现 | 需 Oracle、来源、E3+ 证据和剩余风险追踪 |
 | W8 | 回归建议 | 待实现 | 只输出建议，不自动修改/提交测试代码 |
 | W9 | 50 场景 Benchmark | 计划中 | 需真实运行、隔离 Ground Truth 和 G0–G3 对照 |
@@ -38,10 +38,10 @@
 | 品牌与 Skill 命名扫描 | PASS | `python3 scripts/check_branding.py`；命名契约包含 4 项 Skill ID 检查 |
 | Catalog/Registry | PASS | `python3 scripts/validate_catalog.py` |
 | Benchmark Manifest | PASS（结构） | `validate_benchmark.py` 明确提示场景未执行 |
-| GitHub Actions | 三项 PR 检查通过（均为草稿） | 原 Run `44300382541` 因错误 JSON key 失败；PR #1 的 Run `44304702509`、PR #2 的 Run `44438620887`、PR #3 代码提交的 Run `44442603260` 与最终修正 Run `44443870587` 均成功。PR #3 后续提交只同步中文过程记录，不改动代码；Session R2 变更仍须独立质量审查后才能合并 |
-| 单元测试 | PASS，92/92 | Python 3.12：`python3.12 -m unittest discover -s tests/unit -v`；其中 SessionStore 定向单测 36/36 |
+| GitHub Actions | PR #3 最新代码 head 检查通过 | Run `44535874005`：单测、合同、100% 行覆盖、Catalog、Benchmark 结构和品牌检查均通过。早期 Run `44533110359` 暴露 Linux 目录枚举顺序导致的未覆盖行；Run `44535020463` 诊断为 `session_store.py:780`；排序固定后的 head 全绿 |
+| 单元测试 | PASS，156/156 | Python 3.12：`python3.12 -m unittest discover -s tests/unit -v`；`bugmaster_core` 1,045/1,045 行覆盖、406/406 分支覆盖 |
 | 契约测试 | PASS，75/75 | Python 3.12 + `jsonschema[format-nongpl]==4.26.0`：`python3.12 -m unittest discover -s tests/contracts -v`；Session Schema 11 项含 2 项 Store 集成测试 |
-| 当前核心模块行/分支覆盖率 | PASS，100% / 100% | `bugmaster_core`：752/752 行、324/324 分支。`session_store.py` 为 320/320 行、130/130 分支。行/分支口径分开报告，不等于业务功能覆盖 |
+| 当前核心模块行/分支覆盖率 | PASS，100% / 100% | `bugmaster_core`：1,045/1,045 行、406/406 分支。行/分支口径分开报告，不等于业务功能覆盖 |
 | 业务功能覆盖率 >60% | 未达成 | 目前没有真实业务执行证据 |
 | 核心 Happy / Negative / Edge | 未达成 | 需每个核心功能有三类实际通过证据 |
 | Release | No-Go | 全量功能、真实 Benchmark、双宿主和独立审批均未完成 |
