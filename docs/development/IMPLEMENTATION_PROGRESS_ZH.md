@@ -1,11 +1,11 @@
 # BugMaster 工程实施进度矩阵
 
-**更新日期：** 2026-11-18
-**当前状态：** 工程基线、W6 本地 Action Journal 切片和 Checkpoint 结构契约已提交并推送到 fork 的 `origin/main`；完整产品仍为 Release No-Go。
+**更新日期：** 2026-11-19
+**当前状态：** W6 本地 Action Journal 切片和 Checkpoint 结构契约在 fork `main`；CI 覆盖率修复 PR #1 已通过 Actions 但仍为草稿。Session 结构契约在独立分支 `codex/session-schema`，完整产品仍为 Release No-Go。
 
 ## 仓库审计摘要
 
-- 当前工作区仓库：`/Users/inaodeng/Code/bugmaster`，分支 `main`；导入前只有初始标题 README。
+- 当前源仓库：`/Users/inaodeng/Code/bugmaster`；本轮隔离工作树为 `/Users/inaodeng/.codex/worktrees/session-contract/bugmaster`，分支 `codex/session-schema`，基于 `origin/main` 的 `bcf7e0c` 及通过 CI 修复 PR 的提交 `ac25f52`。
 - GitHub 上游：`AI-Native-QA-Lab/bugmaster`；个人项目 fork：`naodeng/bugmaster`。两者均为公开仓库，当前连接具有管理员权限。
 - 两个仓库的 About 描述与 13 个 topics 已同步；未设置官网链接。基线提交 `cef3cb5` 已推到 fork 的 `origin/main`，尚未向组织上游推送代码。
 - 当前代码来源：用户提供的 `/Users/inaodeng/Downloads/bugmaster 2/`（128 个文件）。该 v1.1 基线采用 11 个 Discovery / Validation / Reporting Skill ID；旧 v1.0 的 `hunt-*` 目录不导入。
@@ -19,7 +19,7 @@
 | Workstream | 目标 | 状态 | 验收证据 / 下一步 |
 |---|---|---|---|
 | W0 | 开发基线与品牌/Skill 名称统一 | 本地检查通过 | `check_branding.py`、`validate_catalog.py`、Skill 命名契约通过；基线提交 `cef3cb5` 已推送到 fork |
-| W1 | Scope、Surface、Feature、Oracle、Finding、Evidence、Journal 数据契约 | 部分实现 | Scope、Feature Inventory、Approval、Action、Event、Checkpoint JSON Schema 与契约测试已完成；Session、Oracle、Evidence、Finding 等仍待实现 |
+| W1 | Scope、Surface、Feature、Oracle、Finding、Evidence、Journal 数据契约 | 部分实现 | Scope、Feature Inventory、Approval、Action、Event、Checkpoint 和 Session JSON Schema 有对应契约测试；Session 仅结构校验，Oracle、Evidence、Finding 等仍待实现；本轮 `TDD-CON-014` 实现提交 `aaa5564` |
 | W2 | 11 个独立 Skills | 本地闭包验证通过 | 11 个包均含规范 Skill/Pattern 闭包且 manifest 摘要一致；Codex/Claude 干净安装和真实 Eval 未验证 |
 | W3 | 16 个 Bug Patterns | 候选规则 | 需适用/排除、Oracle、反例和真实对照 Eval |
 | W4 | 风险路由与有界自主探索 | 部分实现 | `scripts/discover_openapi.py` 可从本地 OpenAPI 3 JSON 输出稳定 ID 和 JSON Pointer 来源清单；URL/Browser 发现、风险路由与动态执行仍待实现 |
@@ -38,9 +38,9 @@
 | 品牌与 Skill 命名扫描 | PASS | `python3 scripts/check_branding.py`；命名契约包含 4 项 Skill ID 检查 |
 | Catalog/Registry | PASS | `python3 scripts/validate_catalog.py` |
 | Benchmark Manifest | PASS（结构） | `validate_benchmark.py` 明确提示场景未执行 |
-| GitHub Actions | 修复通过（PR 草稿） | 原 Run `44300382541` 因错误 JSON key 失败；PR #1 的 Run `44304069748` 在 `ef5bc1d` 全步骤通过。等待独立质量审查，尚未合并 |
+| GitHub Actions | 两项 PR 检查通过（均为草稿） | 原 Run `44300382541` 因错误 JSON key 失败；PR #1 的 Run `44304702509` 在 `ac25f52` 全步骤通过；PR #2 的 Run `44438620887` 在 `cb7d566` 全步骤通过。Session R2 变更仍须独立质量审查后才能合并 |
 | 单元测试 | PASS，56/56 | Python 3.12 与默认 Python 3.9：`python -m unittest discover -s tests/unit -v` |
-| 契约测试 | PASS，64/64 | Python 3.12 + `jsonschema[format-nongpl]==4.26.0`：`python3.12 -m unittest discover -s tests/contracts -v` |
+| 契约测试 | PASS，73/73 | Python 3.12 + `jsonschema[format-nongpl]==4.26.0`：`python3.12 -m unittest discover -s tests/contracts -v`；包含 Session 9 项和 CI 工作流配置回归 1 项 |
 | 当前核心模块行/分支覆盖率 | PASS，100% / 100% | `bugmaster_core`：432/432 语句、194/194 分支；不包括独立 `scripts/` 的生产脚本覆盖，也不等于业务功能覆盖 |
 | 业务功能覆盖率 >60% | 未达成 | 目前没有真实业务执行证据 |
 | 核心 Happy / Negative / Edge | 未达成 | 需每个核心功能有三类实际通过证据 |
@@ -48,7 +48,7 @@
 
 本轮使用生成的核心覆盖 JSON 运行 `python3.12 scripts/quality_gate.py --mode release --coverage /private/tmp/bugmaster-core-coverage.json`，结果仍为 No-Go：功能清单未冻结、真实功能覆盖未超过 60%，核心功能 Happy/Negative/Edge 执行矩阵缺证据。W6 本地状态机单测不作为真实业务功能执行证据。Benchmark 脚本仅验证清单结构，未运行 50 个场景。
 
-初始验证的命令与实际输出记录在 [基线验证记录](2026-11-18_INITIAL_BASELINE_VERIFICATION_ZH.md)。Scope 风险 helper、本地 OpenAPI 静态发现 CLI、Scope/Approval/Action Schema 和 R2 缺少可信审批网关时拒绝派发的 RED/GREEN/REFACTOR/VERIFY 证据分别见 [范围与风险门禁 TDD 记录](2026-11-18_SCOPE_GATE_TDD_ZH.md)、[OpenAPI 发现 TDD 记录](2026-11-18_OPENAPI_DISCOVERY_TDD_ZH.md)、[Scope Schema TDD 记录](2026-11-18_SCOPE_SCHEMA_TDD_ZH.md)、[Approval 与 Action Schema TDD 记录](2026-11-18_APPROVAL_ACTION_SCHEMA_TDD_ZH.md) 与 [R2 门禁 TDD 记录](2026-11-18_R2_GATE_TDD_ZH.md)。
+初始验证的命令与实际输出记录在 [基线验证记录](2026-11-18_INITIAL_BASELINE_VERIFICATION_ZH.md)。Scope 风险 helper、本地 OpenAPI 静态发现 CLI、Scope/Approval/Action Schema、Session Schema 和 R2 缺少可信审批网关时拒绝派发的 RED/GREEN/REFACTOR/VERIFY 证据分别见 [范围与风险门禁 TDD 记录](2026-11-18_SCOPE_GATE_TDD_ZH.md)、[OpenAPI 发现 TDD 记录](2026-11-18_OPENAPI_DISCOVERY_TDD_ZH.md)、[Scope Schema TDD 记录](2026-11-18_SCOPE_SCHEMA_TDD_ZH.md)、[Approval 与 Action Schema TDD 记录](2026-11-18_APPROVAL_ACTION_SCHEMA_TDD_ZH.md)、[Session Schema TDD 记录](2026-11-19_SESSION_SCHEMA_TDD_ZH.md) 与 [R2 门禁 TDD 记录](2026-11-18_R2_GATE_TDD_ZH.md)。
 
 11 个独立包的离线构建/闭包/摘要核验见 [Standalone 打包验证记录](2026-11-18_STANDALONE_PACKAGING_VERIFY_ZH.md)。
 
