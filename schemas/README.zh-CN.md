@@ -16,6 +16,7 @@ Schema 使用 JSON Schema Draft 2020-12。契约测试同时校验 Schema 本身
 - `bugmaster_core.session_store.SessionStore`：将每个通过校验的 Session revision 保存为独立不可变文件，使用私有 Session 目录和 POSIX 文件锁串行化写入，通过同步临时文件后再以不可覆盖方式落盘；拒绝替换、序号缺口、权限错误和不一致的历史转换。它不会认证 Approval 引用、将预算与 Action Journal 对账，也不授权恢复。Windows 行为尚未验证。
 - `bugmaster_core.checkpoint_store.CheckpointStore`：按 Checkpoint ID 的哈希在私有 Session 目录下持久化通过 Schema 校验的 Checkpoint。它与 SessionStore 共用 POSIX 单 Session 锁，通过同步临时文件和不可覆盖硬链接落盘，并拒绝损坏记录。它不会验证引用的 Session revision、Scope revision 或 Journal head 是否存在或真实，也不授权恢复。Windows 行为尚未验证。
 - `bugmaster_core.action_journal.ActionJournal.matches_prefix(sequence, head_hash)`：重放当前 Journal 并执行现有事件、状态转换和哈希链校验，再确认序号/哈希是否指向其前缀。此方法只校验本地完整性，不证明事件来源、事实真实性、授权或安全恢复。
+- `bugmaster_core.checkpoint_reference_validator.CheckpointReferenceValidator`：核对已存 Checkpoint 指向的 Session revision 和 Scope history 是否存在、最新 Session revision 是否登记了该 Checkpoint，以及 Journal 本地前缀是否匹配。Journal 对象由调用方提供；此验证器不会独立绑定 `journalId` 与文件路径，不认证事件，不重新核验授权/预算，也不授权恢复。
 
 `approvalRef`、`enforcementRef` 和 Checkpoint 中的哈希都只是结构/完整性信息。它们不能证明审批人身份、审批真实性/有效期、执行来源或事件真实性。可信授权与恢复验证网关仍未实现；R2 必须由工具层执行审批和控制，R3 仍受独立安全策略约束。
 
@@ -25,6 +26,6 @@ Session Schema 保存结构化历史和计数；`SessionStore` 增加本地不�
 
 Skill Manifest、Pattern、Catalog、Capability Registry、Recovery Decision、Oracle、Evidence、Finding、Review、Report、Regression Recommendation、Eval Manifest 和 Release Manifest 尚未实现。可从 [统一契约](../docs/en/03-contracts.md) 与 [中文统一契约](../docs/zh-CN/03-contracts.md) 中查阅状态和身份约束。当前部分 Schema 不能被视为完整契约套件已通过。
 
-Scope、Feature Inventory、Approval、Action、Event、Checkpoint 和 Session Schema 均有对应的 `tests/contracts/` 测试。Feature Inventory 测试验证 `examples/openapi/orders.json` 的实际 CLI 输出；Event 测试校验实际 Journal 事件（包括 R2 审批引用）；CheckpointStore 持久化由 `tests/unit/test_checkpoint_store.py` 单测和基于 Checkpoint Schema 的契约集成测试覆盖；这些测试不会校验被引用的 Session/Scope/Journal 记录、可信授权、预算对账或恢复流程。SessionStore 持久化由 `tests/unit/test_session_store.py` 和基于 Session Schema 的契约集成测试覆盖；这些测试不运行 Checkpoint 持久化、可信授权、预算对账或恢复流程。
+Scope、Feature Inventory、Approval、Action、Event、Checkpoint 和 Session Schema 均有对应的 `tests/contracts/` 测试。Feature Inventory 测试验证 `examples/openapi/orders.json` 的实际 CLI 输出；Event 测试校验实际 Journal 事件（包括 R2 审批引用）；CheckpointStore 持久化由 `tests/unit/test_checkpoint_store.py` 单测和基于 Checkpoint Schema 的契约集成测试覆盖。`CheckpointReferenceValidator` 使用真实本地存储校验 Session revision、Scope history、最新 Session 登记项和 Journal 前缀一致性；它仍不绑定 Journal ID 与路径，也不验证可信授权、预算对账、事件来源或恢复授权。SessionStore 持久化由 `tests/unit/test_session_store.py` 和基于 Session Schema 的契约集成测试覆盖；这些测试不运行可信授权、预算对账或恢复流程。
 
 CI 安装固定版本的测试验证器并执行契约套件。本地使用 Python 3.12，并安装 `jsonschema[format-nongpl]==4.26.0`；可选格式验证器确保 RFC3339 时间字段被执行检查。该依赖仅用于测试，不是 BugMaster 运行时依赖。低于 Python 3.10 的环境应使用仓库 CI 的 Python 3.12 或兼容环境。
