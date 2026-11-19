@@ -171,4 +171,6 @@ python -m unittest \
 
 PR #3 head `5d398bb761233453c94cfa4d53d932a56e17e866` 的 Actions [Run 44533110359](https://github.com/naodeng/bugmaster/actions/runs/44533110359) 中，156 项单测和 75 项合同测试均通过；Ubuntu 26.04 / Python 3.12 的单元行覆盖率为 1,044/1,045（99.90%），因此 CI 按 100% 门槛失败。macOS 上相同 1,045 行全部覆盖，当前差异表明有一处平台执行路径尚未覆盖。
 
-为让下一次 CI 失败能直接给出文件和未覆盖行，先扩展 `WorkflowCoverageGateTests`，断言失败报告包含缺失行；旧 workflow 在新测试下得到预期 RED。随后更新合同 workflow 的失败信息以输出 `coverage.json` 中各文件的 `missing_lines`，不改变 100% 门槛。`python -m unittest tests.contracts.test_quality_gate -v`：5/5 PASS；`git diff --check`：PASS。该诊断变更推送后，需先从 Ubuntu CI 获取确切行号，再补对应行为测试/执行路径；PR #3 暂不合并。
+为让下一次 CI 失败能直接给出文件和未覆盖行，先扩展 `WorkflowCoverageGateTests`，断言失败报告包含缺失行；旧 workflow 在新测试下得到预期 RED。随后更新合同 workflow 的失败信息以输出 `coverage.json` 中各文件的 `missing_lines`，不改变 100% 门槛。`python -m unittest tests.contracts.test_quality_gate -v`：5/5 PASS；`git diff --check`：PASS。
+
+首个诊断 head `0770f07ba08fabc7fda70a0aec4d860221eeafd2` 的 [Run 44534395315](https://github.com/naodeng/bugmaster/actions/runs/44534395315) 未创建 job。检查发现 YAML 普通标量中的 Python 字典冒号带空格会破坏 workflow 解析；本地 Ruby Psych 首次解析得到语法错误，移除冒号后的空格后解析通过，合同门禁回归仍为 5/5 PASS。修正后的 workflow 需重新推送并取得远端 CI 诊断；找到确切未覆盖行后再补对应行为测试/执行路径。PR #3 暂不合并。
