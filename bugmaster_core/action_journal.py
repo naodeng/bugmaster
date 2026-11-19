@@ -476,3 +476,17 @@ class ActionJournal:
             "completed": "terminal",
             "failed": "terminal",
         }[state["status"]]
+
+    def actions_needing_reconciliation(self):
+        """List action IDs whose journal-recorded outcomes remain unresolved.
+
+        This is a read-only view of local Journal state. It does not verify
+        external effects, authenticate reconciliation claims, or authorize
+        replay.
+        """
+        _, states = self._load_current()
+        return tuple(
+            action_id
+            for action_id, state in states.items()
+            if _needs_reconciliation(state)
+        )
