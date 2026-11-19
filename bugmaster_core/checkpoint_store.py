@@ -20,6 +20,7 @@ from .session_store import (
     _fsync_directory,
     _nonempty,
     _write_all,
+    SessionStore,
     SessionCorruptionError,
     SessionStoreError,
 )
@@ -51,7 +52,7 @@ class CheckpointStore:
             storage_key = hashlib.sha256(session_id.encode("utf-8")).hexdigest()
         except UnicodeEncodeError as error:
             raise CheckpointStoreError("session ID is not valid UTF-8") from error
-        self.root = Path(root)
+        self.root = Path(root).absolute()
         self.session_id = session_id
         self.validator = validator
         self._sessions_dir = self.root / "sessions"
@@ -74,12 +75,10 @@ class CheckpointStore:
             raise CheckpointStoreError("checkpoint ID must be a non-empty string")
         filename = self._checkpoint_filename(checkpoint_id)
         with self._locked(create_directories=False):
-            if self._checkpoints_dir.is_symlink():
-                raise CheckpointCorruptionError("Checkpoint storage path cannot be a symlink")
-            if not self._checkpoints_dir.exists():
+            if not SessionStore._existing_directory(
+                self._checkpoints_dir, "Checkpoint storage", CheckpointCorruptionError
+            ):
                 return None
-            if not self._checkpoints_dir.is_dir():
-                raise CheckpointCorruptionError("Checkpoint storage path is not a directory")
             path = self._checkpoints_dir / filename
             if path.is_symlink():
                 raise CheckpointCorruptionError("Checkpoint record cannot be a symlink")
@@ -121,11 +120,15 @@ class CheckpointStore:
     def _locked(self, create_directories=True):
         if create_directories:
             self._ensure_directories()
-        elif not self._session_dir.exists():
-            yield
-            return
+        else:
+            for directory in (self.root, self._sessions_dir, self._session_dir):
+                if not SessionStore._existing_directory(
+                    directory, "Checkpoint storage", CheckpointCorruptionError
+                ):
+                    yield
+                    return
 
-        flags = os.O_RDWR | os.O_CREAT
+        flags = os.O_RDWR | os.O_CREAT if create_directories else os.O_RDONLY
         if hasattr(os, "O_NOFOLLOW"):
             flags |= os.O_NOFOLLOW
         try:
@@ -136,8 +139,9 @@ class CheckpointStore:
         try:
             if not stat.S_ISREG(os.fstat(fd).st_mode):
                 raise CheckpointStoreError("Session lock is not a regular file")
-            os.fchmod(fd, 0o600)
-            fcntl.flock(fd, fcntl.LOCK_EX)
+            if create_directories:
+                os.fchmod(fd, 0o600)
+            fcntl.flock(fd, fcntl.LOCK_EX if create_directories else fcntl.LOCK_SH)
             acquired = True
             yield
         except OSError as error:

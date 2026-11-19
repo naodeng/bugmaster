@@ -1,4 +1,4 @@
-import json,sys,tempfile,unittest
+import json,shlex,subprocess,sys,tempfile,unittest
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT/'scripts'))
@@ -32,15 +32,32 @@ class GateContractTests(unittest.TestCase):
             self.assertEqual(validate_functional(ledger,matrix),[])
 
 class WorkflowCoverageGateTests(unittest.TestCase):
-    def test_contract_workflow_compares_covered_lines_to_statements(self):
+    def test_contract_workflow_rejects_empty_or_incomplete_coverage(self):
         workflow=(ROOT/'.github'/'workflows'/'contract.yml').read_text(encoding='utf-8')
         coverage_steps=[
-            line.strip()
+            line.strip().removeprefix('- run: ').strip()
             for line in workflow.splitlines()
             if line.strip().startswith('- run: python -c') and 'coverage.json' in line
         ]
 
         self.assertEqual(len(coverage_steps),1)
-        self.assertIn("['covered_lines']",coverage_steps[0])
-        self.assertIn("['num_statements']",coverage_steps[0])
-        self.assertNotIn('percent_covered_lines',coverage_steps[0])
+        command=shlex.split(coverage_steps[0])
+        self.assertEqual(command[:2],['python','-c'])
+        code=command[2]
+
+        def run_gate(covered_lines,num_statements):
+            with tempfile.TemporaryDirectory() as tmp:
+                report=Path(tmp)/'coverage.json'
+                report.write_text(json.dumps({'totals':{
+                    'covered_lines':covered_lines,
+                    'num_statements':num_statements,
+                }}),encoding='utf-8')
+                result=subprocess.run(
+                    [sys.executable,'-c',code.replace('coverage.json',str(report))],
+                    cwd=ROOT,capture_output=True,text=True,
+                )
+                return result.returncode
+
+        self.assertEqual(run_gate(100,100),0)
+        self.assertNotEqual(run_gate(99,100),0)
+        self.assertNotEqual(run_gate(0,0),0)
