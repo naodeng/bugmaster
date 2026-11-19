@@ -6,7 +6,7 @@
 
 **风险：** R3；独立 Security Reviewer 审查前不得合并。
 
-**实现提交：** `4bc2dc0b18ed8523f51fb8f5c171437ea40cd12d`；草稿 PR [#8](https://github.com/naodeng/bugmaster/pull/8)，基于 PR #7 `codex/journal-id-binding`，尚未合并。
+**实现提交：** `4bc2dc0b18ed8523f51fb8f5c171437ea40cd12d`；PR [#8](https://github.com/naodeng/bugmaster/pull/8) 当前 open/ready，基于 PR #7 `codex/journal-id-binding`，尚未合并。
 
 ## 需求、Oracle 与边界
 
@@ -55,7 +55,7 @@ AI 编写的路径断言针对真实临时文件系统和实际文件打开行�
 
 ## 后续缺口
 
-当前只解决 Journal 路径选择和本地文件类型/软链接保护。拥有相同本地权限的主体仍可改写 Journal 内容；尚无事件真实性、当前授权校验、预算与 Journal 消费对账、权威只读 reconciliation、恢复授权、工具层执行绑定或八断点崩溃注入。Windows、真实 API/Browser、Codex/Claude 双宿主和 50 个 Benchmark 场景均未验证。PR #8 保持草稿；整体 Release 仍为 **No-Go**。
+当前只解决 Journal 路径选择和本地文件类型/软链接保护。拥有相同本地权限的主体仍可改写 Journal 内容；尚无事件真实性、当前授权校验、预算与 Journal 消费对账、权威只读 reconciliation、恢复授权、工具层执行绑定或八断点崩溃注入。Windows、真实 API/Browser、Codex/Claude 双宿主和 50 个 Benchmark 场景均未验证。PR #8 当前 open/ready，合并仍需独立安全审查；整体 Release 仍为 **No-Go**。
 
 ## 交叉审核修复（PR #8）
 
@@ -75,3 +75,20 @@ AI 编写的路径断言针对真实临时文件系统和实际文件打开行�
 ### VERIFY
 
 实现提交：`8b9bfec5fff1252d58e450a71a30d6c175085580`。修复后 ActionJournal 41/41、ActionJournalStore 14/14、CheckpointReferenceValidator 15/15 单测 PASS；Event Schema 契约 2/2 PASS；`git diff --check` PASS。全单元、全契约和 100% 行/分支覆盖会在 PR #10 集成后重新运行。
+
+## CI 覆盖门禁复查（2026-11-19）
+
+PR #8 首次推送后 Actions Run [44486235780](https://github.com/naodeng/bugmaster/actions/runs/44486235780) 的单元与契约步骤通过，但精确行覆盖门禁失败：`covered_lines=1178`、`num_statements=1193`。失覆盖位于 Store 的错误处理分支（路径检查、Journal 文件创建/同步、存储根和中间目录类型）以及 Journal 读取的安全打开错误映射。此前的定向正向路径测试没有执行这些边界。
+
+### RED / GREEN
+
+- 在 PR #8 中补充 9 项边界行为测试：Journal 拒绝安全打开错误；Store 将文件路径检查、创建、文件同步和目录同步错误映射为领域错误；拒绝非普通文件、不可用根目录及软链接存储目录。
+- 测试不修改生产实现。补齐后 ActionJournal/ActionJournalStore 定向测试 64/64 PASS；这些断言逐一命中原先未执行的处理路径。
+
+### VERIFY
+
+- 隔离克隆：`/private/tmp/bugmaster-review-fixes-20261119`；分支：`codex/journal-path-resolution`；Python 3.12；coverage.py 7.13.3；测试依赖位于 `/private/tmp/bugmaster-review-venv`。
+- `PYTHONDONTWRITEBYTECODE=1 /private/tmp/bugmaster-review-venv/bin/python -m coverage run --branch --source=bugmaster_core --data-file=/private/tmp/bugmaster-pr8-final.coverage -m unittest discover -s tests/unit`：177/177 PASS。
+- `PYTHONDONTWRITEBYTECODE=1 /private/tmp/bugmaster-review-venv/bin/python -m unittest discover -s tests/contracts`：77/77 PASS。
+- `coverage report --data-file=/private/tmp/bugmaster-pr8-final.coverage --include='bugmaster_core/*'`：1193/1193 语句、474/474 分支，均为 100%。
+- 当前 PR #8 head 的 Actions 重跑待提交后确认；Release 仍为 No-Go。该门禁是单元代码行覆盖，不是业务功能覆盖。
