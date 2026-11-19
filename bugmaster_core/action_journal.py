@@ -280,6 +280,26 @@ class ActionJournal:
             fcntl.flock(fd, fcntl.LOCK_UN)
             os.close(fd)
 
+    def matches_prefix(self, sequence, head_hash):
+        """Return whether sequence and hash identify a validated journal prefix.
+
+        This checks local hash-chain consistency only. It does not establish
+        event authenticity, source truth, authorization, or safe resumption.
+        """
+        if (
+            isinstance(sequence, bool)
+            or not isinstance(sequence, int)
+            or sequence < 0
+        ):
+            raise JournalError("journal sequence must be a non-negative integer")
+
+        events, _ = self._load_current()
+        if sequence == 0:
+            return head_hash is None
+        if not _digest_matches(head_hash) or sequence > len(events):
+            return False
+        return hmac.compare_digest(events[sequence - 1]["entryHash"], head_hash)
+
     def _append(self, event_type, action_id, data):
         self.path.parent.mkdir(parents=True, exist_ok=True)
         created = False

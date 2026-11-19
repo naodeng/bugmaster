@@ -79,6 +79,15 @@ def _write_hashed_events(path, events):
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+def _matches_prefix(test_case, journal, sequence, head_hash):
+    matcher = getattr(journal, "matches_prefix", None)
+    test_case.assertTrue(
+        callable(matcher),
+        "ActionJournal must verify a checkpoint's sequence/hash prefix",
+    )
+    return matcher(sequence, head_hash)
+
+
 class ActionJournalRecoveryTests(unittest.TestCase):
     def test_restart_blocks_replaying_an_action_with_unknown_result(self):
         ActionJournal, _, JournalError = _journal_types(self)
@@ -818,6 +827,69 @@ class ActionJournalRecoveryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             with self.assertRaises(JournalError):
                 ActionJournal(Path(directory) / "journal.jsonl", " ")
+
+    def test_checkpoint_prefix_matches_a_persisted_hash_chain_head(self):
+        ActionJournal, _, _ = _journal_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            journal = ActionJournal(Path(directory) / "journal.jsonl", "session-1")
+            first = journal.prepare("action-1", "a" * 64, 1, "R0")
+            journal.prepare("action-2", "b" * 64, 1, "R0")
+
+            self.assertTrue(
+                _matches_prefix(self, journal, 1, first["entryHash"])
+            )
+
+    def test_checkpoint_prefix_accepts_a_valid_empty_anchor(self):
+        ActionJournal, _, _ = _journal_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            journal = ActionJournal(Path(directory) / "journal.jsonl", "session-1")
+            self.assertTrue(_matches_prefix(self, journal, 0, None))
+            journal.prepare("action-1", "a" * 64, 1, "R0")
+            self.assertTrue(_matches_prefix(self, journal, 0, None))
+
+    def test_checkpoint_prefix_rejects_a_mismatched_anchor(self):
+        ActionJournal, _, _ = _journal_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            journal = ActionJournal(Path(directory) / "journal.jsonl", "session-1")
+            first = journal.prepare("action-1", "a" * 64, 1, "R0")
+
+            for sequence, head_hash in (
+                (1, "b" * 64),
+                (2, first["entryHash"]),
+                (1, None),
+                (1, "not-a-sha256"),
+                (0, "a" * 64),
+            ):
+                with self.subTest(sequence=sequence, head_hash=head_hash):
+                    self.assertFalse(
+                        _matches_prefix(self, journal, sequence, head_hash)
+                    )
+
+    def test_checkpoint_prefix_rejects_malformed_sequences(self):
+        ActionJournal, _, JournalError = _journal_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            journal = ActionJournal(Path(directory) / "journal.jsonl", "session-1")
+            for sequence in (True, -1, 1.5, "1"):
+                with self.subTest(sequence=sequence):
+                    with self.assertRaises(JournalError):
+                        _matches_prefix(self, journal, sequence, None)
+
+    def test_checkpoint_prefix_fails_closed_when_the_journal_is_corrupt(self):
+        ActionJournal, JournalCorruptionError, _ = _journal_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "journal.jsonl"
+            journal = ActionJournal(path, "session-1")
+            first = journal.prepare("action-1", "a" * 64, 1, "R0")
+            with path.open("ab") as stream:
+                stream.write(b"{broken-json}\n")
+
+            with self.assertRaises(JournalCorruptionError):
+                _matches_prefix(self, journal, 1, first["entryHash"])
 
 
 if __name__ == "__main__":
