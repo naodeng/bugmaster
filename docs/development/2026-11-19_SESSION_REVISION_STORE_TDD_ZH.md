@@ -173,4 +173,6 @@ PR #3 head `5d398bb761233453c94cfa4d53d932a56e17e866` 的 Actions [Run 445331103
 
 为让下一次 CI 失败能直接给出文件和未覆盖行，先扩展 `WorkflowCoverageGateTests`，断言失败报告包含缺失行；旧 workflow 在新测试下得到预期 RED。随后更新合同 workflow 的失败信息以输出 `coverage.json` 中各文件的 `missing_lines`，不改变 100% 门槛。`python -m unittest tests.contracts.test_quality_gate -v`：5/5 PASS；`git diff --check`：PASS。
 
-首个诊断 head `0770f07ba08fabc7fda70a0aec4d860221eeafd2` 的 [Run 44534395315](https://github.com/naodeng/bugmaster/actions/runs/44534395315) 未创建 job。检查发现 YAML 普通标量中的 Python 字典冒号带空格会破坏 workflow 解析；本地 Ruby Psych 首次解析得到语法错误，移除冒号后的空格后解析通过，合同门禁回归仍为 5/5 PASS。修正后的 workflow 需重新推送并取得远端 CI 诊断；找到确切未覆盖行后再补对应行为测试/执行路径。PR #3 暂不合并。
+首个诊断 head `0770f07ba08fabc7fda70a0aec4d860221eeafd2` 的 [Run 44534395315](https://github.com/naodeng/bugmaster/actions/runs/44534395315) 未创建 job。检查发现 YAML 普通标量中的 Python 字典冒号带空格会破坏 workflow 解析；本地 Ruby Psych 首次解析得到语法错误，移除冒号后的空格后解析通过，合同门禁回归仍为 5/5 PASS。
+
+修正格式后的 head `0e76caeb514688b19682f5a6d9c35c43fbac636f` 在 [Run 44535020463](https://github.com/naodeng/bugmaster/actions/runs/44535020463) 正常执行至覆盖率门禁，报告唯一未覆盖行是 `bugmaster_core/session_store.py:780`（`00000001.json` 后出现额外目录项时拒绝恢复）。根据前一检查点的控制流和 Linux `scandir` 的无序枚举，这项两 revision 防护测试会先遇到 `00000002.json` 并在行 778 返回，因此没有覆盖行 780；这是测试依赖目录顺序造成的平台差异，未发现生产行为缺陷。将该测试的目录项顺序固定为名称升序后，目标测试 1/1、全单元 156/156、全合同 75/75 PASS；本机 `bugmaster_core` 行覆盖 1,045/1,045（100%）、分支覆盖 406/406（100%），`git diff --check` PASS。修正后的覆盖率 CI、安全复审和常规 CodeX review 仍待新 head 验证；PR #3 暂不合并。
