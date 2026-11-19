@@ -56,3 +56,22 @@ AI 编写的路径断言针对真实临时文件系统和实际文件打开行�
 ## 后续缺口
 
 当前只解决 Journal 路径选择和本地文件类型/软链接保护。拥有相同本地权限的主体仍可改写 Journal 内容；尚无事件真实性、当前授权校验、预算与 Journal 消费对账、权威只读 reconciliation、恢复授权、工具层执行绑定或八断点崩溃注入。Windows、真实 API/Browser、Codex/Claude 双宿主和 50 个 Benchmark 场景均未验证。PR #8 保持草稿；整体 Release 仍为 **No-Go**。
+
+## 交叉审核修复（PR #8）
+
+### RED
+
+- 根路径回归：先构造相对路径 Store，再切换工作目录；13 项定向测试中 1 项失败，证明 Store 保留相对路径并在新工作目录重新解析。
+- 只读读取和历史缺失：Store 定向测试另有 2 项失败，分别证实 `open()` 会对已有目录重新 `chmod`，以及规范 Journal 文件缺失时会返回空 Journal；即使旁边存在旧的调用方自选路径日志，也没有错误提示。
+- FIFO 路径：在临时 POSIX FIFO 上为读取、追加增加非阻塞断言；ActionJournal 41 项定向测试中 2 项因缺少 `O_NONBLOCK` 断言失败，防止测试本身挂住。
+
+### GREEN / REFACTOR
+
+- Store 构造时将根目录固定为绝对路径。
+- 将用途明确分开：`initialize()` 负责显式创建新的规范空 Journal 和私有目录；`open()` 只读打开已存在的规范 Journal，不创建目录或改权限，并在目录/文件缺失时失败关闭。`ActionJournal` 的 `require_existing` 标记也会在检查与打开之间文件消失时拒绝空历史。没有自动迁移旧的调用方自选路径日志。
+- Journal 读取使用非阻塞只读描述符、普通文件校验和共享锁；追加使用非阻塞读写描述符，并在 `fchmod` 或读事件之前拒绝 FIFO/目录等非普通文件。
+- CheckpointReferenceValidator 的测试夹具改用显式 `initialize()` 写入测试 Journal；验证器继续调用只读 `open()`。
+
+### VERIFY
+
+实现提交：`8b9bfec5fff1252d58e450a71a30d6c175085580`。修复后 ActionJournal 41/41、ActionJournalStore 14/14、CheckpointReferenceValidator 15/15 单测 PASS；Event Schema 契约 2/2 PASS；`git diff --check` PASS。全单元、全契约和 100% 行/分支覆盖会在 PR #10 集成后重新运行。

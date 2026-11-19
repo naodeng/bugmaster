@@ -12,7 +12,7 @@ Schema 使用 JSON Schema Draft 2020-12。契约测试同时校验 Schema 本身
 - `action.schema.json`：校验规范化 Action 意图和生命周期状态、R0/R2 变更约束、R2 审批引用、R1 变更强制执行引用，以及不可执行的移动端/未知表面。
 - `event.schema.json` v1.1：校验 Action Journal 事件封套、稳定 `journalId` 和四类 prepared/dispatched/outcome/reconciliation claim 载荷。运行时代码会核验序号、状态转换、Session 与 Journal 身份、RFC3339 时间和 SHA-256 事件链。v1.0 Journal 文件会被拒绝读取且不修改；当前没有迁移程序。
 - `bugmaster_core.action_journal.ActionJournal`：为固定 Session/Journal 身份读写 v1.1 事件。若省略 Journal ID，默认值为 `journal-<sessionId>`；Session 使用自定义 `journalId` 时，调用方必须将其传入构造器。`ActionJournalStore` 根据存储根目录、Session ID 和 Journal ID 解析规范文件。
-- `bugmaster_core.action_journal_store.ActionJournalStore`：将 Session 和 Journal 身份映射到 `<root>/journals/<sha256(sessionId)>/<sha256(journalId)>.jsonl`；创建私有目录并拒绝软链接路径组件及 Journal 软链接文件。路径和身份字段不能认证 Journal 内容。
+- `bugmaster_core.action_journal_store.ActionJournalStore`：将 Session 和 Journal 身份映射到 `<root>/journals/<sha256(sessionId)>/<sha256(journalId)>.jsonl`。`initialize()` 显式创建新的规范空 Journal；`open()` 只读打开已有规范 Journal，不创建或修改路径，存储目录或文件缺失时失败关闭。当前不提供从此前调用方自选路径迁移的功能。路径和身份字段不能认证 Journal 内容。
 - `checkpoint.schema.json`：校验 Checkpoint 的不可变 Session revision、Scope revision 与 Journal 序号/哈希锚点，并覆盖空 Journal 边界。它只做结构验证；恢复仍需验证所引用的 revision 和 Journal，并重新核验当前授权与预算。
 - `session.schema.json`：校验版本化 Session revision、规范生命周期状态、Scope revision 历史、绑定 Scope revision 的审批引用、预算上限与已用计数，以及 Journal/Checkpoint 引用。引用不构成授权或安全恢复证明。
 - `bugmaster_core.session_store.SessionStore`：将每个通过校验的 Session revision 保存为独立不可变文件，使用私有 Session 目录和 POSIX 文件锁串行化写入，通过同步临时文件后再以不可覆盖方式落盘；拒绝替换、序号缺口、权限错误和不一致的历史转换。它不会认证 Approval 引用、将预算与 Action Journal 对账，也不授权恢复。Windows 行为尚未验证。

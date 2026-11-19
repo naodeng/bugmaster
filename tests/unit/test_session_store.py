@@ -526,6 +526,221 @@ class SessionStoreTests(unittest.TestCase):
             store.create(_valid_session())
             self.assertIsNone(store.read_revision(2))
 
+    def test_read_latest_fails_closed_when_the_latest_revision_is_missing(self):
+        _, _, SessionCorruptionError = _session_store_types(self)
+        with tempfile.TemporaryDirectory() as directory:
+            store = self.make_store(directory)
+            first = _valid_session()
+            store.create(first)
+            second = _next_revision(first, status="ready")
+            store.append_revision(second, expected_revision=1)
+            (store._revisions_dir / "00000002.json").unlink()
+
+            with self.assertRaises(SessionCorruptionError):
+                store.read_latest()
+
+    def test_append_cannot_reuse_a_missing_revision_and_reset_its_budget(self):
+        _, _, SessionCorruptionError = _session_store_types(self)
+        with tempfile.TemporaryDirectory() as directory:
+            store = self.make_store(directory)
+            first = _valid_session()
+            store.create(first)
+            consumed = _next_revision(
+                first,
+                status="ready",
+                actionBudget={"maxActions": 20, "consumedActions": 5},
+            )
+            store.append_revision(consumed, expected_revision=1)
+            (store._revisions_dir / "00000002.json").unlink()
+            reset = _next_revision(first, status="paused")
+
+            with self.assertRaises(SessionCorruptionError):
+                store.append_revision(reset, expected_revision=1)
+
+    def test_read_latest_rejects_a_dangling_revision_directory_symlink(self):
+        _, _, SessionCorruptionError = _session_store_types(self)
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            store = self.make_store(base / "store")
+            store.create(_valid_session())
+            for revision_path in store._revisions_dir.iterdir():
+                revision_path.unlink()
+            store._revisions_dir.rmdir()
+            store._revisions_dir.symlink_to(base / "missing", target_is_directory=True)
+
+            with self.assertRaises(SessionCorruptionError):
+                store.read_latest()
+
+    def test_read_latest_rejects_a_symlinked_session_directory(self):
+        _, _, SessionCorruptionError = _session_store_types(self)
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            actual = self.make_store(base / "actual")
+            actual.create(_valid_session())
+            linked = self.make_store(base / "linked")
+            linked._sessions_dir.mkdir(parents=True)
+            linked._session_dir.symlink_to(actual._session_dir, target_is_directory=True)
+
+            with self.assertRaises(SessionCorruptionError):
+                linked.read_latest()
+
+    def test_read_only_reader_does_not_require_write_permission_on_lock(self):
+        _, _, _ = _session_store_types(self)
+        with tempfile.TemporaryDirectory() as directory:
+            store = self.make_store(directory)
+            store.create(_valid_session())
+            os.chmod(store._lock_path, 0o400)
+
+            self.assertEqual(store.read_latest()["revision"], 1)
+            self.assertEqual(stat.S_IMODE(store._lock_path.stat().st_mode), 0o400)
+
+    def test_relative_root_is_fixed_when_the_store_is_created(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            original_cwd = Path.cwd()
+            first = base / "first"
+            second = base / "second"
+            first.mkdir()
+            second.mkdir()
+            try:
+                os.chdir(first)
+                store = self.make_store("session-data")
+                os.chdir(second)
+                store.create(_valid_session())
+            finally:
+                os.chdir(original_cwd)
+
+            self.assertTrue((first / "session-data" / "sessions").is_dir())
+            self.assertFalse((second / "session-data").exists())
+
+    def test_missing_revisions_directory_with_head_fails_closed(self):
+        _, _, SessionCorruptionError = _session_store_types(self)
+        with tempfile.TemporaryDirectory() as directory:
+            store = self.make_store(directory)
+            store.create(_valid_session())
+            for revision_path in store._revisions_dir.iterdir():
+                revision_path.unlink()
+            store._revisions_dir.rmdir()
+
+            with self.assertRaises(SessionCorruptionError):
+                store.read_latest()
+
+    def test_missing_head_with_revisions_fails_closed(self):
+        _, _, SessionCorruptionError = _session_store_types(self)
+        with tempfile.TemporaryDirectory() as directory:
+            store = self.make_store(directory)
+            store.create(_valid_session())
+            store._head_path.unlink()
+
+            with self.assertRaises(SessionCorruptionError):
+                store.read_latest()
+
+    def test_invalid_revision_heads_fail_closed(self):
+        _, _, SessionCorruptionError = _session_store_types(self)
+        corruptions = (
+            "directory",
+            "wrong-mode",
+            "too-large",
+            "incomplete",
+            "invalid-json",
+            "invalid-fields",
+        )
+        for corruption in corruptions:
+            with self.subTest(corruption=corruption), tempfile.TemporaryDirectory() as directory:
+                store = self.make_store(directory)
+                store.create(_valid_session())
+                store._head_path.unlink()
+                if corruption == "directory":
+                    store._head_path.mkdir()
+                else:
+                    if corruption == "too-large":
+                        payload = b"x" * 1025 + b"\n"
+                    elif corruption == "incomplete":
+                        payload = b"{}"
+                    elif corruption == "invalid-json":
+                        payload = b"not-json\n"
+                    else:
+                        payload = json.dumps(
+                            {"sessionId": "session-1", "revision": 1, "revisionDigest": "bad"},
+                            sort_keys=True,
+                            separators=(",", ":"),
+                        ).encode("utf-8") + b"\n"
+                    store._head_path.write_bytes(payload)
+                    os.chmod(store._head_path, 0o644 if corruption == "wrong-mode" else 0o600)
+
+                with self.assertRaises(SessionCorruptionError):
+                    store.read_latest()
+
+    def test_revision_head_open_errors_fail_closed(self):
+        _, _, SessionCorruptionError = _session_store_types(self)
+        with tempfile.TemporaryDirectory() as directory:
+            store = self.make_store(directory)
+            store.create(_valid_session())
+            real_open = os.open
+
+            def fail_head_open(path, flags, *args, **kwargs):
+                if Path(path) == store._head_path:
+                    raise OSError("head unavailable")
+                return real_open(path, flags, *args, **kwargs)
+
+            with patch("bugmaster_core.session_store.os.open", side_effect=fail_head_open):
+                with self.assertRaises(SessionCorruptionError):
+                    store.read_latest()
+
+    def test_revision_directory_inspection_errors_fail_closed(self):
+        _, _, SessionCorruptionError = _session_store_types(self)
+        with tempfile.TemporaryDirectory() as directory:
+            store = self.make_store(directory)
+            store.create(_valid_session())
+            original_lstat = Path.lstat
+
+            def fail_revision_lstat(path):
+                if path == store._revisions_dir:
+                    raise OSError("revision path unavailable")
+                return original_lstat(path)
+
+            with patch.object(Path, "lstat", fail_revision_lstat):
+                with self.assertRaises(SessionCorruptionError):
+                    store.read_latest()
+
+    def test_revision_head_write_failure_cleans_up_temporary_file(self):
+        _, SessionStoreError, _ = _session_store_types(self)
+        with tempfile.TemporaryDirectory() as directory:
+            store = self.make_store(directory)
+            real_replace = os.replace
+
+            def fail_head_replace(source, destination):
+                if Path(destination) == store._head_path:
+                    Path(source).unlink()
+                    raise OSError("head publication failed")
+                return real_replace(source, destination)
+
+            with patch("bugmaster_core.session_store.os.replace", side_effect=fail_head_replace):
+                with self.assertRaises(SessionStoreError):
+                    store.create(_valid_session())
+
+            self.assertEqual(list(store._session_dir.glob(".session-head-*")), [])
+
+    def test_revision_head_mode_failure_cleans_up_open_file_and_temporary_file(self):
+        _, SessionStoreError, _ = _session_store_types(self)
+        with tempfile.TemporaryDirectory() as directory:
+            store = self.make_store(directory)
+            real_fchmod = os.fchmod
+            calls = 0
+
+            def fail_head_mode(fd, mode):
+                nonlocal calls
+                calls += 1
+                if calls == 3:
+                    raise OSError("head mode unavailable")
+                return real_fchmod(fd, mode)
+
+            with patch("bugmaster_core.session_store.os.fchmod", side_effect=fail_head_mode):
+                with self.assertRaises(SessionStoreError):
+                    store.create(_valid_session())
+
+            self.assertEqual(list(store._session_dir.glob(".session-head-*")), [])
+
     def test_storage_rejects_symlink_and_non_directory_paths(self):
         _, SessionStoreError, SessionCorruptionError = _session_store_types(self)
         with tempfile.TemporaryDirectory() as directory:
@@ -549,7 +764,9 @@ class SessionStoreTests(unittest.TestCase):
                 self.make_store(blocked_root).create(_valid_session())
 
             store = self.make_store(base / "linked-revisions")
-            store._ensure_directories()
+            store.create(_valid_session())
+            for revision_path in store._revisions_dir.iterdir():
+                revision_path.unlink()
             store._revisions_dir.rmdir()
             outside = base / "outside-revisions"
             outside.mkdir()

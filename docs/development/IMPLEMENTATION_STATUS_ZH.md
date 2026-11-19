@@ -11,9 +11,9 @@
 | 50 Benchmark | Planned 列表 | 未执行，缺独立 Ground Truth 运行证据 |
 | 单元测试 | 145/145 通过 | Python 3.12；`bugmaster_core` 为 1060/1060 语句与 428/428 分支覆盖 |
 | 契约测试 | 78/78 通过 | Python 3.12 + 固定 `jsonschema[format-nongpl]==4.26.0`；含 SessionStore、CheckpointStore Schema 集成测试和 replay gate 负例 |
-| Session 契约与持久化 | 部分实现 | Schema 提交 `aaa5564`、11 项契约测试；`SessionStore` 最终提交 `7d2e195`、36 项定向单测，320/320 行与 130/130 分支覆盖。PR #3 Actions Run `44443870587` 通过；预算/Journal 对账、审批真实性与恢复授权仍未实现。属于 R2，独立质量审查前不合并 |
+| Session 契约与持久化 | 部分实现 | Schema 提交 `aaa5564`、11 项契约测试；`SessionStore` 最终提交 `7d2e195`、36 项定向单测，320/320 行与 130/130 分支覆盖。PR #3 Actions Run `44443870587` 通过；预算/Journal 对账、审批真实性与恢复授权仍未实现。按 Q15 W6-01 归为 R3，独立安全审查前不合并 |
 | Checkpoint 持久化 | 部分实现 | `CheckpointStore` 提交 `ba8bc6a`，19 项定向单测，187/187 行、60/60 分支覆盖；PR #4 Actions Run `44446002412` 通过。只持久化结构记录，不验证外部引用或授权恢复；R3 变更须独立 Security Reviewer，详见 [Checkpoint TDD 记录](2026-11-19_CHECKPOINT_STORE_TDD_ZH.md) |
-| Journal / Safe Resume | 部分实现 | Journal 有 append/fsync、状态校验、哈希链、未决 Action 阻断和 Checkpoint 前缀核验（PR #5）；PR #6/#7 校验跨存储引用和 Session/Journal ID；PR #8 的 `ActionJournalStore` 按 Session/Journal ID 确定性解析路径并拒绝软链接/非普通文件；PR #9 将 `can_replay()` 改为在可信 verifier 接入前恒拒绝。Event v1.0 日志 fail-closed 且不改写，无迁移器。可信恢复验证器、预算对账、HTTP/Browser 网关及审批真实性认证仍未实现。PR #5–#9 均为 R3，独立安全审查前不合并 |
+| Journal / Safe Resume | 部分实现 | Journal 有 append/fsync、状态校验、哈希链、未决 Action 阻断和 Checkpoint 前缀核验（PR #5）；PR #6/#7 校验跨存储引用和 Session/Journal ID；PR #8 的 `ActionJournalStore` 固定绝对根路径，显式 `initialize()` 新日志，只读 `open()` 读取现有规范日志并在缺失时失败关闭，也拒绝软链接/非普通文件；PR #9 将 `can_replay()` 改为在可信 verifier 接入前恒拒绝。Event v1.0 和此前调用方自选路径日志均不会被隐式迁移。事件真实性、预算对账、可信恢复验证器、HTTP/Browser 网关及审批真实性认证仍未实现。PR #5–#9 均为 R3，独立安全审查前不合并 |
 | 业务功能覆盖 >60% | **未达成** | 缺真实业务执行证据 |
 | 核心 Happy/Negative/Edge | **未达成** | 核心功能矩阵只有待执行位置 |
 | API/Browser 自主探索 | **未完成** | 未建立真实执行闭环 |
