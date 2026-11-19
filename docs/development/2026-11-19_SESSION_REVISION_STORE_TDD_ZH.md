@@ -1,6 +1,6 @@
 # W6 Session Revision 持久化 TDD 记录
 
-**日期：** 2026-11-19  
+**日期：** 2026-11-19
 **Workstream / 义务：** W6-01 Session Persistence；`F-RECOVERY`；`TDD-ACT-004`
 **风险：** R3；合并前需要独立 Security Reviewer。
 **实现提交：** `7d2e1957dc417146ed9559e75f04e9c694a3ebbb`（初版存储提交 `2e2101015d0ab062ed7b9a7a0301ba729bb6679b`）；草稿 PR [#3](https://github.com/naodeng/bugmaster/pull/3)，叠加于 Session Schema PR #2，尚未合并。
@@ -125,4 +125,42 @@ python -m unittest \
 
 ## 未覆盖的产品能力
 
-100% 单元行覆盖不是业务功能覆盖，也不是 BLK-03 完成证据。Checkpoint 持久化、崩溃断点注入、Windows 实现、进程/主机恢复、Approval 真实性验证、预算与 Journal 对账、可信只读核验及恢复授权仍未实现或未验证。未执行任何真实 API/Browser 目标测试、50 个 Benchmark 场景或双宿主验证。完整 Release 维持 **No-Go**；本 PR 不得在缺少独立 R2 质量审查时合并。
+100% 单元行覆盖不是业务功能覆盖，也不是 BLK-03 完成证据。Checkpoint 持久化、崩溃断点注入、Windows 实现、进程/主机恢复、Approval 真实性验证、预算与 Journal 对账、可信只读核验及恢复授权仍未实现或未验证。未执行任何真实 API/Browser 目标测试、50 个 Benchmark 场景或双宿主验证。完整 Release 维持 **No-Go**；本 R3 PR 不得在缺少独立安全审查时合并。
+
+## 独立安全与工程复审补充
+
+**日期：** 2026-11-19
+**复审范围：** PR #3 当前本地完整差异；W6-01 / `F-RECOVERY` / `TDD-ACT-004`；R3。
+
+### RED
+
+独立 Security Review 与 Engineering Review 交叉检查后，针对新发现分别新增回归测试并确认旧实现失败：
+
+- 根目录检查后被替换成软链接、首次 revision 恢复请求与孤立数据不一致、已有数据丢失锁时追加会重建新锁、根路径末级 `..` 别名无法读取既有 Session、`_fsync_directory(Path)` 堆叠兼容，以及根/子目录 `fsync` 失败后的重试没有补同步父目录。
+- 空 Session 目录在首次锁创建前被读取、旧版遗留的空 `revisions/` 无锁状态不能重试、锁并发创建时未重开锁、读取为并发首次提交误报损坏、深层 JSON 与超长整数把解析异常泄漏给调用方、超长历史读取累积全部 revision，以及进程中断遗留临时文件未清理。
+- 通过故障注入覆盖 `mkdir`、目录重开、目录扫描、fsync 与锁打开错误；并修正一项并发锁失败测试，明确断言三次 `open()`，避免只测试首次打开失败造成假阳性。
+
+### GREEN / REFACTOR
+
+- 首次创建恢复先比对磁盘 revision 1 与本次请求的规范字节，再发布 head；请求不一致时保留孤立状态，不能替请求确认另一份 Session。
+- 读写均先打开现有锁；只允许空目录，或仅含真实且为空的旧版 `revisions/` 目录时新建锁，并以 `O_EXCL` 处理并发初始化。已有数据缺锁仍失败关闭。锁初次打开未命中时检查目录；如果 revisions 扫描已看到并发发布的数据，会再打开锁并等待 `flock` 后读取。
+- 写入重试会重新同步已有根路径分量和子目录的父目录；目录创建及重开失败转换为 Store 层异常。保留 `_fsync_directory(Path)` 供叠加 PR #4 的 CheckpointStore 使用，SessionStore 内部使用描述符版本。
+- 只规范化根路径的末级 `..`；普通末级路径仍以 `O_NOFOLLOW` 打开，避免检查后被替换为软链接。revision 历史逐个扫描、校验并滚动摘要，只保留当前、前一和请求 revision，限制长历史读取内存。深层或整数过长的 JSON 统一映射为 `SessionCorruptionError`；下次独占写入时只清理匹配格式的普通临时文件并同步目录。
+
+### VERIFY（本地最终差异；远端 head 待更新）
+
+环境：macOS；Python 3.12.16；coverage.py 7.13.3；合同依赖位于 `/private/tmp/bugmaster-jsonschema`。
+
+| 检查 | 命令 / 结果 |
+|---|---|
+| 全单元及分支采集 | `PYTHONDONTWRITEBYTECODE=1 /private/tmp/bugmaster-review-venv/bin/python -m coverage run --branch --source=bugmaster_core --data-file=/private/tmp/session-pr3-final-v15.coverage -m unittest discover -s tests/unit`：156/156 PASS |
+| 合同测试 | `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/private/tmp/bugmaster-jsonschema /private/tmp/bugmaster-review-venv/bin/python -m unittest discover -s tests/contracts`：75/75 PASS |
+| 单元生产代码行覆盖 | `bugmaster_core` 1,045/1,045（100%） |
+| 单元生产代码分支覆盖 | `bugmaster_core` 406/406（100%）；与行覆盖分开报告 |
+| Release quality gate | Coverage 检查通过；整体 **No-Go**，原因仍是 Feature Inventory 未冻结、业务覆盖与核心 Happy/Negative/Edge 执行证据不足。本 PR 不声称 Release GO |
+| 独立 Security Reviewer（CodeX 安全角色） | 最新复审无待修复发现；覆盖锁重开竞态、无锁数据隔离及旧目录兼容 |
+| 独立 Engineering Reviewer | 最新复审无待修复发现；实测空目录竞态可线性化，进行中的首次提交会等待 writer lock 后读取 |
+| `git diff --check` | PASS |
+| GitHub Actions / GitHub 常规 CodeX Review / GitHub Security Review | 本地最终差异尚未推送；推送后须对新 head 重新核实 Actions、常规 review 与 Security review，再决定合并 |
+
+这份本地复审结论不替代新远端 head 的 CI、GitHub review 状态或 Release 级审计。PR #3 保持未合并，直到新 head 的远端门禁与安全审查复核完成。
