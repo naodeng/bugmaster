@@ -1,7 +1,7 @@
 # BugMaster 工程实施进度矩阵
 
 **更新日期：** 2026-11-19
-**当前状态：** W6 Action Journal、SessionStore、CheckpointStore、跨存储引用校验、Journal 身份绑定、路径解析、fail-closed replay gate、待对账 Action 只读枚举和 19 个进程崩溃注入点均为局部切片。GitHub 实时核对的 PR #1–#10 全部 open、ready、未合并；本地已修复 PR 评论与交叉审核发现，当前 198 项单测、78 项契约测试和 `bugmaster_core` 100% 行/分支覆盖通过，修复提交待推送和 Actions 复核。完整产品仍为 Release No-Go。
+**当前状态：** W6 Action Journal、SessionStore、CheckpointStore、跨存储引用校验、Journal 身份绑定、路径解析、fail-closed replay gate、待对账 Action 只读枚举和 19 个进程崩溃注入点均为局部切片。GitHub 实时核对的 PR #1–#10 全部 open、ready、未合并；inline review findings 已修复并解决，交叉审核问题也已修复。本地 198 项单测、78 项契约测试和 `bugmaster_core` 100% 行/分支覆盖通过；PR #1–#10 对应代码/测试 head 的 Actions 全部通过。完整产品仍为 Release No-Go。
 
 ## 仓库审计摘要
 
@@ -38,7 +38,7 @@
 | 品牌与 Skill 命名扫描 | PASS | `python3 scripts/check_branding.py`；命名契约包含 4 项 Skill ID 检查 |
 | Catalog/Registry | PASS | `python3 scripts/validate_catalog.py` |
 | Benchmark Manifest | PASS（结构） | `validate_benchmark.py` 明确提示场景未执行 |
-| GitHub Actions | 历史提交 PASS；本轮修复 NOT_RUN | PR #1–#10 当前均为 open、ready、未合并。原 PR #10 Run `44472202033` 成功；本地交叉审核修复待推送并重跑 Actions。PR #1–#2 为 R2，PR #3–#10 为 R3，仍需独立质量/安全审查 |
+| GitHub Actions | PASS（当前代码/测试 head） | PR #1–#10 均 open、ready、未合并；Runs [44486194925](https://github.com/naodeng/bugmaster/actions/runs/44486194925), [44486207106](https://github.com/naodeng/bugmaster/actions/runs/44486207106), [44486210063](https://github.com/naodeng/bugmaster/actions/runs/44486210063), [44486216357](https://github.com/naodeng/bugmaster/actions/runs/44486216357), [44486219511](https://github.com/naodeng/bugmaster/actions/runs/44486219511), [44486223458](https://github.com/naodeng/bugmaster/actions/runs/44486223458), [44486229369](https://github.com/naodeng/bugmaster/actions/runs/44486229369), [44487177211](https://github.com/naodeng/bugmaster/actions/runs/44487177211), [44487182796](https://github.com/naodeng/bugmaster/actions/runs/44487182796), [44487187776](https://github.com/naodeng/bugmaster/actions/runs/44487187776) 均成功。PR #1–#2 为 R2、PR #3–#10 为 R3，仍需独立人工质量/安全审查 |
 | 单元测试 | PASS，198/198 | Python 3.12；ActionJournal/Store 定向 64/64，Journal/Session/Checkpoint 崩溃恢复 21/21，CheckpointReferenceValidator 15/15 |
 | 契约测试 | PASS，78/78 | Python 3.12 + `jsonschema[format-nongpl]==4.26.0`：包含 SessionStore、CheckpointStore Schema 集成测试及 replay gate 负例 |
 | 当前核心模块行/分支覆盖率 | PASS，100% / 100% | `bugmaster_core`：1196/1196 语句、474/474 分支；`session_store.py` 400/400 语句、160/160 分支；`checkpoint_store.py` 185/185 语句、60/60 分支；`action_journal.py` 317/317 语句、148/148 分支；`action_journal_store.py` 101/101 语句、18/18 分支；`checkpoint_reference_validator.py` 37/37 语句、20/20 分支。行/分支口径分开报告，不等于业务功能覆盖；replay gate helper 由合同测试单独覆盖 |

@@ -19,8 +19,8 @@
 | API/Browser 自主探索 | **未完成** | 未建立真实执行闭环 |
 | Codex/Claude 双宿主 | **未验证** | 未提供可复查运行 ID |
 | GitHub 项目信息 | 已更新 | 上游 `AI-Native-QA-Lab/bugmaster` 与 fork `naodeng/bugmaster` 描述及 13 个 topics 已同步 |
-| GitHub 代码 | W6 PR #3–#10 已推送；本轮修复待推送 | PR #1–#10 当前均 open、ready、未合并且逐层叠加。本地已修复 PR #3 P1、PR #4 P2 以及交叉审核发现；需推送分支并复跑 Actions 后才能更新为远端已验证 |
-| GitHub Issues / CI | 历史提交 Actions PASS；本轮修复 NOT_RUN | 历史 Runs `44304702509` / `44438620887` / `44443870587` / `44446002412` / `44448388986` / `44450205158` / `44452742738` / `44455794738` / `44457678961` / `44472202033` 曾全部成功。PR #1–#2 为 R2、PR #3–#10 为 R3，仍需独立质量/安全审查；Issues 尚未导入 |
+| GitHub 代码 | 本轮修复已推送；PR #1–#10 open/ready | PR #1–#10 均未合并且逐层叠加；没有已废弃或重复 PR 可安全关闭。PR #3 P1、PR #4 P2 inline threads 已回复并解决；其余交叉审核发现已补充测试或修复 |
+| GitHub Issues / CI | 当前代码/测试 head Actions 全部 PASS | Runs [44486194925](https://github.com/naodeng/bugmaster/actions/runs/44486194925), [44486207106](https://github.com/naodeng/bugmaster/actions/runs/44486207106), [44486210063](https://github.com/naodeng/bugmaster/actions/runs/44486210063), [44486216357](https://github.com/naodeng/bugmaster/actions/runs/44486216357), [44486219511](https://github.com/naodeng/bugmaster/actions/runs/44486219511), [44486223458](https://github.com/naodeng/bugmaster/actions/runs/44486223458), [44486229369](https://github.com/naodeng/bugmaster/actions/runs/44486229369), [44487177211](https://github.com/naodeng/bugmaster/actions/runs/44487177211), [44487182796](https://github.com/naodeng/bugmaster/actions/runs/44487182796), [44487187776](https://github.com/naodeng/bugmaster/actions/runs/44487187776) 均成功。PR #1–#2 为 R2，需要独立 Quality Reviewer；PR #3–#10 为 R3，需要独立 Security Reviewer。当前没有独立人工 Approve；Issues 尚未导入 |
 | Release | **No-Go** | Q15/Q16 独立人工审批证据不存在 |
 
 最近一次本地质量门禁仍为 **No-Go**：功能义务清单未冻结、真实业务覆盖未超过 60%，核心功能 Happy/Negative/Edge 执行证据缺失。`bugmaster_core` 单元覆盖率不等于业务功能覆盖率。本文不把本地 Checkpoint 引用校验表述成完整产品或 BLK-03 通过证明。

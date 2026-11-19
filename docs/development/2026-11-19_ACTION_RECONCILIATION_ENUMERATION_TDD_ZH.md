@@ -6,7 +6,7 @@
 **实现提交：** `8129838d0165115a78bf7435f1cdced7fa3de601`  
 **崩溃注入测试提交：** `72157f7e9d8df73f324d8432555d16e3ac1ef988`
 **PR：** [#10](https://github.com/naodeng/bugmaster/pull/10)，基于 PR #9  
-**状态：** 本地交叉审核修复已验证；新提交推送后仍需等待 GitHub Actions。只读待对账 Action 枚举，以及 Journal/SessionStore/CheckpointStore 进程崩溃注入不提供可信外部核验、恢复授权或真实 API/Browser 执行。
+**状态：** 本地交叉审核修复已验证；当前代码与测试已推送，PR #10 Actions Run `44487187776` 全步骤通过。只读待对账 Action 枚举，以及 Journal/SessionStore/CheckpointStore 进程崩溃注入不提供可信外部核验、恢复授权或真实 API/Browser 执行。
 
 ## 需求与边界
 
@@ -82,7 +82,7 @@ PYTHONDONTWRITEBYTECODE=1 python3.12 -m unittest discover -s tests/unit -p 'test
 
 本轮测试提交：`605297156e006e9b6f7f9aacccb4755bc820d62b`。其中包含测试、TDD 记录和进度状态更新；本地全量验证在该测试内容提交前运行，随后只修改了中文证据的命令和路径记录。
 
-合入 PR #8 覆盖边界测试后的全量验证基于提交 `301c7e79ab325a64d2bc935131900beb6bdc530d`：198 项单测、78 项契约和 1196/1196 语句、474/474 分支均通过。随后仅同步 PR #8 的中文证据提交 `0965dd876ccb00c90877fe483da7b4d8fd8c537c`；未再修改代码或测试，`git diff --check` 通过。GitHub Actions 将在该 head 推送后重跑。
+合入 PR #8 覆盖边界测试后的全量验证基于提交 `301c7e79ab325a64d2bc935131900beb6bdc530d`：198 项单测、78 项契约和 1196/1196 语句、474/474 分支均通过。PR #10 Actions [Run 44487187776](https://github.com/naodeng/bugmaster/actions/runs/44487187776) 在代码与测试 head `8f498d38d81c4fe8127c5c35759f27eb7ceffb32` 全步骤通过。随后只同步 PR #8 的工作流证据，未改动代码或测试；`git diff --check` 通过。
 
 | 检查 | 命令 / 结果 |
 |---|---|
@@ -93,6 +93,7 @@ PYTHONDONTWRITEBYTECODE=1 python3.12 -m unittest discover -s tests/unit -p 'test
 | 行 / 分支覆盖 | `PYTHONDONTWRITEBYTECODE=1 /private/tmp/bugmaster-review-venv/bin/python -m coverage report --data-file=/private/tmp/bugmaster-pr10-final.coverage --include='bugmaster_core/*'`：1196/1196 语句、474/474 分支，均为 100%；无排除项 |
 | 品牌 / Catalog / Benchmark | `/private/tmp/bugmaster-review-venv/bin/python scripts/check_branding.py`、`/private/tmp/bugmaster-review-venv/bin/python scripts/validate_catalog.py`、`/private/tmp/bugmaster-review-venv/bin/python scripts/validate_benchmark.py` 均 PASS；Benchmark 仅结构检查，场景未执行 |
 | 发布门禁 | `PYTHONDONTWRITEBYTECODE=1 /private/tmp/bugmaster-review-venv/bin/python scripts/quality_gate.py --mode release --coverage /private/tmp/bugmaster-pr10-final-coverage.json` 按预期 NO-GO：义务清单未冻结，真实功能覆盖与核心 Happy/Negative/Edge 证据缺失 |
+| GitHub Actions | PR #10 代码/测试 head [Run 44487187776](https://github.com/naodeng/bugmaster/actions/runs/44487187776)：PASS；PR #1–#9 对应当前代码/测试 head 的工作流也通过，见 [Actions 列表](https://github.com/naodeng/bugmaster/actions) |
 | 补丁格式 | `git diff --check`：PASS |
 
-崩溃模拟仍只覆盖应用进程 `os._exit`；不代表断电、内核崩溃、文件系统失效、真实外部副作用或 Windows 行为。分支推送后需等待 CI，并由独立 R3 Security Reviewer 审核。
+崩溃模拟仍只覆盖应用进程 `os._exit`；不代表断电、内核崩溃、文件系统失效、真实外部副作用或 Windows 行为。PR #10 仍需独立 R3 Security Reviewer 审核。
