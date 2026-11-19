@@ -45,6 +45,8 @@ The Scope JSON Schema records a per-target decision (`in_scope`, `pending_author
 
 The Approval and Action schemas capture scope/action references, scope revision, target, environment, normalized method and parameter digest, risk, count, expiry and lifecycle status. Their reference fields remain untrusted data until the host verifies the originating event and action binding. R2 is blocked by the current helper until that trusted gateway exists; R3 cannot enter a dispatched or completed state.
 
+Action Journal event schema v1.1 binds every event to both `sessionId` and `journalId`; a reader rejects an event stream whose identities do not match its configured Session and Journal. v1.0 logs are rejected without modification because their events do not carry a Journal ID; no migration is implemented. This local binding and the hash chain do not establish event provenance or external truth.
+
 ## Checkpoint invariant
 
 Persist action intent before dispatch, append journal events, and reconcile unknown effects with authoritative read-only state before allowing any replay. A prepared event without dispatched event does **not** prove non-execution. Do not promise exactly-once effects for external systems. Session recovery cannot reset budgets or approvals.

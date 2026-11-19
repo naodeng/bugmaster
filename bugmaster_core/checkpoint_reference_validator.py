@@ -62,6 +62,10 @@ class CheckpointReferenceValidator:
             raise CheckpointReferenceError(
                 "Latest Session revision does not reference the Checkpoint"
             )
+        if self.journal.journal_id != latest_session["journalId"]:
+            raise CheckpointReferenceError(
+                "Session Journal ID does not match the supplied Journal"
+            )
         if not self.journal.matches_prefix(
             checkpoint["journalSequence"], checkpoint["journalHeadHash"]
         ):

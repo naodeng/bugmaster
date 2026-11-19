@@ -34,8 +34,9 @@ def _prepare_and_dispatch(journal, action_id="action-1", digest="a" * 64):
 
 def _event(event_type, sequence, data, action_id="action-1"):
     return {
-        "schemaVersion": "1.0",
+        "schemaVersion": "1.1",
         "sessionId": "session-1",
+        "journalId": "journal-session-1",
         "sequence": sequence,
         "eventType": event_type,
         "actionId": action_id,
@@ -890,6 +891,85 @@ class ActionJournalRecoveryTests(unittest.TestCase):
 
             with self.assertRaises(JournalCorruptionError):
                 _matches_prefix(self, journal, 1, first["entryHash"])
+
+    def test_journal_events_bind_the_configured_journal_id_and_schema_version(self):
+        ActionJournal, _, _ = _journal_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            try:
+                journal = ActionJournal(
+                    Path(directory) / "journal.jsonl",
+                    session_id="session-1",
+                    journal_id="journal-primary",
+                )
+            except TypeError as error:
+                self.fail("ActionJournal must accept a stable journal ID: {}".format(error))
+            event = journal.prepare("action-1", "a" * 64, 1, "R0")
+
+            self.assertEqual(event.get("journalId"), "journal-primary")
+            self.assertEqual(event.get("schemaVersion"), "1.1")
+
+    def test_journal_identity_cannot_be_changed_after_construction(self):
+        ActionJournal, _, _ = _journal_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            try:
+                journal = ActionJournal(
+                    Path(directory) / "journal.jsonl",
+                    session_id="session-1",
+                    journal_id="journal-primary",
+                )
+            except TypeError as error:
+                self.fail("ActionJournal must accept a stable journal ID: {}".format(error))
+
+            with self.assertRaises(AttributeError):
+                journal.journal_id = "journal-secondary"
+            self.assertEqual(journal.journal_id, "journal-primary")
+
+    def test_journal_rejects_events_bound_to_a_different_journal_id(self):
+        ActionJournal, JournalCorruptionError, _ = _journal_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "journal.jsonl"
+            try:
+                journal = ActionJournal(
+                    path,
+                    session_id="session-1",
+                    journal_id="journal-primary",
+                )
+            except TypeError as error:
+                self.fail("ActionJournal must accept a stable journal ID: {}".format(error))
+            journal.prepare("action-1", "a" * 64, 1, "R0")
+
+            try:
+                ActionJournal(
+                    path,
+                    session_id="session-1",
+                    journal_id="journal-secondary",
+                )
+            except JournalCorruptionError:
+                pass
+            except TypeError as error:
+                self.fail("ActionJournal must validate the persisted journal ID: {}".format(error))
+            else:
+                self.fail("a different Journal ID must not load this event log")
+
+    def test_journal_rejects_an_empty_explicit_journal_id(self):
+        ActionJournal, _, JournalError = _journal_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            try:
+                ActionJournal(
+                    Path(directory) / "journal.jsonl",
+                    session_id="session-1",
+                    journal_id=" ",
+                )
+            except JournalError:
+                pass
+            except TypeError as error:
+                self.fail("ActionJournal must validate an explicit Journal ID: {}".format(error))
+            else:
+                self.fail("an empty Journal ID must be rejected")
 
 
 if __name__ == "__main__":

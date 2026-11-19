@@ -71,6 +71,14 @@ class JournalSchemaTests(unittest.TestCase):
                     "action_reconciliation_claimed",
                 ],
             )
+            self.assertTrue(
+                all(
+                    event.get("journalId") == "journal-session-1"
+                    and event.get("schemaVersion") == "1.1"
+                    for event in events
+                ),
+                "every event must bind the persistent Journal identity",
+            )
             for event in events:
                 with self.subTest(eventType=event["eventType"]):
                     validator.validate(event)

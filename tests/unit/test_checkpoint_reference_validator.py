@@ -23,7 +23,7 @@ def _accept_document(_document):
     return None
 
 
-def _valid_session(session_id="session-1"):
+def _valid_session(session_id="session-1", journal_id="journal-session-1"):
     return {
         "schemaVersion": "1.0",
         "sessionId": session_id,
@@ -37,7 +37,7 @@ def _valid_session(session_id="session-1"):
         "approvalRefs": [],
         "checkpointRefs": [],
         "actionBudget": {},
-        "journalId": "journal-1",
+        "journalId": journal_id,
     }
 
 
@@ -58,7 +58,13 @@ def _valid_checkpoint(**changes):
 
 
 class CheckpointReferenceValidatorTests(unittest.TestCase):
-    def make_context(self, root, session_id="session-1", session_root=None):
+    def make_context(
+        self,
+        root,
+        session_id="session-1",
+        session_root=None,
+        journal_id="journal-session-1",
+    ):
         from bugmaster_core.action_journal import ActionJournal
         from bugmaster_core.checkpoint_store import CheckpointStore
         from bugmaster_core.session_store import SessionStore
@@ -74,7 +80,7 @@ class CheckpointReferenceValidatorTests(unittest.TestCase):
         journal = ActionJournal(
             root / "journals" / "journal-1.jsonl", session_id
         )
-        session_store.create(_valid_session(session_id))
+        session_store.create(_valid_session(session_id, journal_id))
         return checkpoint_store, session_store, journal
 
     @staticmethod
@@ -242,6 +248,22 @@ class CheckpointReferenceValidatorTests(unittest.TestCase):
                 CheckpointReferenceValidator(
                     checkpoint_store, session_store, other_journal
                 )
+
+    def test_rejects_session_journal_id_that_differs_from_the_bound_journal(self):
+        CheckpointReferenceError, CheckpointReferenceValidator = _reference_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            checkpoint_store, session_store, journal = self.make_context(
+                directory, journal_id="journal-wrong"
+            )
+            checkpoint = _valid_checkpoint()
+            self.register_checkpoint(checkpoint_store, session_store, checkpoint)
+            validator = CheckpointReferenceValidator(
+                checkpoint_store, session_store, journal
+            )
+
+            with self.assertRaises(CheckpointReferenceError):
+                validator.validate("checkpoint-1")
 
     def test_rejects_session_and_checkpoint_stores_with_different_roots(self):
         CheckpointReferenceError, CheckpointReferenceValidator = _reference_types(self)

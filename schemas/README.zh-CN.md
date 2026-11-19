@@ -10,13 +10,14 @@ Schema 使用 JSON Schema Draft 2020-12。契约测试同时校验 Schema 本身
 - `feature-inventory.schema.json`：校验带来源的 Feature Inventory；授权与执行进度保存在独立账本。
 - `approval.schema.json`：校验 Scope 或 Action 审批记录、Scope revision 和目标绑定、来源/审批人引用、有效期，以及 R2 所需动作意图字段。
 - `action.schema.json`：校验规范化 Action 意图和生命周期状态、R0/R2 变更约束、R2 审批引用、R1 变更强制执行引用，以及不可执行的移动端/未知表面。
-- `event.schema.json`：校验版本化 Action Journal 事件封套和 prepared/dispatched/outcome/reconciliation claim 载荷。运行时代码还会核验序号、状态转换、Session 身份、RFC3339 时间和 SHA-256 事件链。
+- `event.schema.json` v1.1：校验 Action Journal 事件封套、稳定 `journalId` 和四类 prepared/dispatched/outcome/reconciliation claim 载荷。运行时代码会核验序号、状态转换、Session 与 Journal 身份、RFC3339 时间和 SHA-256 事件链。v1.0 Journal 文件会被拒绝读取且不修改；当前没有迁移程序。
+- `bugmaster_core.action_journal.ActionJournal`：为固定 Session/Journal 身份读写 v1.1 事件。若省略 Journal ID，默认值为 `journal-<sessionId>`；Session 使用自定义 `journalId` 时，调用方必须将其传入构造器。Journal 文件路径仍由调用方选择。
 - `checkpoint.schema.json`：校验 Checkpoint 的不可变 Session revision、Scope revision 与 Journal 序号/哈希锚点，并覆盖空 Journal 边界。它只做结构验证；恢复仍需验证所引用的 revision 和 Journal，并重新核验当前授权与预算。
 - `session.schema.json`：校验版本化 Session revision、规范生命周期状态、Scope revision 历史、绑定 Scope revision 的审批引用、预算上限与已用计数，以及 Journal/Checkpoint 引用。引用不构成授权或安全恢复证明。
 - `bugmaster_core.session_store.SessionStore`：将每个通过校验的 Session revision 保存为独立不可变文件，使用私有 Session 目录和 POSIX 文件锁串行化写入，通过同步临时文件后再以不可覆盖方式落盘；拒绝替换、序号缺口、权限错误和不一致的历史转换。它不会认证 Approval 引用、将预算与 Action Journal 对账，也不授权恢复。Windows 行为尚未验证。
 - `bugmaster_core.checkpoint_store.CheckpointStore`：按 Checkpoint ID 的哈希在私有 Session 目录下持久化通过 Schema 校验的 Checkpoint。它与 SessionStore 共用 POSIX 单 Session 锁，通过同步临时文件和不可覆盖硬链接落盘，并拒绝损坏记录。它不会验证引用的 Session revision、Scope revision 或 Journal head 是否存在或真实，也不授权恢复。Windows 行为尚未验证。
 - `bugmaster_core.action_journal.ActionJournal.matches_prefix(sequence, head_hash)`：重放当前 Journal 并执行现有事件、状态转换和哈希链校验，再确认序号/哈希是否指向其前缀。此方法只校验本地完整性，不证明事件来源、事实真实性、授权或安全恢复。
-- `bugmaster_core.checkpoint_reference_validator.CheckpointReferenceValidator`：核对已存 Checkpoint 指向的 Session revision 和 Scope history 是否存在、最新 Session revision 是否登记了该 Checkpoint，以及 Journal 本地前缀是否匹配。Journal 对象由调用方提供；此验证器不会独立绑定 `journalId` 与文件路径，不认证事件，不重新核验授权/预算，也不授权恢复。
+- `bugmaster_core.checkpoint_reference_validator.CheckpointReferenceValidator`：核对已存 Checkpoint 指向的 Session revision 和 Scope history 是否存在、最新 Session revision 是否登记了该 Checkpoint，以及 Journal 本地前缀是否匹配；也会比对最新 Session 的 Journal ID 与传入 Journal 对象及事件中的 ID。Journal 路径仍由调用方选择；此验证器不认证事件来源、不重新核验授权/预算，也不授权恢复。
 
 `approvalRef`、`enforcementRef` 和 Checkpoint 中的哈希都只是结构/完整性信息。它们不能证明审批人身份、审批真实性/有效期、执行来源或事件真实性。可信授权与恢复验证网关仍未实现；R2 必须由工具层执行审批和控制，R3 仍受独立安全策略约束。
 
