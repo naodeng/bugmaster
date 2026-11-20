@@ -5,23 +5,22 @@ referenced Session, Scope, Action Journal, current authorization, or resume
 safety.
 """
 
-import fcntl
 import hashlib
 import json
 import os
 import stat
-import tempfile
 from contextlib import contextmanager
-from pathlib import Path
 
 from .session_store import (
     _MAX_SESSION_BYTES,
     _canonical_bytes,
-    _fsync_directory,
+    _create_temporary_file,
+    _fsync_directory_fd,
     _nonempty,
+    _open_child_directory,
     _write_all,
-    SessionStore,
     SessionCorruptionError,
+    SessionStore,
     SessionStoreError,
 )
 
@@ -49,14 +48,16 @@ class CheckpointStore:
         if not callable(validator):
             raise CheckpointStoreError("a Checkpoint schema validator is required")
         try:
-            storage_key = hashlib.sha256(session_id.encode("utf-8")).hexdigest()
-        except UnicodeEncodeError as error:
-            raise CheckpointStoreError("session ID is not valid UTF-8") from error
-        self.root = Path(root).absolute()
+            self._session_store = SessionStore(
+                root, session_id, lambda _document: None
+            )
+        except (SessionStoreError, OSError) as error:
+            raise CheckpointStoreError(str(error)) from error
+        self.root = self._session_store.root
         self.session_id = session_id
         self.validator = validator
-        self._sessions_dir = self.root / "sessions"
-        self._session_dir = self._sessions_dir / storage_key
+        self._sessions_dir = self._session_store._sessions_dir
+        self._session_dir = self._session_store._session_dir
         self._checkpoints_dir = self._session_dir / "checkpoints"
         self._lock_path = self._session_dir / "session.lock"
 
@@ -64,9 +65,19 @@ class CheckpointStore:
         """Persist a new Checkpoint ID, rejecting replacement."""
         payload, normalized = self._validate_document(document)
         filename = self._checkpoint_filename(normalized["checkpointId"])
-        with self._locked():
-            self._ensure_private_directory(self._checkpoints_dir)
-            self._write_checkpoint_locked(filename, payload)
+        with self._locked() as storage:
+            checkpoints_fd = _open_child_directory(
+                storage["session_fd"],
+                "checkpoints",
+                create=True,
+                error_type=CheckpointStoreError,
+                label="Checkpoint storage",
+                private=True,
+            )
+            try:
+                self._write_checkpoint_locked(storage, checkpoints_fd, filename, payload)
+            finally:
+                os.close(checkpoints_fd)
         return normalized
 
     def read(self, checkpoint_id):
@@ -74,19 +85,33 @@ class CheckpointStore:
         if not _nonempty(checkpoint_id):
             raise CheckpointStoreError("checkpoint ID must be a non-empty string")
         filename = self._checkpoint_filename(checkpoint_id)
-        with self._locked(create_directories=False):
-            if not SessionStore._existing_directory(
-                self._checkpoints_dir, "Checkpoint storage", CheckpointCorruptionError
-            ):
+        with self._locked(create_directories=False) as storage:
+            if storage is None:
                 return None
-            path = self._checkpoints_dir / filename
-            if path.is_symlink():
-                raise CheckpointCorruptionError("Checkpoint record cannot be a symlink")
-            if not path.exists():
-                return None
-            if not path.is_file():
-                raise CheckpointCorruptionError("Checkpoint record is not a regular file")
-            return self._read_checkpoint_file(path, checkpoint_id)
+            return self._read_locked(storage, checkpoint_id, filename)
+
+    def _read_locked(self, storage, checkpoint_id, filename):
+        """Read a Checkpoint using a caller-held Session storage snapshot."""
+        checkpoints_fd = _open_child_directory(
+            storage["session_fd"],
+            "checkpoints",
+            create=False,
+            error_type=CheckpointCorruptionError,
+            label="Checkpoint storage",
+        )
+        if checkpoints_fd is None:
+            return None
+        try:
+            directory_stat = os.fstat(checkpoints_fd)
+            if stat.S_IMODE(directory_stat.st_mode) != 0o700:
+                raise CheckpointCorruptionError(
+                    "Checkpoint directory permissions are invalid"
+                )
+            return self._read_checkpoint_file(
+                checkpoints_fd, filename, checkpoint_id
+            )
+        finally:
+            os.close(checkpoints_fd)
 
     def _checkpoint_filename(self, checkpoint_id):
         try:
@@ -105,11 +130,14 @@ class CheckpointStore:
             raise error_type("Checkpoint ID must be a non-empty string")
         try:
             payload = _canonical_bytes(document)
-        except (TypeError, ValueError, UnicodeEncodeError) as error:
+        except (TypeError, ValueError, UnicodeEncodeError, RecursionError) as error:
             raise error_type("Checkpoint document is not valid JSON data") from error
         if len(payload) > _MAX_SESSION_BYTES:
             raise error_type("Checkpoint document exceeds the storage size limit")
-        normalized = json.loads(payload.decode("utf-8"))
+        try:
+            normalized = json.loads(payload.decode("utf-8"))
+        except (UnicodeDecodeError, ValueError, RecursionError) as error:
+            raise error_type("Checkpoint document is not valid JSON data") from error
         try:
             self.validator(normalized)
         except Exception as error:
@@ -118,68 +146,56 @@ class CheckpointStore:
 
     @contextmanager
     def _locked(self, create_directories=True):
-        if create_directories:
-            self._ensure_directories()
-        else:
-            for directory in (self.root, self._sessions_dir, self._session_dir):
-                if not SessionStore._existing_directory(
-                    directory, "Checkpoint storage", CheckpointCorruptionError
-                ):
-                    yield
-                    return
-
-        flags = os.O_RDWR | os.O_CREAT if create_directories else os.O_RDONLY
-        if hasattr(os, "O_NOFOLLOW"):
-            flags |= os.O_NOFOLLOW
         try:
-            fd = os.open(str(self._lock_path), flags, 0o600)
-        except OSError as error:
-            raise CheckpointStoreError("cannot open Session lock") from error
-        acquired = False
-        try:
-            if not stat.S_ISREG(os.fstat(fd).st_mode):
-                raise CheckpointStoreError("Session lock is not a regular file")
-            if create_directories:
-                os.fchmod(fd, 0o600)
-            fcntl.flock(fd, fcntl.LOCK_EX if create_directories else fcntl.LOCK_SH)
-            acquired = True
-            yield
-        except OSError as error:
-            raise CheckpointStoreError("Checkpoint storage lock failed") from error
-        finally:
-            if acquired:
-                fcntl.flock(fd, fcntl.LOCK_UN)
-            os.close(fd)
+            if not all(
+                hasattr(os, name)
+                for name in ("O_DIRECTORY", "O_NOFOLLOW", "O_NONBLOCK")
+            ):
+                raise CheckpointStoreError(
+                    "secure Checkpoint directory operations are unavailable"
+                )
+            with self._session_store._locked(create_directories) as storage:
+                yield storage
+        except CheckpointCorruptionError:
+            raise
+        except SessionCorruptionError as error:
+            raise CheckpointCorruptionError(
+                "Checkpoint Session storage is corrupt"
+            ) from error
+        except CheckpointStoreError:
+            raise
+        except SessionStoreError as error:
+            raise CheckpointStoreError(
+                "cannot safely access Checkpoint Session storage"
+            ) from error
 
     def _ensure_directories(self):
         try:
-            self.root.mkdir(parents=True, exist_ok=True, mode=0o700)
-            if self.root.is_symlink() or not self.root.is_dir():
-                raise CheckpointStoreError("Checkpoint root must be a real directory")
-            self._ensure_private_directory(self._sessions_dir)
-            self._ensure_private_directory(self._session_dir)
+            self._session_store._ensure_directories()
+        except SessionCorruptionError as error:
+            raise CheckpointCorruptionError(
+                "Checkpoint Session storage is corrupt"
+            ) from error
+        except SessionStoreError as error:
+            raise CheckpointStoreError(
+                "cannot safely prepare Checkpoint Session storage"
+            ) from error
+
+    def _read_checkpoint_file(self, checkpoints_fd, filename, expected_id):
+        try:
+            path_stat = os.stat(filename, dir_fd=checkpoints_fd, follow_symlinks=False)
+        except FileNotFoundError:
+            return None
         except OSError as error:
-            raise CheckpointStoreError("cannot prepare Checkpoint storage directories") from error
+            raise CheckpointCorruptionError("cannot inspect persisted Checkpoint") from error
+        if not stat.S_ISREG(path_stat.st_mode):
+            raise CheckpointCorruptionError("Checkpoint record is not a regular file")
 
-    def _ensure_private_directory(self, directory):
-        created = False
+        flags = os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW
         try:
-            directory.mkdir(mode=0o700)
-            created = True
-        except FileExistsError:
-            pass
-        if directory.is_symlink() or not directory.is_dir():
-            raise CheckpointStoreError("Checkpoint storage path must be a real directory")
-        os.chmod(directory, 0o700)
-        if created:
-            _fsync_directory(directory.parent)
-
-    def _read_checkpoint_file(self, path, expected_id):
-        flags = os.O_RDONLY
-        if hasattr(os, "O_NOFOLLOW"):
-            flags |= os.O_NOFOLLOW
-        try:
-            fd = os.open(str(path), flags)
+            fd = os.open(filename, flags, dir_fd=checkpoints_fd)
+        except FileNotFoundError:
+            return None
         except OSError as error:
             raise CheckpointCorruptionError("cannot open persisted Checkpoint") from error
         try:
@@ -193,6 +209,8 @@ class CheckpointStore:
                 chunk = os.read(fd, 65536)
                 if not chunk:
                     break
+                if len(raw) + len(chunk) > _MAX_SESSION_BYTES + 1:
+                    raise CheckpointCorruptionError("persisted Checkpoint is too large")
                 raw.extend(chunk)
         finally:
             os.close(fd)
@@ -201,7 +219,7 @@ class CheckpointStore:
             raise CheckpointCorruptionError("persisted Checkpoint is incomplete")
         try:
             document = json.loads(bytes(raw[:-1]).decode("utf-8"))
-        except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        except (UnicodeDecodeError, ValueError, RecursionError) as error:
             raise CheckpointCorruptionError("persisted Checkpoint is invalid JSON") from error
         payload, normalized = self._validate_document(document, persisted=True)
         if bytes(raw[:-1]) != payload:
@@ -210,10 +228,9 @@ class CheckpointStore:
             raise CheckpointCorruptionError("Checkpoint ID does not match its storage key")
         return normalized
 
-    def _write_checkpoint_locked(self, filename, payload):
-        final_path = self._checkpoints_dir / filename
-        fd, temporary_path = tempfile.mkstemp(
-            prefix=".checkpoint-", dir=str(self._session_dir)
+    def _write_checkpoint_locked(self, storage, checkpoints_fd, filename, payload):
+        fd, temporary_name = _create_temporary_file(
+            storage["session_fd"], ".checkpoint-"
         )
         try:
             os.fchmod(fd, 0o600)
@@ -222,20 +239,27 @@ class CheckpointStore:
             os.close(fd)
             fd = None
             try:
-                os.link(temporary_path, final_path)
+                os.link(
+                    temporary_name,
+                    filename,
+                    src_dir_fd=storage["session_fd"],
+                    dst_dir_fd=checkpoints_fd,
+                    follow_symlinks=False,
+                )
             except FileExistsError as error:
                 raise CheckpointStoreError("Checkpoint ID is already stored") from error
-            _fsync_directory(self._checkpoints_dir)
-            os.unlink(temporary_path)
-            temporary_path = None
-            _fsync_directory(self._session_dir)
+            _fsync_directory_fd(checkpoints_fd)
+            os.unlink(temporary_name, dir_fd=storage["session_fd"])
+            temporary_name = None
+            _fsync_directory_fd(storage["session_fd"])
         except OSError as error:
             raise CheckpointStoreError("cannot durably write Checkpoint") from error
         finally:
             if fd is not None:
                 os.close(fd)
-            if temporary_path is not None:
+            if temporary_name is not None:
                 try:
-                    os.unlink(temporary_path)
+                    os.unlink(temporary_name, dir_fd=storage["session_fd"])
                 except FileNotFoundError:
                     pass
+

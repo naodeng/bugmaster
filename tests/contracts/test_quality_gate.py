@@ -48,16 +48,25 @@ class WorkflowCoverageGateTests(unittest.TestCase):
         def run_gate(covered_lines,num_statements):
             with tempfile.TemporaryDirectory() as tmp:
                 report=Path(tmp)/'coverage.json'
-                report.write_text(json.dumps({'totals':{
-                    'covered_lines':covered_lines,
-                    'num_statements':num_statements,
-                }}),encoding='utf-8')
+                report.write_text(json.dumps({
+                    'totals':{
+                        'covered_lines':covered_lines,
+                        'num_statements':num_statements,
+                    },
+                    'files':{
+                        'bugmaster_core/example.py':{
+                            'missing_lines':[12] if covered_lines < num_statements else [],
+                        },
+                    },
+                }),encoding='utf-8')
                 result=subprocess.run(
                     [sys.executable,'-c',code.replace('coverage.json',str(report))],
                     cwd=ROOT,capture_output=True,text=True,
                 )
-                return result.returncode
+                return result
 
-        self.assertEqual(run_gate(100,100),0)
-        self.assertNotEqual(run_gate(99,100),0)
-        self.assertNotEqual(run_gate(0,0),0)
+        self.assertEqual(run_gate(100,100).returncode,0)
+        incomplete=run_gate(99,100)
+        self.assertNotEqual(incomplete.returncode,0)
+        self.assertIn("'bugmaster_core/example.py': [12]",incomplete.stderr)
+        self.assertNotEqual(run_gate(0,0).returncode,0)

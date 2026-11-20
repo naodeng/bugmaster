@@ -36,11 +36,40 @@ class CheckpointReferenceValidator:
 
     def validate(self, checkpoint_id):
         """Return a Checkpoint whose local Session, Scope, and Journal anchors match."""
-        checkpoint = self.checkpoint_store.read(checkpoint_id)
-        if checkpoint is None:
-            raise CheckpointReferenceError("Checkpoint is not stored")
+        if not isinstance(checkpoint_id, str) or not checkpoint_id.strip():
+            raise CheckpointReferenceError(
+                "Checkpoint ID must be a non-empty string"
+            )
+        filename = self.checkpoint_store._checkpoint_filename(checkpoint_id)
+        with self.checkpoint_store._locked(create_directories=False) as storage:
+            if storage is None:
+                raise CheckpointReferenceError("Checkpoint is not stored")
+            checkpoint = self.checkpoint_store._read_locked(
+                storage, checkpoint_id, filename
+            )
+            if checkpoint is None:
+                raise CheckpointReferenceError("Checkpoint is not stored")
 
-        session = self.session_store.read_revision(checkpoint["sessionRevision"])
+            session_revision = checkpoint["sessionRevision"]
+            if isinstance(session_revision, float):
+                if not session_revision.is_integer():
+                    raise CheckpointReferenceError(
+                        "Checkpoint Session revision must be an integer"
+                    )
+                session_revision = int(session_revision)
+            if (
+                isinstance(session_revision, bool)
+                or not isinstance(session_revision, int)
+                or session_revision < 1
+            ):
+                raise CheckpointReferenceError(
+                    "Checkpoint Session revision must be a positive integer"
+                )
+            history = self.session_store._read_revisions_locked(
+                storage, requested_revision=session_revision
+            )
+            session = history["requested"]
+            latest_session = history["latest"]
         if session is None:
             raise CheckpointReferenceError(
                 "Checkpoint Session revision is not stored"
@@ -55,9 +84,6 @@ class CheckpointReferenceValidator:
                 "Checkpoint Scope revision is absent from its Session revision"
             )
 
-        latest_session = self.session_store.read_latest()
-        if latest_session is None:
-            raise CheckpointReferenceError("Session history is not stored")
         if checkpoint_id not in latest_session["checkpointRefs"]:
             raise CheckpointReferenceError(
                 "Latest Session revision does not reference the Checkpoint"
@@ -69,3 +95,4 @@ class CheckpointReferenceValidator:
                 "Checkpoint Journal prefix does not match the stored Journal"
             )
         return checkpoint
+
