@@ -9,18 +9,18 @@
 | 11 Skills | 候选骨架 | 不代表真实独立执行成功 |
 | 16 Patterns | 候选规则数据 | 未达到 Verified |
 | 50 Benchmark | Planned 列表 | 未执行，缺独立 Ground Truth 运行证据 |
-| 单元测试 | 当前本地候选 257/257 通过 | Python 3.12.16；`bugmaster_core/` 行覆盖 100%、分支覆盖 100%，仅为 GATE-U100 初始样例范围；全项目 GATE-U100 仍须覆盖所有需单测生产 Python 模块 |
-| R3 安全测试 | 当前本地候选 1/1 通过 | `tests/security/` 专项套件已加入 CI 单独执行；独立 Security Reviewer 对当前候选未发现 P1/P2 |
+| 单元测试 | 当前本地候选 257/257 通过；CheckpointReferenceValidator 定向测试 18/18 | Python 3.12.16；`bugmaster_core/` 行覆盖 100%、分支覆盖 100%，仅为 GATE-U100 初始样例范围；全项目 GATE-U100 仍须覆盖所有需单测生产 Python 模块 |
+| R3 安全测试 | 当前本地候选 1/1 通过 | `tests/security/` 专项套件已加入 CI 单独执行；CodeX 独立安全复审角色对 PR #6 代码 head `a5af48f18b9fdded9b1515bf007f58cf4386442b` 静态复审无 P1/P2；GitHub `@codex security review` 对同一 head 返回[无重大问题的复审回执](https://github.com/naodeng/bugmaster/pull/6#issuecomment-7033495382)，review submission 列表为空，不代表人工批准 |
 | 契约测试 | 当前本地候选 78/78 通过 | Python 3.12 + 固定 `jsonschema[format-nongpl]==4.26.0`；包含使用真实 Checkpoint/Session Schema 的跨存储数字语义测试 |
 | Session 契约与持久化 | 部分实现，PR #3 已合入 | Schema PR #2 已合并；`SessionStore` PR #3 保存不可变 revision 并校验历史转换，merge commit `1368b1a`，Actions Run `44537417048` 通过。预算/Journal 对账、审批真实性与恢复授权仍未实现；详见 [Session Revision TDD 记录](2026-11-19_SESSION_REVISION_STORE_TDD_ZH.md) |
-| Journal / Safe Resume | 部分实现，PR #4/#5 已合入；PR #6 本地候选复审通过 | PR #5 head `923f76f` 的 Actions Run `44671017598` 通过。PR #6 候选在同一共享锁和目录描述符下读取 Checkpoint 与 Session 锚点，核对 Scope history、最新登记和 Journal 前缀；拒绝跨存储目录替换混读，并按 Schema 语义接受整值浮点 revision。独立安全复审无 P1/P2；远端 head/Actions 更新待完成。Session `journalId` 与 Journal 路径绑定、可信恢复、预算对账和当前授权复核仍未实现 |
+| Journal / Safe Resume | 部分实现，PR #4/#5 已合入；PR #6 开放，代码检查通过 | PR #5 最终 head `c974a88` 的 Actions Run `44690535886` 通过。PR #6 head `a5af48f18b9fdded9b1515bf007f58cf4386442b` 的 Actions Run `44695141474` 通过；修复后在同一共享锁和目录描述符下读取 Checkpoint 与 Session 锚点，核对 Scope history、最新登记和 Journal 前缀。CodeX 独立安全复审角色和 GitHub `@codex security review` 对该代码 head 均未报告 P1/P2/重大问题；当前证据文档同步提交尚未运行 CI。Session `journalId` 与 Journal 路径绑定、可信恢复、预算对账和当前授权复核仍未实现 |
 | 业务功能覆盖 >60% | **未达成** | 缺真实业务执行证据 |
 | 核心 Happy/Negative/Edge | **未达成** | 核心功能矩阵只有待执行位置 |
 | API/Browser 自主探索 | **未完成** | 未建立真实执行闭环 |
 | Codex/Claude 双宿主 | **未验证** | 未提供可复查运行 ID |
 | GitHub 项目信息 | 已更新 | 上游 `AI-Native-QA-Lab/bugmaster` 与 fork `naodeng/bugmaster` 描述及 13 个 topics 已同步 |
-| GitHub 代码 | PR #1–#5 已合并；PR #6 开放待更新 | 当前 main `5994542`；PR #6 旧 head `e5c443c` 仍以旧栈分支为 base，修复候选准备以 `main` 为基线更新 |
-| GitHub Issues / CI | PR #4/#5 当前检查通过；PR #6 旧检查不适用于候选 | PR #4 Run `44662457674`、PR #5 Run `44671017598` 通过。PR #6 旧 head Run `44486223458` 通过但基线过时；当前候选的独立 R3 安全复审与本地门禁通过，等待推送后 Actions。Issues 尚未导入 |
+| GitHub 代码 | PR #1–#5 已合并；PR #6 开放，源代码更新已推送 | 当前 main `5994542`；PR #6 base 为 `main`，当前代码 head `a5af48f`，本地证据文档同步提交待推送 |
+| GitHub Issues / CI | PR #4–#6 当前已核实检查通过 | PR #4 Run `44662457674` 通过；PR #5 最终 head `c974a88` Run `44690535886` 通过；PR #6 代码 head `a5af48f` Run `44695141474` 通过。PR #6 证据文档同步提交待 CI；Issues 尚未导入 |
 | Release | **No-Go** | Q15/Q16 独立人工审批证据不存在 |
 
 最近一次本地质量门禁仍为 **No-Go**：功能义务清单未冻结、真实业务覆盖未超过 60%，核心功能 Happy/Negative/Edge 执行证据缺失。`bugmaster_core` 单元覆盖率不等于业务功能覆盖率。本文不把本地 Journal 切片表述成完整产品或 BLK-03 通过证明。
