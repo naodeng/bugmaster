@@ -1,7 +1,7 @@
 # BugMaster 工程实施进度矩阵
 
 **更新日期：** 2026-11-20
-**当前状态：** W6 Action Journal、Session revision 与 Checkpoint 持久化均为局部切片。Session Schema PR #2 和 SessionStore PR #3 已合入 `main`；PR #3 merge commit 为 `1368b1a`，Actions Run `44537417048` 成功。CheckpointStore PR #4 已切换到 `main`；代码候选 `685a967` 的 Actions Run `44661819969` 成功，旧的两条 review threads 已回复并解决，PR 等待合并。完整产品仍为 Release No-Go。
+**当前状态：** W6 Action Journal、Session revision 与 Checkpoint 持久化均为局部切片。PR #2–#4 已合入 `main`；PR #4 merge commit 为 `6c5d519`。PR #5 已更新至 `main`，head `923f76f` 的 Actions Run `44671017598` 通过；独立安全复审无 P1/P2。完整产品仍为 Release No-Go。
 
 ## 仓库审计摘要
 
@@ -24,7 +24,7 @@
 | W3 | 16 个 Bug Patterns | 候选规则 | 需适用/排除、Oracle、反例和真实对照 Eval |
 | W4 | 风险路由与有界自主探索 | 部分实现 | `scripts/discover_openapi.py` 可从本地 OpenAPI 3 JSON 输出稳定 ID 和 JSON Pointer 来源清单；URL/Browser 发现、风险路由与动态执行仍待实现 |
 | W5 | R0–R3 动作级授权 | 部分实现 | R0/R1 基础 helper 已 fail-closed；无可信网关时 R2 现在 fail-closed；真实网关、审批摘要和修订绑定仍待实现 |
-| W6 | Action Journal、Session 持久化与安全恢复 | 部分实现 | Action Journal 有本地 append/fsync、POSIX 锁、事件哈希链和未决 Action 阻断；SessionStore 已实现不可变 revision 追加/读取、完整历史摘要、崩溃恢复与历史转换校验（PR #3 已合入 `main`，merge `1368b1a`；Scope history 递增）；CheckpointStore 本地实现不可变 Schema-validated Checkpoint 读写与目录/锁固定、失效关闭（PR #4 待最终推送与 CI）。可信恢复核验、预算与 Journal 对账、八断点崩溃注入、工具层执行绑定及双宿主验证仍待实现 |
+| W6 | Action Journal、Session 持久化与安全恢复 | 部分实现 | SessionStore（PR #3）与 CheckpointStore（PR #4）已合入 `main`；Journal 前缀核验（PR #5）先完整校验日志，再比对 Checkpoint 锚点；拒绝歧义 JSON、软链接、硬链接、FIFO 和非普通文件，固定父目录/日志 inode，并在锁等待前后核对目录项。它只校验本地完整性；可信恢复核验、预算与 Journal 对账、工具层执行绑定及双宿主验证仍待实现 |
 | W7 | Finding、跨入口去重与报告 | 待实现 | 需 Oracle、来源、E3+ 证据和剩余风险追踪 |
 | W8 | 回归建议 | 待实现 | 只输出建议，不自动修改/提交测试代码 |
 | W9 | 50 场景 Benchmark | 计划中 | 需真实运行、隔离 Ground Truth 和 G0–G3 对照 |
@@ -38,16 +38,16 @@
 | 品牌与 Skill 命名扫描 | PASS | `python3 scripts/check_branding.py`；命名契约包含 4 项 Skill ID 检查 |
 | Catalog/Registry | PASS | `python3 scripts/validate_catalog.py` |
 | Benchmark Manifest | PASS（结构） | `validate_benchmark.py` 明确提示场景未执行 |
-| GitHub Actions | PR #3 与 PR #4 代码候选检查通过 | PR #3 Run `44537417048`；PR #4 代码提交 `685a967` 的 Run `44661819969`：单测、合同、安全套件、100% 行覆盖、Catalog、Benchmark 结构和品牌步骤均通过 |
-| 单元测试 | 本地候选 PASS，197/197 | Python 3.12；命令和 coverage 文件见 [Checkpoint TDD 记录](2026-11-19_CHECKPOINT_STORE_TDD_ZH.md)；`bugmaster_core` 1,214/1,214 行覆盖、448/448 分支覆盖，单元套件独立达到 100% |
+| GitHub Actions | PR #4、PR #5 当前 head 检查通过 | PR #4 最终 head Run `44662457674` 通过；PR #5 head `923f76f` 的 Run `44671017598` 通过。最新 head 与检查链接以 PR 页面为准 |
+| 单元测试 | 本地复审候选 PASS，239/239 | Python 3.12.16；全部 `bugmaster_core/` 生产模块行覆盖 100%、分支覆盖 100%。该目录仍只是 GATE-U100 初始样例范围，不代表全项目生产模块覆盖 |
 | R3 安全测试 | 本地候选 PASS，1/1 | `python -m unittest discover -s tests/security -v`；CI 单独执行，不并入单元覆盖率分母 |
 | 契约测试 | 本地候选 PASS，77/77 | Python 3.12 + `jsonschema[format-nongpl]==4.26.0`；最终命令见 Checkpoint TDD 记录 |
-| 当前核心模块行/分支覆盖率 | 本地候选 PASS，100% / 100% | `bugmaster_core`：1,214/1,214 行、448/448 分支。行/分支口径分开报告，不等于业务功能覆盖 |
+| 当前核心模块行/分支覆盖率 | 本地复审候选 PASS，100% / 100%（初始样例范围） | `bugmaster_core` 为 1,393/1,393 行、508/508 分支；覆盖 JSON：`/private/tmp/bugmaster-pr5-coverage-final.json`。全项目 GATE-U100 仍需把所有需单测的生产 Python 模块纳入覆盖统计。行/分支口径分开报告，不等于业务功能覆盖 |
 | 业务功能覆盖率 >60% | 未达成 | 目前没有真实业务执行证据 |
 | 核心 Happy / Negative / Edge | 未达成 | 需每个核心功能有三类实际通过证据 |
 | Release | No-Go | 全量功能、真实 Benchmark、双宿主和独立审批均未完成 |
 
-本轮使用生成的核心覆盖 JSON 运行 `scripts/quality_gate.py --mode release --coverage /private/tmp/bugmaster-pr4-main-coverage.json`，结果仍为 No-Go：功能清单未冻结、真实功能覆盖未超过 60%，核心功能 Happy/Negative/Edge 执行矩阵缺证据。W6 本地状态机单测不作为真实业务功能执行证据。Benchmark 脚本仅验证清单结构，未运行 50 个场景。
+本轮使用核心覆盖 JSON `/private/tmp/bugmaster-pr5-coverage-final.json` 运行 release quality gate，结果仍为 No-Go：功能清单未冻结、真实功能覆盖未超过 60%，核心功能 Happy/Negative/Edge 执行矩阵缺证据。W6 本地状态机单测不作为真实业务功能执行证据。Benchmark 脚本仅验证清单结构，未运行 50 个场景。
 
 初始验证的命令与实际输出记录在 [基线验证记录](2026-11-18_INITIAL_BASELINE_VERIFICATION_ZH.md)。Scope 风险 helper、本地 OpenAPI 静态发现 CLI、Scope/Approval/Action Schema、Session Schema 和 R2 缺少可信审批网关时拒绝派发的 RED/GREEN/REFACTOR/VERIFY 证据分别见 [范围与风险门禁 TDD 记录](2026-11-18_SCOPE_GATE_TDD_ZH.md)、[OpenAPI 发现 TDD 记录](2026-11-18_OPENAPI_DISCOVERY_TDD_ZH.md)、[Scope Schema TDD 记录](2026-11-18_SCOPE_SCHEMA_TDD_ZH.md)、[Approval 与 Action Schema TDD 记录](2026-11-18_APPROVAL_ACTION_SCHEMA_TDD_ZH.md)、[Session Schema TDD 记录](2026-11-19_SESSION_SCHEMA_TDD_ZH.md) 与 [R2 门禁 TDD 记录](2026-11-18_R2_GATE_TDD_ZH.md) 和 [Session Revision 持久化 TDD 记录](2026-11-19_SESSION_REVISION_STORE_TDD_ZH.md)。
 
