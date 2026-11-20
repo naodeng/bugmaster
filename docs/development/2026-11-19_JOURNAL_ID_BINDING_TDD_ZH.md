@@ -96,6 +96,9 @@ Event Schema 的首次身份版本断言在 PR #6 merge SHA `c67af41c6aa2e74688b
 | 行与分支覆盖 | `bugmaster_core`：1457/1457 语句、540/540 分支，均 100%；Event / Checkpoint 跨存储新增路径包含在内 |
 | Catalog / Benchmark / 品牌 | `scripts/validate_catalog.py`、`scripts/validate_benchmark.py`、`scripts/check_branding.py`：PASS；Benchmark 只检查清单结构，未执行场景 |
 | Release 质量门禁 | `python3.12 scripts/quality_gate.py --mode release --coverage /private/tmp/bugmaster-pr7-integrated-coverage.json`：预期 **No-Go**；功能义务清单未冻结、真实业务覆盖未超过 60%，且核心功能 Happy/Negative/Edge 执行证据缺失 |
-| 远端 CI / PR 复审 | 集成候选尚未推送；NOT_RUN。原 PR head 的既有检查/复审不能代替新 head 验证 |
+| GitHub Actions | 代码提交 `62002573e6f319b85a71719a3275e538efafa2f4` 的 [Run 44748455778](https://github.com/naodeng/bugmaster/actions/runs/44748455778)：单元、契约、安全、行覆盖、Catalog、Benchmark 结构和品牌步骤全部成功 |
+| GitHub CodeX 复审 | 最终 PR head 的 Code Review / Security Review 待重新触发；旧 head 回执不计入 |
 
-以上本地测试及覆盖数据证明当前声明范围内的代码路径，不证明完整功能验收、真实 API/Browser 执行、Safe Resume、50 个 Benchmark 执行或发布批准。最终集成 commit SHA 与其 GitHub Actions Run 应在推送后补录。
+首次集成上传提交 `b1c24923b864ccd04d0457326fad7e601da0cb7b` 的 [Actions Run 44747906615](https://github.com/naodeng/bugmaster/actions/runs/44747906615) 曾失败：单元测试文件在 GitHub Blob 组装时被读取工具截断，日志出现 `Warning: truncated output` 并导致 `SyntaxError`，尚未进入测试断言。随后通过修复提交 `62002573e6f319b85a71719a3275e538efafa2f4` 完整恢复 1,968 行测试文件；Run `44748455778` 全步骤通过。该次失败属于提交组装错误，不是行为测试失败。
+
+以上本地测试及覆盖数据证明当前声明范围内的代码路径，不证明完整功能验收、真实 API/Browser 执行、Safe Resume、50 个 Benchmark 执行或发布批准。上表 GitHub Actions 直接验证代码提交 `6200257`；后续证据文档同步提交仍需在 PR 中确认最终检查状态。

@@ -1,7 +1,7 @@
 # BugMaster 工程实施进度矩阵
 
 **更新日期：** 2026-11-20
-**当前状态：** W6 Action Journal、Session revision、Checkpoint 持久化和跨存储引用校验均为局部切片。PR #1–#6 已合入 `main`；PR #6 merge commit 为 `c67af41`。PR #7 远端 head `8114413` 仍基于旧 PR #6 分支，虽旧 Actions Run `44486229369` 成功，但不覆盖本轮集成后的源码；本地隔离候选已补入 PR #6 的同快照/安全打开修复及本轮身份绑定修正，验证与复审待完成后推送。完整产品仍为 Release No-Go。
+**当前状态：** W6 Action Journal、Session revision、Checkpoint 持久化和跨存储引用校验均为局部切片。PR #1–#6 已合入 `main`；PR #6 merge commit 为 `c67af41`。PR #7 已集成到 `main`，代码 head `6200257` 的 Actions Run `44748455778` 全步骤通过；首次上传 Run `44747906615` 因测试文件传输截断失败，已在后续提交恢复完整文件并复验。CodeX 最终 head 的 Code/Security Review 待重新完成。完整产品仍为 Release No-Go。
 
 ## 仓库审计摘要
 
@@ -38,7 +38,7 @@
 | 品牌与 Skill 命名扫描 | PASS | `python3 scripts/check_branding.py`；命名契约包含 4 项 Skill ID 检查 |
 | Catalog/Registry | PASS | `python3 scripts/validate_catalog.py` |
 | Benchmark Manifest | PASS（结构） | `validate_benchmark.py` 明确提示场景未执行 |
-| GitHub Actions | PR #4–#6 历史 head 检查通过；PR #7 集成 head 待 CI | PR #4 Run `44662457674`、PR #5 最终 head `c974a88` Run `44690535886`、PR #6 最终文档 head Run `44697609761` 均成功。PR #7 原 head Run `44486229369` 已成功但基于旧 base，不能作为集成修复证据 |
+| GitHub Actions | PR #4–#6 历史 head 检查通过；PR #7 代码 head 检查通过 | PR #4 Run `44662457674`、PR #5 最终 head `c974a88` Run `44690535886`、PR #6 最终文档 head Run `44697609761` 均成功。PR #7 代码 head `6200257` Run `44748455778` 全步骤通过；更早的 `44747906615` 因上传时测试文件截断失败，已修复并复验 |
 | 单元测试 | PR #7 隔离集成候选 PASS，268/268 | Python 3.12；`bugmaster_core/` 行覆盖 100%、分支覆盖 100%。该目录仍只是 GATE-U100 初始样例范围，不代表全项目生产模块覆盖 |
 | R3 安全测试 | PR #7 隔离集成候选 PASS，1/1 | `python3.12 -m unittest discover -s tests/security`；CI 单独执行，不并入单元覆盖率分母 |
 | 契约测试 | PR #7 隔离集成候选 PASS，79/79 | Python 3.12 + `jsonschema[format-nongpl]==4.26.0`；覆盖 Event v1.1 与 Checkpoint/Session 跨存储身份回归 |
