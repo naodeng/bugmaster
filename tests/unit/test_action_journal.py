@@ -1,10 +1,17 @@
+Warning: truncated output (original token count: 20815)
+Total output lines: 1969
+
 import hashlib
 import tempfile
 import unittest
 import copy
 import json
 import os
+import stat
+import subprocess
+import sys
 from pathlib import Path
+from unittest.mock import patch
 
 
 def _journal_types(test_case):
@@ -786,175 +793,699 @@ class ActionJournalRecoveryTests(unittest.TestCase):
         ActionJournal, _, JournalError = _journal_types(self)
 
         with tempfile.TemporaryDirectory() as directory:
-            journal = ActionJournal(Path(directory) / "journal.jsonl", "session-1")
-            _prepare_and_dispatch(journal)
-            with self.assertRaises(JournalError):
-                journal.record_outcome("action-1", "completed")
+            journal = ActionJournal(Path(directory) / "jou…4815 tokens truncated…t(mutate(line) + "\n", encoding="utf-8")
 
-    def test_journal_file_is_private_on_posix(self):
-        ActionJournal, _, _ = _journal_types(self)
-        if os.name != "posix":
-            self.skipTest("POSIX file mode is not available on this host")
+                with self.assertRaises(JournalCorruptionError) as raised:
+                    ActionJournal(path, "session-1")
+                if cause_types is not None:
+                    self.assertIsInstance(raised.exception.__cause__, cause_types)
 
-        with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "journal.jsonl"
-            journal = ActionJournal(path, session_id="session-1")
-            journal.prepare(
-                action_id="action-1",
-                intent_digest="a" * 64,
-                scope_revision=1,
-                risk="R0",
-            )
-            self.assertEqual(path.stat().st_mode & 0o777, 0o600)
-
-    def test_session_mismatch_is_rejected(self):
-        ActionJournal, _, JournalError = _journal_types(self)
+    def test_unencodable_journal_text_is_wrapped_as_corruption(self):
+        ActionJournal, JournalCorruptionError, _ = _journal_types(self)
 
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "journal.jsonl"
-            journal = ActionJournal(path, session_id="session-1")
-            journal.prepare(
-                action_id="action-1",
-                intent_digest="a" * 64,
-                scope_revision=1,
-                risk="R0",
+            event = _prepared_event()
+            event["actionId"] = "\ud800"
+            path.write_text(json.dumps(event) + "\n", encoding="utf-8")
+
+            with self.assertRaises(JournalCorruptionError) as raised:
+                ActionJournal(path, "session-1")
+            self.assertIsInstance(raised.exception.__cause__, UnicodeEncodeError)
+
+    def test_parent_directory_disappearance_does_not_look_like_an_empty_journal(self):
+        ActionJournal, JournalCorruptionError, _ = _journal_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            parent = Path(directory) / "nested" / "journals"
+            path = parent / "journal.jsonl"
+            journal = ActionJournal(path, "session-1")
+            journal.prepare("action-1", "a" * 64, 1, "R0")
+            path.unlink()
+            parent.rmdir()
+            parent.parent.rmdir()
+
+            with self.assertRaises(JournalCorruptionError):
+                _matches_prefix(self, journal, 0, None)
+
+    def test_parent_symlink_retarget_does_not_redirect_journal_reads_or_appends(self):
+        ActionJournal, JournalCorruptionError, _ = _journal_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            first_root = root / "first"
+            second_root = root / "second"
+            first_parent = first_root / "journals"
+            second_parent = second_root / "journals"
+            first_parent.mkdir(parents=True)
+            second_parent.mkdir(parents=True)
+            first_path = first_parent / "journal.jsonl"
+            second_path = second_parent / "journal.jsonl"
+            first_event = ActionJournal(first_path, "session-1").prepare(
+                "action-a", "a" * 64, 1, "R0"
             )
-            with self.assertRaises(JournalError):
-                ActionJournal(path, session_id="session-2")
+            ActionJournal(second_path, "session-1").prepare(
+                "action-b", "b" * 64, 1, "R0"
+            )
+            alias = root / "current"
+            alias.symlink_to(first_root, target_is_directory=True)
+            journal = ActionJournal(alias / "journals" / "journal.jsonl", "session-1")
 
-    def test_empty_session_id_is_rejected(self):
-        ActionJournal, _, JournalError = _journal_types(self)
-
-        with tempfile.TemporaryDirectory() as directory:
-            with self.assertRaises(JournalError):
-                ActionJournal(Path(directory) / "journal.jsonl", " ")
-
-    def test_checkpoint_prefix_matches_a_persisted_hash_chain_head(self):
-        ActionJournal, _, _ = _journal_types(self)
-
-        with tempfile.TemporaryDirectory() as directory:
-            journal = ActionJournal(Path(directory) / "journal.jsonl", "session-1")
-            first = journal.prepare("action-1", "a" * 64, 1, "R0")
-            journal.prepare("action-2", "b" * 64, 1, "R0")
+            alias.unlink()
+            alias.symlink_to(second_root, target_is_directory=True)
 
             self.assertTrue(
-                _matches_prefix(self, journal, 1, first["entryHash"])
+                _matches_prefix(self, journal, 1, first_event["entryHash"])
+            )
+            journal.prepare("action-c", "c" * 64, 1, "R0")
+            self.assertEqual(len(first_path.read_text(encoding="utf-8").splitlines()), 2)
+            self.assertEqual(len(second_path.read_text(encoding="utf-8").splitlines()), 1)
+
+    def test_missing_parent_is_created_under_the_ancestor_captured_at_init(self):
+        ActionJournal, _, _ = _journal_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            first_root = root / "first"
+            second_root = root / "second"
+            first_root.mkdir()
+            second_root.mkdir()
+            alias = root / "current"
+            alias.symlink_to(first_root, target_is_directory=True)
+            journal = ActionJournal(
+                alias / "journals" / "journal.jsonl", "session-1"
             )
 
-    def test_checkpoint_prefix_accepts_a_valid_empty_anchor(self):
-        ActionJournal, _, _ = _journal_types(self)
-
-        with tempfile.TemporaryDirectory() as directory:
-            journal = ActionJournal(Path(directory) / "journal.jsonl", "session-1")
-            self.assertTrue(_matches_prefix(self, journal, 0, None))
+            alias.unlink()
+            alias.symlink_to(second_root, target_is_directory=True)
             journal.prepare("action-1", "a" * 64, 1, "R0")
-            self.assertTrue(_matches_prefix(self, journal, 0, None))
 
-    def test_checkpoint_prefix_rejects_a_mismatched_anchor(self):
+            self.assertTrue((first_root / "journals" / "journal.jsonl").is_file())
+            self.assertFalse((second_root / "journals").exists())
+
+    def test_new_parent_directory_entries_are_synced(self):
         ActionJournal, _, _ = _journal_types(self)
+        from bugmaster_core import action_journal
 
         with tempfile.TemporaryDirectory() as directory:
-            journal = ActionJournal(Path(directory) / "journal.jsonl", "session-1")
-            first = journal.prepare("action-1", "a" * 64, 1, "R0")
+            path = Path(directory) / "level-one" / "level-two" / "journal.jsonl"
+            journal = ActionJournal(path, "session-1")
+            real_fsync = action_journal.os.fsync
+            directory_syncs = []
 
-            for sequence, head_hash in (
-                (1, "b" * 64),
-                (2, first["entryHash"]),
-                (1, None),
-                (1, "not-a-sha256"),
-                (0, "a" * 64),
+            def record_directory_sync(fd):
+                if stat.S_ISDIR(os.fstat(fd).st_mode):
+                    info = os.fstat(fd)
+                    directory_syncs.append((info.st_dev, info.st_ino))
+                return real_fsync(fd)
+
+            with patch.object(
+                action_journal.os, "fsync", side_effect=record_directory_sync
             ):
-                with self.subTest(sequence=sequence, head_hash=head_hash):
-                    self.assertFalse(
-                        _matches_prefix(self, journal, sequence, head_hash)
-                    )
+                journal.prepare("action-1", "a" * 64, 1, "R0")
 
-    def test_checkpoint_prefix_rejects_malformed_sequences(self):
-        ActionJournal, _, JournalError = _journal_types(self)
+            required_directories = {
+                (path.parents[2].stat().st_dev, path.parents[2].stat().st_ino),
+                (path.parents[1].stat().st_dev, path.parents[1].stat().st_ino),
+                (path.parent.stat().st_dev, path.parent.stat().st_ino),
+            }
+            self.assertTrue(required_directories.issubset(set(directory_syncs)))
+
+    def test_parent_directory_sync_failure_is_retried_before_another_append(self):
+        ActionJournal, _, _ = _journal_types(self)
+        from bugmaster_core import action_journal
 
         with tempfile.TemporaryDirectory() as directory:
-            journal = ActionJournal(Path(directory) / "journal.jsonl", "session-1")
-            for sequence in (True, -1, 1.5, "1"):
-                with self.subTest(sequence=sequence):
-                    with self.assertRaises(JournalError):
-                        _matches_prefix(self, journal, sequence, None)
+            path = Path(directory) / "journal.jsonl"
+            journal = ActionJournal(path, "session-1")
+            directory_syncs = []
+            real_fsync = action_journal.os.fsync
 
-    def test_checkpoint_prefix_fails_closed_when_the_journal_is_corrupt(self):
+            def fail_directory_sync(fd):
+                if stat.S_ISDIR(os.fstat(fd).st_mode):
+                    directory_syncs.append(fd)
+                    raise OSError("directory entry sync failed")
+                return real_fsync(fd)
+
+            with patch.object(
+                action_journal.os, "fsync", side_effect=fail_directory_sync
+            ):
+                with self.assertRaises(OSError):
+                    journal.prepare("action-1", "a" * 64, 1, "R0")
+                with self.assertRaises(OSError):
+                    journal.prepare("action-2", "b" * 64, 1, "R0")
+
+            self.assertEqual(len(directory_syncs), 2)
+            self.assertFalse(path.exists())
+
+    def test_new_instance_resyncs_parent_after_directory_creation_sync_failure(self):
+        ActionJournal, _, _ = _journal_types(self)
+        from bugmaster_core import action_journal
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / "journals" / "journal.jsonl"
+            root_stat = root.stat()
+            root_identity = (root_stat.st_dev, root_stat.st_ino)
+            first = ActionJournal(path, "session-1")
+            real_fsync = action_journal.os.fsync
+            failed = []
+            synced = []
+
+            def fail_root_once(fd):
+                current = os.fstat(fd)
+                identity = (current.st_dev, current.st_ino)
+                if identity == root_identity and not failed:
+                    failed.append(identity)
+                    raise OSError("parent directory sync failed")
+                if stat.S_ISDIR(current.st_mode):
+                    synced.append(identity)
+                return real_fsync(fd)
+
+            with patch.object(action_journal.os, "fsync", side_effect=fail_root_once):
+                with self.assertRaises(OSError):
+                    first.prepare("action-1", "a" * 64, 1, "R0")
+                second = ActionJournal(path, "session-1")
+                second.prepare("action-1", "a" * 64, 1, "R0")
+
+            self.assertEqual(failed, [root_identity])
+            self.assertIn(root_identity, synced)
+
+    def test_missing_journal_after_observation_fails_without_recreation(self):
         ActionJournal, JournalCorruptionError, _ = _journal_types(self)
 
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "journal.jsonl"
             journal = ActionJournal(path, "session-1")
-            first = journal.prepare("action-1", "a" * 64, 1, "R0")
-            with path.open("ab") as stream:
-                stream.write(b"{broken-json}\n")
+            journal.prepare("action-1", "a" * 64, 1, "R0")
+            path.unlink()
 
             with self.assertRaises(JournalCorruptionError):
-                _matches_prefix(self, journal, 1, first["entryHash"])
+                _matches_prefix(self, journal, 0, None)
+            with self.assertRaises(JournalCorruptionError):
+                journal.prepare("action-2", "b" * 64, 1, "R0")
+            self.assertFalse(path.exists())
 
-    def test_journal_events_bind_the_configured_journal_id_and_schema_version(self):
-        ActionJournal, _, _ = _journal_types(self)
-
-        with tempfile.TemporaryDirectory() as directory:
-            try:
-                journal = ActionJournal(
-                    Path(directory) / "journal.jsonl",
-                    session_id="session-1",
-                    journal_id="journal-primary",
-                )
-            except TypeError as error:
-                self.fail("ActionJournal must accept a stable journal ID: {}".format(error))
-            event = journal.prepare("action-1", "a" * 64, 1, "R0")
-
-            self.assertEqual(event.get("journalId"), "journal-primary")
-            self.assertEqual(event.get("schemaVersion"), "1.1")
-
-    def test_journal_identity_cannot_be_changed_after_construction(self):
-        ActionJournal, _, _ = _journal_types(self)
-
-        with tempfile.TemporaryDirectory() as directory:
-            try:
-                journal = ActionJournal(
-                    Path(directory) / "journal.jsonl",
-                    session_id="session-1",
-                    journal_id="journal-primary",
-                )
-            except TypeError as error:
-                self.fail("ActionJournal must accept a stable journal ID: {}".format(error))
-
-            with self.assertRaises(AttributeError):
-                journal.journal_id = "journal-secondary"
-            self.assertEqual(journal.journal_id, "journal-primary")
-
-    def test_journal_rejects_events_bound_to_a_different_journal_id(self):
+    def test_replaced_journal_file_fails_closed(self):
         ActionJournal, JournalCorruptionError, _ = _journal_types(self)
 
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "journal.jsonl"
-            try:
-                journal = ActionJournal(
-                    path,
-                    session_id="session-1",
-                    journal_id="journal-primary",
-                )
-            except TypeError as error:
-                self.fail("ActionJournal must accept a stable journal ID: {}".format(error))
+            journal = ActionJournal(path, "session-1")
             journal.prepare("action-1", "a" * 64, 1, "R0")
+            original = Path(directory) / "journal.original"
+            path.rename(original)
+            path.write_bytes(b"")
 
-            try:
+            with self.assertRaises(JournalCorruptionError):
+                _matches_prefix(self, journal, 0, None)
+
+    def test_hardlinked_journal_is_rejected_before_changing_target(self):
+        ActionJournal, JournalCorruptionError, _ = _journal_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / "journal.jsonl"
+            journal = ActionJournal(path, "session-1")
+            target = root / "other-file.jsonl"
+            target.write_text("not a Journal\n", encoding="utf-8")
+            os.chmod(target, 0o644)
+            os.link(target, path)
+
+            with self.assertRaises(JournalCorruptionError):
+                journal.prepare("action-1", "a" * 64, 1, "R0")
+
+            self.assertEqual(target.stat().st_mode & 0o777, 0o644)
+            self.assertEqual(target.read_text(encoding="utf-8"), "not a Journal\n")
+
+    def test_read_rejects_journal_replaced_while_waiting_for_lock(self):
+        ActionJournal, JournalCorruptionError, _ = _journal_types(self)
+        import fcntl
+        from bugmaster_core import action_journal
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / "journal.jsonl"
+            journal = ActionJournal(path, "session-1")
+            event = journal.prepare("action-1", "a" * 64, 1, "R0")
+            original = root / "journal.original"
+            real_flock = action_journal.fcntl.flock
+            replaced = []
+
+            def replace_before_lock(fd, operation):
+                if operation == fcntl.LOCK_EX and not replaced:
+                    path.rename(original)
+                    path.write_text("", encoding="utf-8")
+                    replaced.append(True)
+                return real_flock(fd, operation)
+
+            with patch.object(
+                action_journal.fcntl, "flock", side_effect=replace_before_lock
+            ):
+                with self.assertRaises(JournalCorruptionError):
+                    _matches_prefix(self, journal, 1, event["entryHash"])
+
+            self.assertEqual(path.read_text(encoding="utf-8"), "")
+            self.assertEqual(len(original.read_text(encoding="utf-8").splitlines()), 1)
+
+    def test_append_rejects_journal_replaced_while_waiting_for_lock(self):
+        ActionJournal, JournalCorruptionError, _ = _journal_types(self)
+        import fcntl
+        from bugmaster_core import action_journal
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / "journal.jsonl"
+            journal = ActionJournal(path, "session-1")
+            journal.prepare("action-1", "a" * 64, 1, "R0")
+            original = root / "journal.original"
+            real_flock = action_journal.fcntl.flock
+            replaced = []
+
+            def replace_before_lock(fd, operation):
+                if operation == fcntl.LOCK_EX and not replaced:
+                    path.rename(original)
+                    path.write_text("", encoding="utf-8")
+                    replaced.append(True)
+                return real_flock(fd, operation)
+
+            with patch.object(
+                action_journal.fcntl, "flock", side_effect=replace_before_lock
+            ):
+                with self.assertRaises(JournalCorruptionError):
+                    journal.prepare("action-2", "b" * 64, 1, "R0")
+
+            self.assertEqual(path.read_text(encoding="utf-8"), "")
+            self.assertEqual(len(original.read_text(encoding="utf-8").splitlines()), 1)
+
+    def test_hardlink_added_while_waiting_for_append_lock_is_rejected(self):
+        ActionJournal, JournalCorruptionError, _ = _journal_types(self)
+        import fcntl
+        from bugmaster_core import action_journal
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / "journal.jsonl"
+            journal = ActionJournal(path, "session-1")
+            journal.prepare("action-1", "a" * 64, 1, "R0")
+            alias = root / "journal-alias.jsonl"
+            original_contents = path.read_text(encoding="utf-8")
+            real_flock = action_journal.fcntl.flock
+            linked = []
+
+            def link_before_lock(fd, operation):
+                if operation == fcntl.LOCK_EX and not linked:
+                    os.link(path, alias)
+                    linked.append(True)
+                return real_flock(fd, operation)
+
+            with patch.object(
+                action_journal.fcntl, "flock", side_effect=link_before_lock
+            ):
+                with self.assertRaises(JournalCorruptionError):
+                    journal.prepare("action-2", "b" * 64, 1, "R0")
+
+            self.assertEqual(path.read_text(encoding="utf-8"), original_contents)
+            self.assertEqual(alias.read_text(encoding="utf-8"), original_contents)
+
+    def test_read_rejects_journal_removed_while_waiting_for_lock(self):
+        ActionJournal, JournalCorruptionError, _ = _journal_types(self)
+        import fcntl
+        from bugmaster_core import action_journal
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / "journal.jsonl"
+            journal = ActionJournal(path, "session-1")
+            event = journal.prepare("action-1", "a" * 64, 1, "R0")
+            moved = root / "journal.moved"
+            real_flock = action_journal.fcntl.flock
+            removed = []
+
+            def remove_before_lock(fd, operation):
+                if operation == fcntl.LOCK_EX and not removed:
+                    path.rename(moved)
+                    removed.append(True)
+                return real_flock(fd, operation)
+
+            with patch.object(
+                action_journal.fcntl, "flock", side_effect=remove_before_lock
+            ):
+                with self.assertRaises(JournalCorruptionError):
+                    _matches_prefix(self, journal, 1, event["entryHash"])
+
+            self.assertEqual(len(moved.read_text(encoding="utf-8").splitlines()), 1)
+
+    def test_read_rejects_symlink_inserted_while_waiting_for_lock(self):
+        ActionJournal, JournalCorruptionError, _ = _journal_types(self)
+        import fcntl
+        from bugmaster_core import action_journal
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / "journal.jsonl"
+            journal = ActionJournal(path, "session-1")
+            event = journal.prepare("action-1", "a" * 64, 1, "R0")
+            original = root / "journal.original"
+            real_flock = action_journal.fcntl.flock
+            linked = []
+
+            def insert_symlink_before_lock(fd, operation):
+                if operation == fcntl.LOCK_EX and not linked:
+                    path.rename(original)
+                    path.symlink_to(original)
+                    linked.append(True)
+                return real_flock(fd, operation)
+
+            with patch.object(
+                action_journal.fcntl, "flock", side_effect=insert_symlink_before_lock
+            ):
+                with self.assertRaises(JournalCorruptionError):
+                    _matches_prefix(self, journal, 1, event["entryHash"])
+
+            self.assertTrue(path.is_symlink())
+
+    def test_read_rejects_parent_replaced_while_waiting_for_lock(self):
+        ActionJournal, JournalCorruptionError, _ = _journal_types(self)
+        import fcntl
+        from bugmaster_core import action_journal
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            parent = root / "journal-dir"
+            parent.mkdir()
+            path = parent / "journal.jsonl"
+            journal = ActionJournal(path, "session-1")
+            event = journal.prepare("action-1", "a" * 64, 1, "R0")
+            moved = root / "journal-dir.moved"
+            real_flock = action_journal.fcntl.flock
+            replaced = []
+
+            def replace_parent_before_lock(fd, operation):
+                if operation == fcntl.LOCK_EX and not replaced:
+                    parent.rename(moved)
+                    parent.mkdir()
+                    replaced.append(True)
+                return real_flock(fd, operation)
+
+            with patch.object(
+                action_journal.fcntl, "flock", side_effect=replace_parent_before_lock
+            ):
+                with self.assertRaises(JournalCorruptionError):
+                    _matches_prefix(self, journal, 1, event["entryHash"])
+
+            self.assertFalse(path.exists())
+            self.assertEqual(
+                len((moved / "journal.jsonl").read_text(encoding="utf-8").splitlines()),
+                1,
+            )
+
+    def test_append_rejects_parent_replaced_while_waiting_for_lock(self):
+        ActionJournal, JournalCorruptionError, _ = _journal_types(self)
+        import fcntl
+        from bugmaster_core import action_journal
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            parent = root / "journal-dir"
+            parent.mkdir()
+            path = parent / "journal.jsonl"
+            journal = ActionJournal(path, "session-1")
+            journal.prepare("action-1", "a" * 64, 1, "R0")
+            moved = root / "journal-dir.moved"
+            real_flock = action_journal.fcntl.flock
+            replaced = []
+
+            def replace_parent_before_lock(fd, operation):
+                if operation == fcntl.LOCK_EX and not replaced:
+                    parent.rename(moved)
+                    parent.mkdir()
+                    replaced.append(True)
+                return real_flock(fd, operation)
+
+            with patch.object(
+                action_journal.fcntl, "flock", side_effect=replace_parent_before_lock
+            ):
+                with self.assertRaises(JournalCorruptionError):
+                    journal.prepare("action-2", "b" * 64, 1, "R0")
+
+            self.assertFalse(path.exists())
+            self.assertEqual(
+                len((moved / "journal.jsonl").read_text(encoding="utf-8").splitlines()),
+                1,
+            )
+
+    def test_append_handles_existing_file_and_wraps_open_errors(self):
+        ActionJournal, JournalCorruptionError, _ = _journal_types(self)
+        from bugmaster_core import action_journal
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "journal.jsonl"
+            journal = ActionJournal(path, "session-1")
+            path.write_text("", encoding="utf-8")
+            event = journal.prepare("action-1", "a" * 64, 1, "R0")
+            self.assertEqual(event["sequence"], 1)
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "journal.jsonl"
+            journal = ActionJournal(path, "session-1")
+            real_open = action_journal.os.open
+
+            def fail_create_open(file, flags, *args, **kwargs):
+                if (
+                    file == path.name
+                    and flags & os.O_CREAT
+                    and flags & os.O_EXCL
+                ):
+                    raise PermissionError("journal cannot be created")
+                return real_open(file, flags, *args, **kwargs)
+
+            with patch.object(action_journal.os, "open", new=fail_create_open):
+                with self.assertRaises(JournalCorruptionError):
+                    journal.prepare("action-1", "a" * 64, 1, "R0")
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "journal.jsonl"
+            journal = ActionJournal(path, "session-1")
+            journal.prepare("action-1", "a" * 64, 1, "R0")
+            real_open = action_journal.os.open
+
+            def fail_existing_open(file, flags, *args, **kwargs):
+                if file == path.name and kwargs.get("dir_fd") is not None:
+                    raise PermissionError("journal cannot be reopened")
+                return real_open(file, flags, *args, **kwargs)
+
+            with patch.object(action_journal.os, "open", new=fail_existing_open):
+                with self.assertRaises(JournalCorruptionError):
+                    journal.prepare("action-2", "b" * 64, 1, "R0")
+
+    def test_read_descriptor_closes_when_unlock_fails(self):
+        ActionJournal, _, _ = _journal_types(self)
+        import fcntl
+        from bugmaster_core import action_journal
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "journal.jsonl"
+            journal = ActionJournal(path, "session-1")
+            journal.prepare("action-1", "a" * 64, 1, "R0")
+            real_open = action_journal.os.open
+            real_close = action_journal.os.close
+            real_flock = action_journal.fcntl.flock
+            file_fds = []
+            closed_fds = []
+
+            def track_open(file, flags, *args, **kwargs):
+                fd = real_open(file, flags, *args, **kwargs)
+                if kwargs.get("dir_fd") is not None:
+                    file_fds.append(fd)
+                return fd
+
+            def track_close(fd):
+                closed_fds.append(fd)
+                return real_close(fd)
+
+            def fail_unlock(fd, operation):
+                if operation == fcntl.LOCK_UN:
+                    raise OSError("unlock failed")
+                return real_flock(fd, operation)
+
+            with patch.object(action_journal.os, "open", side_effect=track_open):
+                with patch.object(action_journal.os, "close", side_effect=track_close):
+                    with patch.object(
+                        action_journal.fcntl, "flock", side_effect=fail_unlock
+                    ):
+                        with self.assertRaises(OSError):
+                            journal._load_current()
+
+            self.assertTrue(file_fds)
+            self.assertIn(file_fds[-1], closed_fds)
+
+    def test_append_descriptor_closes_when_unlock_fails(self):
+        ActionJournal, _, _ = _journal_types(self)
+        import fcntl
+        from bugmaster_core import action_journal
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "journal.jsonl"
+            journal = ActionJournal(path, "session-1")
+            journal.prepare("action-1", "a" * 64, 1, "R0")
+            real_open = action_journal.os.open
+            real_close = action_journal.os.close
+            real_flock = action_journal.fcntl.flock
+            file_fds = []
+            closed_fds = []
+
+            def track_open(file, flags, *args, **kwargs):
+                fd = real_open(file, flags, *args, **kwargs)
+                if kwargs.get("dir_fd") is not None:
+                    file_fds.append(fd)
+                return fd
+
+            def track_close(fd):
+                closed_fds.append(fd)
+                return real_close(fd)
+
+            def fail_unlock(fd, operation):
+                if operation == fcntl.LOCK_UN:
+                    raise OSError("unlock failed")
+                return real_flock(fd, operation)
+
+            with patch.object(action_journal.os, "open", side_effect=track_open):
+                with patch.object(action_journal.os, "close", side_effect=track_close):
+                    with patch.object(
+                        action_journal.fcntl, "flock", side_effect=fail_unlock
+                    ):
+                        with self.assertRaises(OSError):
+                            journal.prepare("action-2", "b" * 64, 1, "R0")
+
+            self.assertTrue(file_fds)
+            self.assertIn(file_fds[-1], closed_fds)
+
+    def test_append_rejects_a_journal_symlink_before_changing_its_target(self):
+        ActionJournal, JournalCorruptionError, _ = _journal_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / "journal.jsonl"
+            journal = ActionJournal(path, "session-1")
+            target = root / "other-file.jsonl"
+            target.write_text("not a Journal\n", encoding="utf-8")
+            os.chmod(target, 0o644)
+            path.symlink_to(target)
+
+            with self.assertRaises(JournalCorruptionError):
+                journal.prepare("action-1", "a" * 64, 1, "R0")
+
+            self.assertEqual(target.stat().st_mode & 0o777, 0o644)
+            self.assertEqual(target.read_text(encoding="utf-8"), "not a Journal\n")
+
+    def test_rejects_duplicate_journal_id_in_later_event_before_prefix_read(self):
+        ActionJournal, JournalCorruptionError, _ = _journal_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "journal.jsonl"
+            events = [
+                _prepared_event(sequence=1, action_id="action-1"),
+                _prepared_event(sequence=2, action_id="action-2"),
+            ]
+            _write_hashed_events(path, events)
+            lines = path.read_text(encoding="utf-8").splitlines()
+            lines[1] = lines[1].replace(
+                '"journalId":"journal-session-1"',
+                '"journalId":"other-journal","journalId":"journal-session-1"',
+                1,
+            )
+            path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            os.chmod(path, 0o600)
+
+            with self.assertRaisesRegex(JournalCorruptionError, "invalid JSON"):
                 ActionJournal(
-                    path,
-                    session_id="session-1",
-                    journal_id="journal-secondary",
-                )
-            except JournalCorruptionError:
-                pass
-            except TypeError as error:
-                self.fail("ActionJournal must validate the persisted journal ID: {}".format(error))
-            else:
-                self.fail("a different Journal ID must not load this event log")
+                    path, session_id="session-1", journal_id="journal-session-1"
+                ).matches_prefix(1, events[0]["entryHash"])
 
-    def test_journal_id_may_contain_unicode_line_separator_characters(self):
+    def test_rejects_a_legacy_v1_journal_without_mutating_its_file(self):
+        ActionJournal, JournalCorruptionError, _ = _journal_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "journal.jsonl"
+            legacy_event = _prepared_event()
+            legacy_event["schemaVersion"] = "1.0"
+            legacy_event.pop("journalId")
+            _write_hashed_events(path, [legacy_event])
+            os.chmod(path, 0o600)
+            original = path.read_bytes()
+            original_mode = stat.S_IMODE(path.stat().st_mode)
+
+            with self.assertRaises(JournalCorruptionError):
+                ActionJournal(
+                    path, session_id="session-1", journal_id="journal-session-1"
+                )
+
+            self.assertEqual(path.read_bytes(), original)
+            self.assertEqual(stat.S_IMODE(path.stat().st_mode), original_mode)
+
+    def test_rejects_appending_to_a_late_appearing_v1_journal_without_mutation(self):
+        ActionJournal, JournalCorruptionError, _ = _journal_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "journal.jsonl"
+            journal = ActionJournal(
+                path, session_id="session-1", journal_id="journal-session-1"
+            )
+            legacy_event = _prepared_event()
+            legacy_event["schemaVersion"] = "1.0"
+            legacy_event.pop("journalId")
+            _write_hashed_events(path, [legacy_event])
+            os.chmod(path, 0o644)
+            original = path.read_bytes()
+            original_mode = stat.S_IMODE(path.stat().st_mode)
+
+            with self.assertRaises(JournalCorruptionError):
+                journal.prepare("action-2", "b" * 64, 1, "R0")
+
+            self.assertEqual(path.read_bytes(), original)
+            self.assertEqual(stat.S_IMODE(path.stat().st_mode), original_mode)
+
+    def test_rejects_an_unencodable_journal_id_before_file_creation(self):
+        ActionJournal, _, JournalError = _journal_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "journal.jsonl"
+            with self.assertRaisesRegex(JournalError, "UTF-8"):
+                ActionJournal(path, "session-1", journal_id="\ud800")
+            self.assertFalse(path.exists())
+
+    def test_rejects_an_unencodable_session_id_before_file_creation(self):
+        ActionJournal, _, JournalError = _journal_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "journal.jsonl"
+            with self.assertRaisesRegex(JournalError, "UTF-8"):
+                ActionJournal(
+                    path, "\ud800", journal_id="journal-valid"
+                )
+            self.assertFalse(path.exists())
+
+    def test_explicit_journal_identity_is_read_only_and_survives_reopen(self):
+        ActionJournal, _, _ = _journal_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "journal.jsonl"
+            journal = ActionJournal(
+                path, session_id="session-1", journal_id="journal-explicit"
+            )
+            event = journal.prepare("action-1", "a" * 64, 1, "R0")
+
+            with self.assertRaises(AttributeError):
+                journal.journal_id = "journal-replaced"
+
+            reopened = ActionJournal(
+                path, session_id="session-1", journal_id="journal-explicit"
+            )
+            self.assertEqual(reopened.journal_id, "journal-explicit")
+            self.assertTrue(reopened.matches_prefix(1, event["entryHash"]))
+
+    def test_unicode_journal_identity_survives_event_write_and_reopen(self):
         ActionJournal, _, _ = _journal_types(self)
 
         with tempfile.TemporaryDirectory() as directory:
@@ -963,34 +1494,40 @@ class ActionJournalRecoveryTests(unittest.TestCase):
             journal = ActionJournal(
                 path, session_id="session-1", journal_id=journal_id
             )
-            first = journal.prepare("action-1", "a" * 64, 1, "R0")
-
+            event = journal.prepare("action-1", "a" * 64, 1, "R0")
             reopened = ActionJournal(
                 path, session_id="session-1", journal_id=journal_id
             )
 
-            self.assertEqual(
-                reopened.recovery_status("action-1"), "needs_reconciliation"
-            )
-            self.assertTrue(reopened.matches_prefix(1, first["entryHash"]))
+            self.assertEqual(event["journalId"], journal_id)
+            self.assertEqual(reopened.journal_id, journal_id)
+            self.assertTrue(reopened.matches_prefix(1, event["entryHash"]))
 
-    def test_journal_rejects_an_empty_explicit_journal_id(self):
+    def test_rejects_an_empty_explicit_journal_id_before_file_creation(self):
         ActionJournal, _, JournalError = _journal_types(self)
 
         with tempfile.TemporaryDirectory() as directory:
-            try:
+            path = Path(directory) / "journal.jsonl"
+            with self.assertRaisesRegex(JournalError, "non-empty"):
+                ActionJournal(path, "session-1", journal_id="")
+            self.assertFalse(path.exists())
+
+    def test_rejects_a_valid_event_bound_to_a_different_journal_id(self):
+        ActionJournal, JournalCorruptionError, _ = _journal_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "journal.jsonl"
+            event = _prepared_event()
+            event["journalId"] = "journal-actual"
+            _write_hashed_events(path, [event])
+            os.chmod(path, 0o600)
+
+            with self.assertRaisesRegex(JournalCorruptionError, "ID does not match"):
                 ActionJournal(
-                    Path(directory) / "journal.jsonl",
-                    session_id="session-1",
-                    journal_id=" ",
+                    path, session_id="session-1", journal_id="journal-reader"
                 )
-            except JournalError:
-                pass
-            except TypeError as error:
-                self.fail("ActionJournal must validate an explicit Journal ID: {}".format(error))
-            else:
-                self.fail("an empty Journal ID must be rejected")
 
 
 if __name__ == "__main__":
     unittest.main()
+

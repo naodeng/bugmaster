@@ -45,7 +45,7 @@ Scope JSON Schema 按目标记录 `in_scope`、`pending_authorization` 或 `out_
 
 Approval 和 Action Schema 记录 Scope/Action 引用、Scope Revision、目标、环境、规范化操作与参数摘要、风险、次数、有效期及生命周期状态。在宿主核验来源事件和动作绑定前，引用字段仍是不可信数据；当前 helper 在真实网关实现前拒绝 R2，R3 不能进入已派发或已完成状态。
 
-Action Journal 事件 Schema v1.1 要求每个事件同时绑定 `sessionId` 和 `journalId`；读取器会拒绝与配置 Session 或 Journal 身份不一致的事件流。v1.0 日志不含 Journal ID，会被拒绝且不会修改；当前未实现迁移。此本地身份绑定与哈希链不能证明事件来源或外部事实真实性。
+每条 Action Journal Event 使用 Schema v1.1，必须同时绑定 `sessionId` 和稳定的 `journalId`；读取器拒绝身份不匹配或含重复 JSON 键的记录。Checkpoint 引用验证会在同一共享锁下读取 Checkpoint 与 Session 快照，并比较调用方配置的 Journal 对象 ID 与最新 Session 声明的 `journalId`。Journal 文件路径仍由调用方选择，因此此检查不认证 ID 到路径的映射，也不证明事件来源。缺少 `journalId` 的 v1.0 事件会被拒绝；本轮不提供迁移，也不会原地改写旧文件。
 
 ## 实现顺序
 
