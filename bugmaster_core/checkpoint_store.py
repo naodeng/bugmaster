@@ -88,26 +88,30 @@ class CheckpointStore:
         with self._locked(create_directories=False) as storage:
             if storage is None:
                 return None
-            checkpoints_fd = _open_child_directory(
-                storage["session_fd"],
-                "checkpoints",
-                create=False,
-                error_type=CheckpointCorruptionError,
-                label="Checkpoint storage",
-            )
-            if checkpoints_fd is None:
-                return None
-            try:
-                directory_stat = os.fstat(checkpoints_fd)
-                if stat.S_IMODE(directory_stat.st_mode) != 0o700:
-                    raise CheckpointCorruptionError(
-                        "Checkpoint directory permissions are invalid"
-                    )
-                return self._read_checkpoint_file(
-                    checkpoints_fd, filename, checkpoint_id
+            return self._read_locked(storage, checkpoint_id, filename)
+
+    def _read_locked(self, storage, checkpoint_id, filename):
+        """Read a Checkpoint using a caller-held Session storage snapshot."""
+        checkpoints_fd = _open_child_directory(
+            storage["session_fd"],
+            "checkpoints",
+            create=False,
+            error_type=CheckpointCorruptionError,
+            label="Checkpoint storage",
+        )
+        if checkpoints_fd is None:
+            return None
+        try:
+            directory_stat = os.fstat(checkpoints_fd)
+            if stat.S_IMODE(directory_stat.st_mode) != 0o700:
+                raise CheckpointCorruptionError(
+                    "Checkpoint directory permissions are invalid"
                 )
-            finally:
-                os.close(checkpoints_fd)
+            return self._read_checkpoint_file(
+                checkpoints_fd, filename, checkpoint_id
+            )
+        finally:
+            os.close(checkpoints_fd)
 
     def _checkpoint_filename(self, checkpoint_id):
         try:
@@ -258,3 +262,4 @@ class CheckpointStore:
                     os.unlink(temporary_name, dir_fd=storage["session_fd"])
                 except FileNotFoundError:
                     pass
+

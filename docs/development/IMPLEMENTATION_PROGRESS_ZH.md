@@ -1,7 +1,7 @@
 # BugMaster 工程实施进度矩阵
 
 **更新日期：** 2026-11-20
-**当前状态：** W6 Action Journal、Session revision 与 Checkpoint 持久化均为局部切片。PR #2–#4 已合入 `main`；PR #4 merge commit 为 `6c5d519`。PR #5 已更新至 `main`，head `923f76f` 的 Actions Run `44671017598` 通过；独立安全复审无 P1/P2。完整产品仍为 Release No-Go。
+**当前状态：** W6 Action Journal、Session revision、Checkpoint 持久化和跨存储引用校验均为局部切片。PR #1–#5 已合入 `main`（当前 main `5994542`）。PR #6 以 `main` 为 base；代码 head `a5af48f` 的 Actions Run `44695141474` 全步骤通过。CodeX 独立安全复审角色对该代码 head 静态复审无 P1/P2；GitHub `@codex security review` 对同一 head 返回[无重大问题的复审回执](https://github.com/naodeng/bugmaster/pull/6#issuecomment-7033495382)。当前证据文档仍需同步提交和重跑 Actions；完整产品仍为 Release No-Go。
 
 ## 仓库审计摘要
 
@@ -24,7 +24,7 @@
 | W3 | 16 个 Bug Patterns | 候选规则 | 需适用/排除、Oracle、反例和真实对照 Eval |
 | W4 | 风险路由与有界自主探索 | 部分实现 | `scripts/discover_openapi.py` 可从本地 OpenAPI 3 JSON 输出稳定 ID 和 JSON Pointer 来源清单；URL/Browser 发现、风险路由与动态执行仍待实现 |
 | W5 | R0–R3 动作级授权 | 部分实现 | R0/R1 基础 helper 已 fail-closed；无可信网关时 R2 现在 fail-closed；真实网关、审批摘要和修订绑定仍待实现 |
-| W6 | Action Journal、Session 持久化与安全恢复 | 部分实现 | SessionStore（PR #3）与 CheckpointStore（PR #4）已合入 `main`；Journal 前缀核验（PR #5）先完整校验日志，再比对 Checkpoint 锚点；拒绝歧义 JSON、软链接、硬链接、FIFO 和非普通文件，固定父目录/日志 inode，并在锁等待前后核对目录项。它只校验本地完整性；可信恢复核验、预算与 Journal 对账、工具层执行绑定及双宿主验证仍待实现 |
+| W6 | Action Journal、Session/Checkpoint 持久化与安全恢复 | 部分实现 | PR #3–#5 已合入 `main`。PR #6 的 `CheckpointReferenceValidator` 在 CheckpointStore 共享锁和同一组目录描述符下读取 Checkpoint、锚定 Session revision 与最新登记，检查 Scope history 和 Journal 前缀；拒绝跨存储目录替换混读，并按 Schema 整数语义接受整值浮点 revision。它仍不绑定 Session `journalId` 到 Journal 路径、不验证权威 Scope/事件真实性、授权或预算；不是可信 Safe Resume。当前候选的本地证据见 [Checkpoint 跨存储引用 TDD 记录](2026-11-19_CHECKPOINT_REFERENCE_VALIDATION_TDD_ZH.md) |
 | W7 | Finding、跨入口去重与报告 | 待实现 | 需 Oracle、来源、E3+ 证据和剩余风险追踪 |
 | W8 | 回归建议 | 待实现 | 只输出建议，不自动修改/提交测试代码 |
 | W9 | 50 场景 Benchmark | 计划中 | 需真实运行、隔离 Ground Truth 和 G0–G3 对照 |
@@ -38,18 +38,18 @@
 | 品牌与 Skill 命名扫描 | PASS | `python3 scripts/check_branding.py`；命名契约包含 4 项 Skill ID 检查 |
 | Catalog/Registry | PASS | `python3 scripts/validate_catalog.py` |
 | Benchmark Manifest | PASS（结构） | `validate_benchmark.py` 明确提示场景未执行 |
-| GitHub Actions | PR #4、PR #5 当前 head 检查通过 | PR #4 最终 head Run `44662457674` 通过；PR #5 head `923f76f` 的 Run `44671017598` 通过。最新 head 与检查链接以 PR 页面为准 |
-| 单元测试 | 本地复审候选 PASS，239/239 | Python 3.12.16；全部 `bugmaster_core/` 生产模块行覆盖 100%、分支覆盖 100%。该目录仍只是 GATE-U100 初始样例范围，不代表全项目生产模块覆盖 |
-| R3 安全测试 | 本地候选 PASS，1/1 | `python -m unittest discover -s tests/security -v`；CI 单独执行，不并入单元覆盖率分母 |
-| 契约测试 | 本地候选 PASS，77/77 | Python 3.12 + `jsonschema[format-nongpl]==4.26.0`；最终命令见 Checkpoint TDD 记录 |
-| 当前核心模块行/分支覆盖率 | 本地复审候选 PASS，100% / 100%（初始样例范围） | `bugmaster_core` 为 1,393/1,393 行、508/508 分支；覆盖 JSON：`/private/tmp/bugmaster-pr5-coverage-final.json`。全项目 GATE-U100 仍需把所有需单测的生产 Python 模块纳入覆盖统计。行/分支口径分开报告，不等于业务功能覆盖 |
+| GitHub Actions | PR #4–#6 当前可核实 head 检查通过 | PR #4 Run `44662457674` 通过；PR #5 最终 head `c974a88` Run `44690535886` 通过；PR #6 代码 head `a5af48f` Run `44695141474` 全步骤通过。PR #6 当前文档证据同步提交待最终 Actions 重跑 |
+| 单元测试 | PR #6 修复后代码候选 PASS，257/257 | Python 3.12.16；`bugmaster_core/` 行和分支覆盖均 100%。该目录仍只是 GATE-U100 初始样例范围，不代表全项目生产模块覆盖 |
+| R3 安全测试 | 本地候选 PASS，1/1 | `python3.12 -m unittest discover -s tests/security -v`；CI 单独执行，不并入单元覆盖率分母 |
+| 契约测试 | PR #6 修复后代码候选 PASS，78/78 | Python 3.12 + `jsonschema[format-nongpl]==4.26.0`；含真实 Schema 的 Checkpoint 跨存储整值数字回归 |
+| 当前核心模块行/分支覆盖率 | 本地候选 PASS，100% / 100%（初始样例范围） | `bugmaster_core` 为 1,437/1,437 行、532/532 分支；覆盖 JSON：`/private/tmp/bugmaster-pr6-main-coverage.json`。全项目 GATE-U100 仍需把所有需单测的生产 Python 模块纳入覆盖统计。行/分支口径分开报告，不等于业务功能覆盖 |
 | 业务功能覆盖率 >60% | 未达成 | 目前没有真实业务执行证据 |
 | 核心 Happy / Negative / Edge | 未达成 | 需每个核心功能有三类实际通过证据 |
 | Release | No-Go | 全量功能、真实 Benchmark、双宿主和独立审批均未完成 |
 
-本轮使用核心覆盖 JSON `/private/tmp/bugmaster-pr5-coverage-final.json` 运行 release quality gate，结果仍为 No-Go：功能清单未冻结、真实功能覆盖未超过 60%，核心功能 Happy/Negative/Edge 执行矩阵缺证据。W6 本地状态机单测不作为真实业务功能执行证据。Benchmark 脚本仅验证清单结构，未运行 50 个场景。
+本轮使用核心覆盖 JSON `/private/tmp/bugmaster-pr6-main-coverage.json` 运行 release quality gate，结果仍为 No-Go：功能清单未冻结、真实功能覆盖未超过 60%，核心功能 Happy/Negative/Edge 执行矩阵缺证据。W6 本地状态机单测不作为真实业务功能执行证据。Benchmark 脚本仅验证清单结构，未运行 50 个场景。
 
-初始验证的命令与实际输出记录在 [基线验证记录](2026-11-18_INITIAL_BASELINE_VERIFICATION_ZH.md)。Scope 风险 helper、本地 OpenAPI 静态发现 CLI、Scope/Approval/Action Schema、Session Schema 和 R2 缺少可信审批网关时拒绝派发的 RED/GREEN/REFACTOR/VERIFY 证据分别见 [范围与风险门禁 TDD 记录](2026-11-18_SCOPE_GATE_TDD_ZH.md)、[OpenAPI 发现 TDD 记录](2026-11-18_OPENAPI_DISCOVERY_TDD_ZH.md)、[Scope Schema TDD 记录](2026-11-18_SCOPE_SCHEMA_TDD_ZH.md)、[Approval 与 Action Schema TDD 记录](2026-11-18_APPROVAL_ACTION_SCHEMA_TDD_ZH.md)、[Session Schema TDD 记录](2026-11-19_SESSION_SCHEMA_TDD_ZH.md) 与 [R2 门禁 TDD 记录](2026-11-18_R2_GATE_TDD_ZH.md) 和 [Session Revision 持久化 TDD 记录](2026-11-19_SESSION_REVISION_STORE_TDD_ZH.md)。
+初始验证的命令与实际输出记录在 [基线验证记录](2026-11-18_INITIAL_BASELINE_VERIFICATION_ZH.md)。Scope 风险 helper、本地 OpenAPI 静态发现 CLI、Scope/Approval/Action Schema、Session Schema 和 R2 缺少可信审批网关时拒绝派发的 RED/GREEN/REFACTOR/VERIFY 证据分别见 [范围与风险门禁 TDD 记录](2026-11-18_SCOPE_GATE_TDD_ZH.md)、[OpenAPI 发现 TDD 记录](2026-11-18_OPENAPI_DISCOVERY_TDD_ZH.md)、[Scope Schema TDD 记录](2026-11-18_SCOPE_SCHEMA_TDD_ZH.md)、[Approval 与 Action Schema TDD 记录](2026-11-18_APPROVAL_ACTION_SCHEMA_TDD_ZH.md)、[Session Schema TDD 记录](2026-11-19_SESSION_SCHEMA_TDD_ZH.md)、[R2 门禁 TDD 记录](2026-11-18_R2_GATE_TDD_ZH.md)、[Session Revision 持久化 TDD 记录](2026-11-19_SESSION_REVISION_STORE_TDD_ZH.md)和[Checkpoint 跨存储引用 TDD 记录](2026-11-19_CHECKPOINT_REFERENCE_VALIDATION_TDD_ZH.md)。
 
 11 个独立包的离线构建/闭包/摘要核验见 [Standalone 打包验证记录](2026-11-18_STANDALONE_PACKAGING_VERIFY_ZH.md)。
 
@@ -58,3 +58,4 @@
 1. 运行基线静态检查、单元/契约测试与当前质量门禁，记录真实输出。
 2. 选定 W0/W1 中尚未实现的首个安全关键行为，先写并运行失败测试，再实现最小代码。
 3. 每一轮更新本矩阵和独立中文 TDD 记录；不得将内部纵向切片作为缩水 MVP 对外发布。
+
