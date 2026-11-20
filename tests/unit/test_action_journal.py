@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 20815)
-Total output lines: 1969
-
 import hashlib
 import tempfile
 import unittest
@@ -793,7 +790,446 @@ class ActionJournalRecoveryTests(unittest.TestCase):
         ActionJournal, _, JournalError = _journal_types(self)
 
         with tempfile.TemporaryDirectory() as directory:
-            journal = ActionJournal(Path(directory) / "jou…4815 tokens truncated…t(mutate(line) + "\n", encoding="utf-8")
+            journal = ActionJournal(Path(directory) / "journal.jsonl", "session-1")
+            _prepare_and_dispatch(journal)
+            with self.assertRaises(JournalError):
+                journal.record_outcome("action-1", "completed")
+
+    def test_journal_file_is_private_on_posix(self):
+        ActionJournal, _, _ = _journal_types(self)
+        if os.name != "posix":
+            self.skipTest("POSIX file mode is not available on this host")
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "journal.jsonl"
+            journal = ActionJournal(path, session_id="session-1")
+            journal.prepare(
+                action_id="action-1",
+                intent_digest="a" * 64,
+                scope_revision=1,
+                risk="R0",
+            )
+            self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+
+    def test_session_mismatch_is_rejected(self):
+        ActionJournal, _, JournalError = _journal_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "journal.jsonl"
+            journal = ActionJournal(path, session_id="session-1")
+            journal.prepare(
+                action_id="action-1",
+                intent_digest="a" * 64,
+                scope_revision=1,
+                risk="R0",
+            )
+            with self.assertRaises(JournalError):
+                ActionJournal(path, session_id="session-2")
+
+    def test_empty_session_id_is_rejected(self):
+        ActionJournal, _, JournalError = _journal_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertRaises(JournalError):
+                ActionJournal(Path(directory) / "journal.jsonl", " ")
+
+    def test_checkpoint_prefix_matches_a_persisted_hash_chain_head(self):
+        ActionJournal, _, _ = _journal_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            journal = ActionJournal(Path(directory) / "journal.jsonl", "session-1")
+            first = journal.prepare("action-1", "a" * 64, 1, "R0")
+            journal.prepare("action-2", "b" * 64, 1, "R0")
+
+            self.assertTrue(
+                _matches_prefix(self, journal, 1, first["entryHash"])
+            )
+
+    def test_checkpoint_prefix_accepts_a_valid_empty_anchor(self):
+        ActionJournal, _, _ = _journal_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            journal = ActionJournal(Path(directory) / "journal.jsonl", "session-1")
+            self.assertTrue(_matches_prefix(self, journal, 0, None))
+            event = journal.prepare("action-1", "a" * 64, 1, "R0")
+            self.assertTrue(_matches_prefix(self, journal, 0, None))
+
+    def test_checkpoint_prefix_rejects_a_mismatched_anchor(self):
+        ActionJournal, _, _ = _journal_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            journal = ActionJournal(Path(directory) / "journal.jsonl", "session-1")
+            first = journal.prepare("action-1", "a" * 64, 1, "R0")
+
+            for sequence, head_hash in (
+                (1, "b" * 64),
+                (2, first["entryHash"]),
+                (1, None),
+                (1, "not-a-sha256"),
+                (0, "a" * 64),
+            ):
+                with self.subTest(sequence=sequence, head_hash=head_hash):
+                    self.assertFalse(
+                        _matches_prefix(self, journal, sequence, head_hash)
+                    )
+
+    def test_checkpoint_prefix_rejects_malformed_sequences(self):
+        ActionJournal, _, JournalError = _journal_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            journal = ActionJournal(Path(directory) / "journal.jsonl", "session-1")
+            for sequence in (True, -1, 1.5, "1"):
+                with self.subTest(sequence=sequence):
+                    with self.assertRaises(JournalError):
+                        _matches_prefix(self, journal, sequence, None)
+
+    def test_checkpoint_prefix_accepts_integral_json_number_values(self):
+        ActionJournal, _, _ = _journal_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            journal = ActionJournal(Path(directory) / "journal.jsonl", "session-1")
+            first = journal.prepare("action-1", "a" * 64, 1, "R0")
+
+            self.assertTrue(
+                _matches_prefix(self, journal, 1.0, first["entryHash"])
+            )
+            self.assertTrue(_matches_prefix(self, journal, 0.0, None))
+
+    def test_checkpoint_prefix_fails_closed_when_the_journal_is_corrupt(self):
+        ActionJournal, JournalCorruptionError, _ = _journal_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "journal.jsonl"
+            journal = ActionJournal(path, "session-1")
+            first = journal.prepare("action-1", "a" * 64, 1, "R0")
+            with path.open("ab") as stream:
+                stream.write(b"{broken-json}\n")
+
+            with self.assertRaises(JournalCorruptionError):
+                _matches_prefix(self, journal, 1, first["entryHash"])
+
+    def test_checkpoint_prefix_rejects_duplicate_json_keys_in_later_events(self):
+        ActionJournal, JournalCorruptionError, _ = _journal_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "journal.jsonl"
+            events = [_prepared_event(), _prepared_event(sequence=2, action_id="action-2")]
+            _write_hashed_events(path, events)
+            journal = ActionJournal(path, "session-1")
+            first_hash = events[0]["entryHash"]
+
+            lines = path.read_text(encoding="utf-8").splitlines()
+            lines[1] = lines[1].replace(
+                '"eventType":"action_prepared"',
+                '"eventType":"unknown","eventType":"action_prepared"',
+                1,
+            )
+            path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+            with self.assertRaises(JournalCorruptionError):
+                _matches_prefix(self, journal, 1, first_hash)
+
+    def test_journal_round_trips_unicode_line_separators(self):
+        ActionJournal, _, _ = _journal_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "journal.jsonl"
+            journal = ActionJournal(path, "session-1")
+            event = journal.prepare(
+                "action-1",
+                "a" * 64,
+                1,
+                "R2",
+                approval_ref="approval\u2028reference\u2029end",
+            )
+
+            reloaded = ActionJournal(path, "session-1")
+            self.assertTrue(
+                _matches_prefix(self, reloaded, 1, event["entryHash"])
+            )
+
+    def test_missing_journal_matches_only_the_empty_prefix(self):
+        ActionJournal, _, _ = _journal_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "not-created" / "journal.jsonl"
+            journal = ActionJournal(path, "session-1")
+
+            self.assertTrue(_matches_prefix(self, journal, 0, None))
+            event = journal.prepare("action-1", "a" * 64, 1, "R0")
+            self.assertTrue(_matches_prefix(self, journal, 1, event["entryHash"]))
+
+    def test_dangling_journal_symlink_is_not_treated_as_missing(self):
+        ActionJournal, JournalCorruptionError, _ = _journal_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "journal.jsonl"
+            path.symlink_to(Path(directory) / "missing-target.jsonl")
+
+            with self.assertRaises(JournalCorruptionError):
+                ActionJournal(path, "session-1")
+
+    def test_symlinked_journal_is_rejected(self):
+        ActionJournal, JournalCorruptionError, _ = _journal_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory) / "target.jsonl"
+            ActionJournal(target, "session-1").prepare(
+                "action-1", "a" * 64, 1, "R0"
+            )
+            link = Path(directory) / "journal.jsonl"
+            link.symlink_to(target)
+
+            with self.assertRaises(JournalCorruptionError):
+                ActionJournal(link, "session-1")
+
+    def test_non_regular_journal_is_rejected(self):
+        ActionJournal, JournalCorruptionError, _ = _journal_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "journal-directory"
+            path.mkdir()
+
+            with self.assertRaises(JournalCorruptionError):
+                ActionJournal(path, "session-1")
+
+    def test_fifo_journal_is_rejected_without_blocking(self):
+        if not hasattr(os, "mkfifo"):
+            self.skipTest("FIFO journal checks require POSIX")
+        ActionJournal, _, _ = _journal_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "journal.fifo"
+            os.mkfifo(path)
+            program = (
+                "from bugmaster_core.action_journal import ActionJournal; "
+                "ActionJournal({!r}, 'session-1')"
+            ).format(str(path))
+            try:
+                result = subprocess.run(
+                    [sys.executable, "-c", program],
+                    capture_output=True,
+                    text=True,
+                    timeout=2,
+                )
+            except subprocess.TimeoutExpired:
+                self.fail("opening a FIFO journal must fail without blocking")
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("JournalCorruptionError", result.stderr)
+
+    def test_constructor_rejects_invalid_parent_paths(self):
+        ActionJournal, _, JournalError = _journal_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            file_parent = root / "parent-file"
+            file_parent.write_text("not a directory", encoding="utf-8")
+            with self.assertRaises(JournalError):
+                ActionJournal(file_parent / "journal.jsonl", "session-1")
+
+            directory_parent = root / "directory"
+            directory_parent.mkdir()
+            resolved_file = root / "resolved-file"
+            resolved_file.write_text("not a directory", encoding="utf-8")
+            real_resolve = Path.resolve
+
+            def resolve_to_file(path, *args, **kwargs):
+                if path == directory_parent:
+                    return resolved_file
+                return real_resolve(path, *args, **kwargs)
+
+            with patch.object(Path, "resolve", new=resolve_to_file):
+                with self.assertRaises(JournalError):
+                    ActionJournal(directory_parent / "journal.jsonl", "session-1")
+
+    def test_constructor_wraps_parent_inspection_and_resolution_errors(self):
+        ActionJournal, _, JournalError = _journal_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            parent = Path(directory) / "journals"
+            parent.mkdir()
+            path = parent / "journal.jsonl"
+            real_stat = Path.stat
+
+            def fail_parent_stat(candidate, *args, **kwargs):
+                if candidate == parent:
+                    raise PermissionError("parent metadata is not readable")
+                return real_stat(candidate, *args, **kwargs)
+
+            with patch.object(Path, "stat", new=fail_parent_stat):
+                with self.assertRaises(JournalError):
+                    ActionJournal(path, "session-1")
+
+            real_resolve = Path.resolve
+
+            def fail_parent_resolve(candidate, *args, **kwargs):
+                if candidate == parent:
+                    raise PermissionError("parent cannot be resolved")
+                return real_resolve(candidate, *args, **kwargs)
+
+            with patch.object(Path, "resolve", new=fail_parent_resolve):
+                with self.assertRaises(JournalError):
+                    ActionJournal(path, "session-1")
+
+    def test_constructor_fails_if_no_parent_component_exists(self):
+        ActionJournal, _, JournalError = _journal_types(self)
+
+        with patch.object(Path, "stat", side_effect=FileNotFoundError):
+            with self.assertRaises(JournalError):
+                ActionJournal("/missing/journal.jsonl", "session-1")
+
+    def test_parent_open_and_directory_identity_failures_are_corruption(self):
+        ActionJournal, JournalCorruptionError, _ = _journal_types(self)
+        from bugmaster_core import action_journal
+
+        with tempfile.TemporaryDirectory() as directory:
+            journal = ActionJournal(Path(directory) / "journal.jsonl", "session-1")
+            real_open = action_journal.os.open
+
+            def fail_anchor_open(file, flags, *args, **kwargs):
+                if file == "/":
+                    raise PermissionError("root cannot be opened")
+                return real_open(file, flags, *args, **kwargs)
+
+            with patch.object(action_journal.os, "open", new=fail_anchor_open):
+                with self.assertRaises(JournalCorruptionError):
+                    _matches_prefix(self, journal, 0, None)
+
+            journal._anchor_identity = (0, 0)
+            with self.assertRaises(JournalCorruptionError):
+                _matches_prefix(self, journal, 0, None)
+
+        with tempfile.TemporaryDirectory() as directory:
+            journal = ActionJournal(Path(directory) / "journal.jsonl", "session-1")
+            journal._directory_identities[
+                tuple(journal._relative_parent_parts)
+            ] = (0, 0)
+            with self.assertRaises(JournalCorruptionError):
+                _matches_prefix(self, journal, 0, None)
+
+        with tempfile.TemporaryDirectory() as directory:
+            journal = ActionJournal(Path(directory) / "journal.jsonl", "session-1")
+            journal._parent_identity = (0, 0)
+            with self.assertRaises(JournalCorruptionError):
+                _matches_prefix(self, journal, 0, None)
+
+    def test_parent_open_permission_error_is_corruption(self):
+        ActionJournal, JournalCorruptionError, _ = _journal_types(self)
+        from bugmaster_core import action_journal
+
+        with tempfile.TemporaryDirectory() as directory:
+            journal = ActionJournal(Path(directory) / "journal.jsonl", "session-1")
+            real_open = action_journal.os.open
+            component = journal._relative_parent_parts[-1]
+
+            def fail_parent_component(file, flags, *args, **kwargs):
+                if file == component and kwargs.get("dir_fd") is not None:
+                    raise PermissionError("parent cannot be opened")
+                return real_open(file, flags, *args, **kwargs)
+
+            with patch.object(
+                action_journal.os, "open", new=fail_parent_component
+            ):
+                with self.assertRaises(JournalCorruptionError):
+                    _matches_prefix(self, journal, 0, None)
+
+    def test_path_verification_rejects_a_different_parent_descriptor(self):
+        ActionJournal, JournalCorruptionError, _ = _journal_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / "journal.jsonl"
+            journal = ActionJournal(path, "session-1")
+            journal.prepare("action-1", "a" * 64, 1, "R0")
+            parent_fd = journal._open_parent()
+            file_fd = os.open(path.name, os.O_RDONLY, dir_fd=parent_fd)
+            other = root / "other"
+            other.mkdir()
+            other_fd = os.open(other, os.O_RDONLY | os.O_DIRECTORY)
+            try:
+                with patch.object(journal, "_open_parent", return_value=os.dup(other_fd)):
+                    with self.assertRaises(JournalCorruptionError):
+                        journal._verify_journal_path(file_fd, parent_fd)
+            finally:
+                os.close(file_fd)
+                os.close(parent_fd)
+                os.close(other_fd)
+
+    def test_parent_creation_handles_races_and_fails_closed_on_errors(self):
+        ActionJournal, JournalCorruptionError, _ = _journal_types(self)
+        from bugmaster_core import action_journal
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "nested" / "journal.jsonl"
+            journal = ActionJournal(path, "session-1")
+            real_mkdir = action_journal.os.mkdir
+            raced = []
+
+            def create_before_mkdir(file, mode=0o777, *, dir_fd=None):
+                if file == "nested" and not raced:
+                    real_mkdir(file, mode, dir_fd=dir_fd)
+                    raced.append(True)
+                    raise FileExistsError("another writer created the directory")
+                return real_mkdir(file, mode, dir_fd=dir_fd)
+
+            with patch.object(action_journal.os, "mkdir", new=create_before_mkdir):
+                journal.prepare("action-1", "a" * 64, 1, "R0")
+            self.assertTrue(path.is_file())
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "nested" / "journal.jsonl"
+            journal = ActionJournal(path, "session-1")
+            with patch.object(
+                action_journal.os, "mkdir", side_effect=PermissionError("denied")
+            ):
+                with self.assertRaises(JournalCorruptionError):
+                    journal.prepare("action-1", "a" * 64, 1, "R0")
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "nested" / "journal.jsonl"
+            journal = ActionJournal(path, "session-1")
+            real_open = action_journal.os.open
+            nested_open_count = []
+
+            def fail_open_after_create(file, flags, *args, **kwargs):
+                if file == "nested" and kwargs.get("dir_fd") is not None:
+                    nested_open_count.append(True)
+                    if len(nested_open_count) == 2:
+                        raise PermissionError("created parent cannot be opened")
+                return real_open(file, flags, *args, **kwargs)
+
+            with patch.object(action_journal.os, "open", new=fail_open_after_create):
+                with self.assertRaises(JournalCorruptionError):
+                    journal.prepare("action-1", "a" * 64, 1, "R0")
+            self.assertEqual(len(nested_open_count), 2)
+
+    def test_malformed_journal_json_errors_are_wrapped_as_corruption(self):
+        ActionJournal, JournalCorruptionError, _ = _journal_types(self)
+        cases = (
+            (
+                "deeply-nested",
+                lambda line: line.replace(
+                    '"data":{',
+                    '"data":{"nested":' + "[" * 10000 + "0" + "]" * 10000 + ",",
+                    1,
+                ),
+                (ValueError, RecursionError),
+            ),
+            (
+                "long-integer",
+                lambda line: line.replace(
+                    '"sequence":1', '"sequence":' + "9" * 5000, 1
+                ),
+                None,
+            ),
+        )
+
+        for label, mutate, cause_types in cases:
+            with self.subTest(label=label), tempfile.TemporaryDirectory() as directory:
+                path = Path(directory) / "journal.jsonl"
+                line = json.dumps(_prepared_event(), separators=(",", ":"))
+                path.write_text(mutate(line) + "\n", encoding="utf-8")
 
                 with self.assertRaises(JournalCorruptionError) as raised:
                     ActionJournal(path, "session-1")
@@ -1530,4 +1966,3 @@ class ActionJournalRecoveryTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
