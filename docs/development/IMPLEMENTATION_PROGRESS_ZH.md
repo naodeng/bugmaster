@@ -1,7 +1,7 @@
 # BugMaster 工程实施进度矩阵
 
 **更新日期：** 2026-11-20
-**当前状态：** W6 Action Journal、Session revision、Checkpoint 持久化和跨存储引用校验均为局部切片。PR #1–#5 已合入 `main`（当前 main `5994542`）。PR #6 仍开放；旧 head `e5c443c` 以已合入 #5 的旧栈分支为 base，当前本地候选已修复独立复审发现的跨存储快照、Schema 整数语义和安全打开能力问题。候选本地验证通过，远端 head/Actions 更新待完成；完整产品仍为 Release No-Go。
+**当前状态：** W6 Action Journal、Session revision、Checkpoint 持久化和跨存储引用校验均为局部切片。PR #1–#5 已合入 `main`（当前 main `5994542`）。PR #6 以 `main` 为 base；代码 head `a5af48f` 的 Actions Run `44695141474` 全步骤通过。CodeX 独立安全复审角色对该代码 head 静态复审无 P1/P2；GitHub `@codex security review` 对同一 head 返回[无重大问题的复审回执](https://github.com/naodeng/bugmaster/pull/6#issuecomment-7033495382)。当前证据文档仍需同步提交和重跑 Actions；完整产品仍为 Release No-Go。
 
 ## 仓库审计摘要
 
@@ -38,10 +38,10 @@
 | 品牌与 Skill 命名扫描 | PASS | `python3 scripts/check_branding.py`；命名契约包含 4 项 Skill ID 检查 |
 | Catalog/Registry | PASS | `python3 scripts/validate_catalog.py` |
 | Benchmark Manifest | PASS（结构） | `validate_benchmark.py` 明确提示场景未执行 |
-| GitHub Actions | PR #4、#5 当前 head 检查通过；PR #6 待更新 | PR #4 最终 head Run `44662457674`、PR #5 head `923f76f` Run `44671017598` 通过。PR #6 旧 head `e5c443c` 的 Run `44486223458` 成功，但基线过时；当前候选尚待推送并由 Actions 重跑 |
-| 单元测试 | 本地候选 PASS，257/257 | Python 3.12.16；`bugmaster_core/` 行和分支覆盖均 100%。该目录仍只是 GATE-U100 初始样例范围，不代表全项目生产模块覆盖 |
+| GitHub Actions | PR #4–#6 当前可核实 head 检查通过 | PR #4 Run `44662457674` 通过；PR #5 最终 head `c974a88` Run `44690535886` 通过；PR #6 代码 head `a5af48f` Run `44695141474` 全步骤通过。PR #6 当前文档证据同步提交待最终 Actions 重跑 |
+| 单元测试 | PR #6 修复后代码候选 PASS，257/257 | Python 3.12.16；`bugmaster_core/` 行和分支覆盖均 100%。该目录仍只是 GATE-U100 初始样例范围，不代表全项目生产模块覆盖 |
 | R3 安全测试 | 本地候选 PASS，1/1 | `python3.12 -m unittest discover -s tests/security -v`；CI 单独执行，不并入单元覆盖率分母 |
-| 契约测试 | 本地候选 PASS，78/78 | Python 3.12 + `jsonschema[format-nongpl]==4.26.0`；含真实 Schema 的 Checkpoint 跨存储整值数字回归 |
+| 契约测试 | PR #6 修复后代码候选 PASS，78/78 | Python 3.12 + `jsonschema[format-nongpl]==4.26.0`；含真实 Schema 的 Checkpoint 跨存储整值数字回归 |
 | 当前核心模块行/分支覆盖率 | 本地候选 PASS，100% / 100%（初始样例范围） | `bugmaster_core` 为 1,437/1,437 行、532/532 分支；覆盖 JSON：`/private/tmp/bugmaster-pr6-main-coverage.json`。全项目 GATE-U100 仍需把所有需单测的生产 Python 模块纳入覆盖统计。行/分支口径分开报告，不等于业务功能覆盖 |
 | 业务功能覆盖率 >60% | 未达成 | 目前没有真实业务执行证据 |
 | 核心 Happy / Negative / Edge | 未达成 | 需每个核心功能有三类实际通过证据 |
