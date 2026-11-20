@@ -176,7 +176,9 @@ class CheckpointSchemaTests(unittest.TestCase):
             latest["checkpointRefs"] = ["checkpoint-1"]
             session_store.append_revision(latest, expected_revision=1)
             journal = ActionJournal(
-                Path(directory) / "journals" / "journal-1.jsonl", "session-1"
+                Path(directory) / "journals" / "journal-1.jsonl",
+                "session-1",
+                journal_id="session-1-journal",
             )
 
             validator = CheckpointReferenceValidator(

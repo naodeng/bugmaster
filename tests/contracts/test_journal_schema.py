@@ -84,6 +84,23 @@ class JournalSchemaTests(unittest.TestCase):
             event["data"]["approvalRef"] = None
             self.assertFalse(validator.is_valid(event))
 
+    def test_journal_id_is_required_and_v1_0_is_not_valid(self):
+        schema = self._load_schema()
+        validator = Draft202012Validator(schema, format_checker=FormatChecker())
+
+        with tempfile.TemporaryDirectory() as directory:
+            event = self._real_events(Path(directory) / "journal.jsonl")[0]
+            self.assertEqual(event["schemaVersion"], "1.1")
+            self.assertTrue(event["journalId"])
+
+            missing_id = dict(event)
+            del missing_id["journalId"]
+            self.assertFalse(validator.is_valid(missing_id))
+
+            legacy_event = dict(event)
+            legacy_event["schemaVersion"] = "1.0"
+            self.assertFalse(validator.is_valid(legacy_event))
+
 
 if __name__ == "__main__":
     unittest.main()

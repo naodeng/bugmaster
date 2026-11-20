@@ -23,7 +23,7 @@ def _accept_document(_document):
     return None
 
 
-def _valid_session(session_id="session-1"):
+def _valid_session(session_id="session-1", journal_id="journal-1"):
     return {
         "schemaVersion": "1.0",
         "sessionId": session_id,
@@ -37,7 +37,7 @@ def _valid_session(session_id="session-1"):
         "approvalRefs": [],
         "checkpointRefs": [],
         "actionBudget": {},
-        "journalId": "journal-1",
+        "journalId": journal_id,
     }
 
 
@@ -72,7 +72,9 @@ class CheckpointReferenceValidatorTests(unittest.TestCase):
             root, session_id, _accept_document
         )
         journal = ActionJournal(
-            root / "journals" / "journal-1.jsonl", session_id
+            root / "journals" / "journal-1.jsonl",
+            session_id,
+            journal_id="journal-1",
         )
         session_store.create(_valid_session(session_id))
         return checkpoint_store, session_store, journal
@@ -156,7 +158,9 @@ class CheckpointReferenceValidatorTests(unittest.TestCase):
             session_store = SessionStore(
                 root, "session-1", _accept_document
             )
-            journal = ActionJournal(root / "journal-1.jsonl", "session-1")
+            journal = ActionJournal(
+                root / "journal-1.jsonl", "session-1", journal_id="journal-1"
+            )
             validator = CheckpointReferenceValidator(
                 checkpoint_store, session_store, journal
             )
@@ -265,7 +269,9 @@ class CheckpointReferenceValidatorTests(unittest.TestCase):
                 root, "session-1", _accept_document
             )
             journal = ActionJournal(
-                root / "journals" / "journal-1.jsonl", "session-1"
+                root / "journals" / "journal-1.jsonl",
+                "session-1",
+                journal_id="journal-1",
             )
             checkpoint_store.create(_valid_checkpoint())
             validator = CheckpointReferenceValidator(
@@ -299,7 +305,9 @@ class CheckpointReferenceValidatorTests(unittest.TestCase):
             session_store.create(_valid_session())
             alternate_session_store.create(_valid_session())
 
-            journal = ActionJournal(root / "journal-a.jsonl", "session-1")
+            journal = ActionJournal(
+                root / "journal-a.jsonl", "session-1", journal_id="journal-1"
+            )
             event = journal.prepare("action-a", "a" * 64, 1, "R0")
             checkpoint = _valid_checkpoint(
                 journalSequence=event["sequence"],
@@ -308,7 +316,9 @@ class CheckpointReferenceValidatorTests(unittest.TestCase):
             checkpoint_store.create(checkpoint)
 
             alternate_journal = ActionJournal(
-                alternate_root / "journal-b.jsonl", "session-1"
+                alternate_root / "journal-b.jsonl",
+                "session-1",
+                journal_id="journal-1",
             )
             alternate_event = alternate_journal.prepare(
                 "action-b", "b" * 64, 1, "R0"
@@ -386,6 +396,94 @@ class CheckpointReferenceValidatorTests(unittest.TestCase):
                     checkpoint_store, session_store, other_journal
                 )
 
+    def test_rejects_journal_id_that_differs_from_the_latest_session(self):
+        CheckpointReferenceError, CheckpointReferenceValidator = _reference_types(self)
+        from bugmaster_core.action_journal import ActionJournal
+
+        with tempfile.TemporaryDirectory() as directory:
+            checkpoint_store, session_store, _ = self.make_context(directory)
+            self.register_checkpoint(
+                checkpoint_store, session_store, _valid_checkpoint()
+            )
+            wrong_journal = ActionJournal(
+                Path(directory) / "journal-other.jsonl",
+                "session-1",
+                journal_id="journal-other",
+            )
+            validator = CheckpointReferenceValidator(
+                checkpoint_store, session_store, wrong_journal
+            )
+
+            with self.assertRaises(CheckpointReferenceError):
+                validator.validate("checkpoint-1")
+
+    def test_rejects_journal_id_from_a_replaced_session_snapshot(self):
+        CheckpointReferenceError, CheckpointReferenceValidator = _reference_types(self)
+        from bugmaster_core.action_journal import ActionJournal
+        from bugmaster_core.checkpoint_store import CheckpointStore
+        from bugmaster_core.session_store import SessionStore
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "active"
+            alternate_root = Path(directory) / "alternate"
+            root.mkdir()
+            alternate_root.mkdir()
+            session_store = SessionStore(root, "session-1", _accept_document)
+            checkpoint_store = CheckpointStore(
+                root, "session-1", _accept_document
+            )
+            alternate_session_store = SessionStore(
+                alternate_root, "session-1", _accept_document
+            )
+            session_store.create(_valid_session(journal_id="journal-a"))
+            alternate_session_store.create(
+                _valid_session(journal_id="journal-b")
+            )
+
+            alternate_journal = ActionJournal(
+                alternate_root / "journal-b.jsonl",
+                "session-1",
+                journal_id="journal-b",
+            )
+            event = alternate_journal.prepare(
+                "action-b", "b" * 64, 1, "R0"
+            )
+            checkpoint = _valid_checkpoint(
+                journalSequence=event["sequence"],
+                journalHeadHash=event["entryHash"],
+            )
+            checkpoint_store.create(checkpoint)
+            alternate_latest = dict(alternate_session_store.read_latest())
+            alternate_latest["revision"] = 2
+            alternate_latest["checkpointRefs"] = ["checkpoint-1"]
+            alternate_session_store.append_revision(
+                alternate_latest, expected_revision=1
+            )
+
+            session_dir = session_store._session_dir
+            backup_dir = root / "session-a-backup"
+            alternate_session_dir = alternate_session_store._session_dir
+            original_read_checkpoint = checkpoint_store._read_checkpoint_file
+            swapped = []
+
+            def replace_storage_after_checkpoint_read(*args, **kwargs):
+                result = original_read_checkpoint(*args, **kwargs)
+                if not swapped:
+                    session_dir.rename(backup_dir)
+                    alternate_session_dir.rename(session_dir)
+                    swapped.append(True)
+                return result
+
+            checkpoint_store._read_checkpoint_file = (
+                replace_storage_after_checkpoint_read
+            )
+            validator = CheckpointReferenceValidator(
+                checkpoint_store, session_store, alternate_journal
+            )
+
+            with self.assertRaises(CheckpointReferenceError):
+                validator.validate("checkpoint-1")
+
     def test_requires_checkpoint_safe_open_flags_from_validator_entry(self):
         _, CheckpointReferenceValidator = _reference_types(self)
         from bugmaster_core.checkpoint_store import CheckpointStoreError
@@ -420,7 +518,9 @@ class CheckpointReferenceValidatorTests(unittest.TestCase):
             session_store = SessionStore(
                 root / "sessions", "session-1", _accept_document
             )
-            journal = ActionJournal(root / "journal.jsonl", "session-1")
+            journal = ActionJournal(
+                root / "journal.jsonl", "session-1", journal_id="journal-1"
+            )
 
             with self.assertRaises(CheckpointReferenceError):
                 CheckpointReferenceValidator(

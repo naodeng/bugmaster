@@ -38,8 +38,9 @@ def _prepare_and_dispatch(journal, action_id="action-1", digest="a" * 64):
 
 def _event(event_type, sequence, data, action_id="action-1"):
     return {
-        "schemaVersion": "1.0",
+        "schemaVersion": "1.1",
         "sessionId": "session-1",
+        "journalId": "journal-session-1",
         "sequence": sequence,
         "eventType": event_type,
         "actionId": action_id,
@@ -850,7 +851,7 @@ class ActionJournalRecoveryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             journal = ActionJournal(Path(directory) / "journal.jsonl", "session-1")
             self.assertTrue(_matches_prefix(self, journal, 0, None))
-            journal.prepare("action-1", "a" * 64, 1, "R0")
+            event = journal.prepare("action-1", "a" * 64, 1, "R0")
             self.assertTrue(_matches_prefix(self, journal, 0, None))
 
     def test_checkpoint_prefix_rejects_a_mismatched_anchor(self):
@@ -1813,6 +1814,154 @@ class ActionJournalRecoveryTests(unittest.TestCase):
 
             self.assertEqual(target.stat().st_mode & 0o777, 0o644)
             self.assertEqual(target.read_text(encoding="utf-8"), "not a Journal\n")
+
+    def test_rejects_duplicate_journal_id_in_later_event_before_prefix_read(self):
+        ActionJournal, JournalCorruptionError, _ = _journal_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "journal.jsonl"
+            events = [
+                _prepared_event(sequence=1, action_id="action-1"),
+                _prepared_event(sequence=2, action_id="action-2"),
+            ]
+            _write_hashed_events(path, events)
+            lines = path.read_text(encoding="utf-8").splitlines()
+            lines[1] = lines[1].replace(
+                '"journalId":"journal-session-1"',
+                '"journalId":"other-journal","journalId":"journal-session-1"',
+                1,
+            )
+            path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            os.chmod(path, 0o600)
+
+            with self.assertRaisesRegex(JournalCorruptionError, "invalid JSON"):
+                ActionJournal(
+                    path, session_id="session-1", journal_id="journal-session-1"
+                ).matches_prefix(1, events[0]["entryHash"])
+
+    def test_rejects_a_legacy_v1_journal_without_mutating_its_file(self):
+        ActionJournal, JournalCorruptionError, _ = _journal_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "journal.jsonl"
+            legacy_event = _prepared_event()
+            legacy_event["schemaVersion"] = "1.0"
+            legacy_event.pop("journalId")
+            _write_hashed_events(path, [legacy_event])
+            os.chmod(path, 0o600)
+            original = path.read_bytes()
+            original_mode = stat.S_IMODE(path.stat().st_mode)
+
+            with self.assertRaises(JournalCorruptionError):
+                ActionJournal(
+                    path, session_id="session-1", journal_id="journal-session-1"
+                )
+
+            self.assertEqual(path.read_bytes(), original)
+            self.assertEqual(stat.S_IMODE(path.stat().st_mode), original_mode)
+
+    def test_rejects_appending_to_a_late_appearing_v1_journal_without_mutation(self):
+        ActionJournal, JournalCorruptionError, _ = _journal_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "journal.jsonl"
+            journal = ActionJournal(
+                path, session_id="session-1", journal_id="journal-session-1"
+            )
+            legacy_event = _prepared_event()
+            legacy_event["schemaVersion"] = "1.0"
+            legacy_event.pop("journalId")
+            _write_hashed_events(path, [legacy_event])
+            os.chmod(path, 0o644)
+            original = path.read_bytes()
+            original_mode = stat.S_IMODE(path.stat().st_mode)
+
+            with self.assertRaises(JournalCorruptionError):
+                journal.prepare("action-2", "b" * 64, 1, "R0")
+
+            self.assertEqual(path.read_bytes(), original)
+            self.assertEqual(stat.S_IMODE(path.stat().st_mode), original_mode)
+
+    def test_rejects_an_unencodable_journal_id_before_file_creation(self):
+        ActionJournal, _, JournalError = _journal_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "journal.jsonl"
+            with self.assertRaisesRegex(JournalError, "UTF-8"):
+                ActionJournal(path, "session-1", journal_id="\ud800")
+            self.assertFalse(path.exists())
+
+    def test_rejects_an_unencodable_session_id_before_file_creation(self):
+        ActionJournal, _, JournalError = _journal_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "journal.jsonl"
+            with self.assertRaisesRegex(JournalError, "UTF-8"):
+                ActionJournal(
+                    path, "\ud800", journal_id="journal-valid"
+                )
+            self.assertFalse(path.exists())
+
+    def test_explicit_journal_identity_is_read_only_and_survives_reopen(self):
+        ActionJournal, _, _ = _journal_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "journal.jsonl"
+            journal = ActionJournal(
+                path, session_id="session-1", journal_id="journal-explicit"
+            )
+            event = journal.prepare("action-1", "a" * 64, 1, "R0")
+
+            with self.assertRaises(AttributeError):
+                journal.journal_id = "journal-replaced"
+
+            reopened = ActionJournal(
+                path, session_id="session-1", journal_id="journal-explicit"
+            )
+            self.assertEqual(reopened.journal_id, "journal-explicit")
+            self.assertTrue(reopened.matches_prefix(1, event["entryHash"]))
+
+    def test_unicode_journal_identity_survives_event_write_and_reopen(self):
+        ActionJournal, _, _ = _journal_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "journal.jsonl"
+            journal_id = "journal\u2028\u0085identity"
+            journal = ActionJournal(
+                path, session_id="session-1", journal_id=journal_id
+            )
+            event = journal.prepare("action-1", "a" * 64, 1, "R0")
+            reopened = ActionJournal(
+                path, session_id="session-1", journal_id=journal_id
+            )
+
+            self.assertEqual(event["journalId"], journal_id)
+            self.assertEqual(reopened.journal_id, journal_id)
+            self.assertTrue(reopened.matches_prefix(1, event["entryHash"]))
+
+    def test_rejects_an_empty_explicit_journal_id_before_file_creation(self):
+        ActionJournal, _, JournalError = _journal_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "journal.jsonl"
+            with self.assertRaisesRegex(JournalError, "non-empty"):
+                ActionJournal(path, "session-1", journal_id="")
+            self.assertFalse(path.exists())
+
+    def test_rejects_a_valid_event_bound_to_a_different_journal_id(self):
+        ActionJournal, JournalCorruptionError, _ = _journal_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "journal.jsonl"
+            event = _prepared_event()
+            event["journalId"] = "journal-actual"
+            _write_hashed_events(path, [event])
+            os.chmod(path, 0o600)
+
+            with self.assertRaisesRegex(JournalCorruptionError, "ID does not match"):
+                ActionJournal(
+                    path, session_id="session-1", journal_id="journal-reader"
+                )
 
 
 if __name__ == "__main__":

@@ -23,6 +23,7 @@ _EVENT_KEYS = frozenset(
     {
         "schemaVersion",
         "sessionId",
+        "journalId",
         "sequence",
         "eventType",
         "actionId",
@@ -186,7 +187,7 @@ def _apply_event(states, event, corruption):
     raise error("journal event type is not supported")
 
 
-def _load_events(fd, session_id):
+def _load_events(fd, session_id, journal_id):
     raw = _read_fd(fd)
     if not raw:
         return [], {}
@@ -209,10 +210,12 @@ def _load_events(fd, session_id):
             raise JournalCorruptionError("journal contains invalid JSON") from error
         if not isinstance(event, dict) or set(event) != _EVENT_KEYS:
             raise JournalCorruptionError("journal event fields are invalid")
-        if event["schemaVersion"] != "1.0":
+        if event["schemaVersion"] != "1.1":
             raise JournalCorruptionError("journal schema version is unsupported")
         if event["sessionId"] != session_id:
             raise JournalError("journal belongs to a different session")
+        if event["journalId"] != journal_id:
+            raise JournalCorruptionError("journal event ID does not match the reader")
         if (
             isinstance(event["sequence"], bool)
             or not isinstance(event["sequence"], int)
@@ -265,9 +268,21 @@ class ActionJournal:
     dispatch; a trusted read-only verifier is not implemented here.
     """
 
-    def __init__(self, path, session_id):
+    def __init__(self, path, session_id, journal_id=None):
         if not _nonempty(session_id):
             raise JournalError("session ID must be a non-empty string")
+        try:
+            session_id.encode("utf-8")
+        except UnicodeEncodeError as error:
+            raise JournalError("session ID must be valid UTF-8") from error
+        if journal_id is None:
+            journal_id = "journal-{}".format(session_id)
+        if not _nonempty(journal_id):
+            raise JournalError("journal ID must be a non-empty string")
+        try:
+            journal_id.encode("utf-8")
+        except UnicodeEncodeError as error:
+            raise JournalError("journal ID must be valid UTF-8") from error
         requested_path = Path(path).absolute()
         anchor_path = requested_path.parent
         missing_parent_parts = []
@@ -313,11 +328,17 @@ class ActionJournal:
             )
             break
         self.session_id = session_id
+        self._journal_id = journal_id
         self._parent_identity = None
         self._file_identity = None
         self._prepared_in_process = set()
         self._dispatched_in_process = set()
         self._load_current()
+
+    @property
+    def journal_id(self):
+        """Return the stable Journal identity selected when this reader was created."""
+        return self._journal_id
 
     def _open_parent(self, *, create=False):
         flags = os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_NOFOLLOW", 0)
@@ -427,7 +448,9 @@ class ActionJournal:
                 fcntl.flock(fd, fcntl.LOCK_EX)
                 locked = True
                 self._verify_journal_path(fd, parent_fd)
-                events_and_states = _load_events(fd, self.session_id)
+                events_and_states = _load_events(
+                    fd, self.session_id, self.journal_id
+                )
                 self._verify_journal_path(fd, parent_fd)
                 return events_and_states
             finally:
@@ -555,7 +578,9 @@ class ActionJournal:
                 fcntl.flock(fd, fcntl.LOCK_EX)
                 locked = True
                 self._verify_journal_path(fd, parent_fd)
-                events, states = _load_events(fd, self.session_id)
+                events, states = _load_events(
+                    fd, self.session_id, self.journal_id
+                )
                 if event_type == "action_dispatched" and any(
                     other_id != action_id
                     and _needs_reconciliation(state)
@@ -567,8 +592,9 @@ class ActionJournal:
                 self._verify_journal_path(fd, parent_fd)
                 os.fchmod(fd, 0o600)
                 event = {
-                    "schemaVersion": "1.0",
+                    "schemaVersion": "1.1",
                     "sessionId": self.session_id,
+                    "journalId": self.journal_id,
                     "sequence": len(events) + 1,
                     "eventType": event_type,
                     "actionId": action_id,
@@ -700,3 +726,4 @@ class ActionJournal:
             "completed": "terminal",
             "failed": "terminal",
         }[state["status"]]
+

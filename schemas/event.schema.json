@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:bugmaster:schema:event:1.0",
+  "$id": "urn:bugmaster:schema:event:1.1",
   "title": "BugMaster Action Journal Event",
   "description": "One append-only session event. Reconciliation records are unverified claims until a trusted read-only verifier checks them. Hashes support local integrity checks but do not prove source authenticity or event truth.",
   "type": "object",
@@ -8,6 +8,7 @@
   "required": [
     "schemaVersion",
     "sessionId",
+    "journalId",
     "sequence",
     "eventType",
     "actionId",
@@ -17,8 +18,9 @@
     "entryHash"
   ],
   "properties": {
-    "schemaVersion": {"const": "1.0"},
+    "schemaVersion": {"const": "1.1"},
     "sessionId": {"type": "string", "minLength": 1},
+    "journalId": {"type": "string", "minLength": 1},
     "sequence": {"type": "integer", "minimum": 1},
     "eventType": {
       "enum": [

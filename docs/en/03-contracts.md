@@ -49,6 +49,8 @@ The Approval and Action schemas capture scope/action references, scope revision,
 
 Persist action intent before dispatch, append journal events, and reconcile unknown effects with authoritative read-only state before allowing any replay. A prepared event without dispatched event does **not** prove non-execution. Do not promise exactly-once effects for external systems. Session recovery cannot reset budgets or approvals.
 
+Each Action Journal Event uses schema v1.1 and binds both `sessionId` and a required stable `journalId`; readers reject mismatches and ambiguous duplicate JSON keys. Checkpoint reference validation compares the configured Journal object's ID with the latest Session's declared `journalId` while reading the Checkpoint and Session snapshot under one shared lock. The caller still selects the Journal path, so this does not authenticate the mapping from an ID to a path or establish event provenance. v1.0 events lack `journalId` and are rejected without migration or in-place modification.
+
 ## Contract build order
 
 1. Define canonical schemas for Skill manifest, Pattern, Registry, Scope, Action, Approval, Oracle, Evidence, Finding, Session, Checkpoint, Review, Recommendation, Eval.

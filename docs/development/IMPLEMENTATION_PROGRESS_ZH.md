@@ -1,7 +1,7 @@
 # BugMaster 工程实施进度矩阵
 
 **更新日期：** 2026-11-20
-**当前状态：** W6 Action Journal、Session revision、Checkpoint 持久化和跨存储引用校验均为局部切片。PR #1–#5 已合入 `main`（当前 main `5994542`）。PR #6 以 `main` 为 base；代码 head `a5af48f` 的 Actions Run `44695141474` 全步骤通过。CodeX 独立安全复审角色对该代码 head 静态复审无 P1/P2；GitHub `@codex security review` 对同一 head 返回[无重大问题的复审回执](https://github.com/naodeng/bugmaster/pull/6#issuecomment-7033495382)。当前证据文档仍需同步提交和重跑 Actions；完整产品仍为 Release No-Go。
+**当前状态：** W6 Action Journal、Session revision、Checkpoint 持久化和跨存储引用校验均为局部切片。PR #1–#6 已合入 `main`；PR #6 merge commit 为 `c67af41`。PR #7 已集成到 `main`，代码 head `6200257` 的 Actions Run `44748455778` 全步骤通过；首次上传 Run `44747906615` 因测试文件传输截断失败，已在后续提交恢复完整文件并复验。CodeX 最终 head 的 Code/Security Review 待重新完成。完整产品仍为 Release No-Go。
 
 ## 仓库审计摘要
 
@@ -24,7 +24,7 @@
 | W3 | 16 个 Bug Patterns | 候选规则 | 需适用/排除、Oracle、反例和真实对照 Eval |
 | W4 | 风险路由与有界自主探索 | 部分实现 | `scripts/discover_openapi.py` 可从本地 OpenAPI 3 JSON 输出稳定 ID 和 JSON Pointer 来源清单；URL/Browser 发现、风险路由与动态执行仍待实现 |
 | W5 | R0–R3 动作级授权 | 部分实现 | R0/R1 基础 helper 已 fail-closed；无可信网关时 R2 现在 fail-closed；真实网关、审批摘要和修订绑定仍待实现 |
-| W6 | Action Journal、Session/Checkpoint 持久化与安全恢复 | 部分实现 | PR #3–#5 已合入 `main`。PR #6 的 `CheckpointReferenceValidator` 在 CheckpointStore 共享锁和同一组目录描述符下读取 Checkpoint、锚定 Session revision 与最新登记，检查 Scope history 和 Journal 前缀；拒绝跨存储目录替换混读，并按 Schema 整数语义接受整值浮点 revision。它仍不绑定 Session `journalId` 到 Journal 路径、不验证权威 Scope/事件真实性、授权或预算；不是可信 Safe Resume。当前候选的本地证据见 [Checkpoint 跨存储引用 TDD 记录](2026-11-19_CHECKPOINT_REFERENCE_VALIDATION_TDD_ZH.md) |
+| W6 | Action Journal、Session/Checkpoint 持久化与安全恢复 | 部分实现 | PR #3–#6 已合入 `main`。PR #6 的 `CheckpointReferenceValidator` 在 CheckpointStore 共享锁和同一组目录描述符下读取 Checkpoint、锚定 Session revision 与最新登记；PR #7 候选进一步要求 Event v1.1 绑定 Session/Journal ID，并在同一 Session 快照内比对配置的 Journal ID。Journal 路径仍由调用方选择，因而不认证 ID 到路径的映射；可信 Safe Resume、权威 Scope/事件真实性、授权和预算对账仍未实现。PR #7 修复版验证和复审完成后再推送。 |
 | W7 | Finding、跨入口去重与报告 | 待实现 | 需 Oracle、来源、E3+ 证据和剩余风险追踪 |
 | W8 | 回归建议 | 待实现 | 只输出建议，不自动修改/提交测试代码 |
 | W9 | 50 场景 Benchmark | 计划中 | 需真实运行、隔离 Ground Truth 和 G0–G3 对照 |
@@ -38,11 +38,11 @@
 | 品牌与 Skill 命名扫描 | PASS | `python3 scripts/check_branding.py`；命名契约包含 4 项 Skill ID 检查 |
 | Catalog/Registry | PASS | `python3 scripts/validate_catalog.py` |
 | Benchmark Manifest | PASS（结构） | `validate_benchmark.py` 明确提示场景未执行 |
-| GitHub Actions | PR #4–#6 当前可核实 head 检查通过 | PR #4 Run `44662457674` 通过；PR #5 最终 head `c974a88` Run `44690535886` 通过；PR #6 代码 head `a5af48f` Run `44695141474` 全步骤通过。PR #6 当前文档证据同步提交待最终 Actions 重跑 |
-| 单元测试 | PR #6 修复后代码候选 PASS，257/257 | Python 3.12.16；`bugmaster_core/` 行和分支覆盖均 100%。该目录仍只是 GATE-U100 初始样例范围，不代表全项目生产模块覆盖 |
-| R3 安全测试 | 本地候选 PASS，1/1 | `python3.12 -m unittest discover -s tests/security -v`；CI 单独执行，不并入单元覆盖率分母 |
-| 契约测试 | PR #6 修复后代码候选 PASS，78/78 | Python 3.12 + `jsonschema[format-nongpl]==4.26.0`；含真实 Schema 的 Checkpoint 跨存储整值数字回归 |
-| 当前核心模块行/分支覆盖率 | 本地候选 PASS，100% / 100%（初始样例范围） | `bugmaster_core` 为 1,437/1,437 行、532/532 分支；覆盖 JSON：`/private/tmp/bugmaster-pr6-main-coverage.json`。全项目 GATE-U100 仍需把所有需单测的生产 Python 模块纳入覆盖统计。行/分支口径分开报告，不等于业务功能覆盖 |
+| GitHub Actions | PR #4–#6 历史 head 检查通过；PR #7 代码 head 检查通过 | PR #4 Run `44662457674`、PR #5 最终 head `c974a88` Run `44690535886`、PR #6 最终文档 head Run `44697609761` 均成功。PR #7 代码 head `6200257` Run `44748455778` 全步骤通过；更早的 `44747906615` 因上传时测试文件截断失败，已修复并复验 |
+| 单元测试 | PR #7 隔离集成候选 PASS，268/268 | Python 3.12；`bugmaster_core/` 行覆盖 100%、分支覆盖 100%。该目录仍只是 GATE-U100 初始样例范围，不代表全项目生产模块覆盖 |
+| R3 安全测试 | PR #7 隔离集成候选 PASS，1/1 | `python3.12 -m unittest discover -s tests/security`；CI 单独执行，不并入单元覆盖率分母 |
+| 契约测试 | PR #7 隔离集成候选 PASS，79/79 | Python 3.12 + `jsonschema[format-nongpl]==4.26.0`；覆盖 Event v1.1 与 Checkpoint/Session 跨存储身份回归 |
+| 当前核心模块行/分支覆盖率 | PR #7 隔离集成候选 PASS，100% / 100%（初始样例范围） | `bugmaster_core` 为 1,457/1,457 行、540/540 分支；JSON：`/private/tmp/bugmaster-pr7-integrated-coverage.json`。全项目 GATE-U100 仍需把所有需单测的生产 Python 模块纳入统计；行/分支口径分开报告，不等于业务功能覆盖 |
 | 业务功能覆盖率 >60% | 未达成 | 目前没有真实业务执行证据 |
 | 核心 Happy / Negative / Edge | 未达成 | 需每个核心功能有三类实际通过证据 |
 | Release | No-Go | 全量功能、真实 Benchmark、双宿主和独立审批均未完成 |
