@@ -78,5 +78,43 @@ class CheckpointSchemaTests(unittest.TestCase):
         self.assert_invalid(checkpoint)
 
 
+    def test_checkpoint_store_persists_schema_valid_document(self):
+        import tempfile
+
+        try:
+            from bugmaster_core.checkpoint_store import CheckpointStore
+        except ImportError:
+            self.fail("CheckpointStore must persist the versioned Checkpoint contract")
+
+        with tempfile.TemporaryDirectory() as directory:
+            store = CheckpointStore(
+                directory, "session-1", self.validator.validate
+            )
+            checkpoint = self.valid_checkpoint()
+            self.assertEqual(store.create(checkpoint), checkpoint)
+            self.assertEqual(store.read("checkpoint-1"), checkpoint)
+
+    def test_checkpoint_store_rejects_schema_invalid_document_before_writing(self):
+        import tempfile
+
+        try:
+            from bugmaster_core.checkpoint_store import (
+                CheckpointStore,
+                CheckpointStoreError,
+            )
+        except ImportError:
+            self.fail("CheckpointStore must reject invalid Checkpoint documents")
+
+        with tempfile.TemporaryDirectory() as directory:
+            store = CheckpointStore(
+                directory, "session-1", self.validator.validate
+            )
+            checkpoint = self.valid_checkpoint()
+            checkpoint["journalHeadHash"] = None
+            with self.assertRaises(CheckpointStoreError):
+                store.create(checkpoint)
+            self.assertEqual(list(Path(directory).iterdir()), [])
+
+
 if __name__ == "__main__":
     unittest.main()
