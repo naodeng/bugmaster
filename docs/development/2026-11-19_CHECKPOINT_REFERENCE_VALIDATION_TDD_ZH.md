@@ -8,7 +8,7 @@
 
 **风险：** R3；CodeX 独立安全复审角色 `pr3_security_review` 已对代码 head `a5af48f18b9fdded9b1515bf007f58cf4386442b` 做静态复审，未发现 P1/P2。针对同一 head 发起 `@codex security review` 后，GitHub 返回[复审回执](https://github.com/naodeng/bugmaster/pull/6#issuecomment-7033495382)，称未发现重大问题；GitHub review submission 列表为空，因此不代表人工批准。
 
-**初始实现提交：** `891885826ad4f392cecd6a21fa80d94ca00092e6`。PR [#6](https://github.com/naodeng/bugmaster/pull/6) 当前开放（非草稿），以当前 `main` 为 base。复审修正后的代码提交为 `a5af48f18b9fdded9b1515bf007f58cf4386442b`；其 Actions Run `44695141474` 全步骤通过。当前仅有文档证据同步尚待提交和重跑。
+**初始实现提交：** `891885826ad4f392cecd6a21fa80d94ca00092e6`。PR [#6](https://github.com/naodeng/bugmaster/pull/6) 当前开放（非草稿），以当前 `main` 为 base。复审修正后的代码提交为 `a5af48f18b9fdded9b1515bf007f58cf4386442b`；其 Actions Run `44695141474` 全步骤通过。文档证据已同步到 PR 分支；最终文档 head 的 Actions 待完成。
 
 ## Oracle 与范围
 
@@ -64,7 +64,7 @@ GREEN 后检查发现读取 Session 锚定 revision 与最新登记之间，Sess
 
 复审以已合入 PR #5 的 `main`（`59945424f5528645afd7ba725801dfe769f48591`）为验证基线，不沿用旧 head `e5c443c` 的 144 单测、77 契约测试和旧覆盖数据。
 
-为复现下列 RED，可在包含 PR #6 提交历史的 clone 中，把当前 head 的测试、Schema 和依赖复制到临时目录，再恢复旧 PR head 的三个存储源码文件：
+为复现下列 RED，可在包含 PR #6 提交历史的 clone 中，把当前 head 的测试与 Schema 归档到临时目录，再恢复旧 PR head 的三个存储源码文件。契约测试依赖从 `/private/tmp/bugmaster-jsonschema` 加载，不属于归档内容：
 
 ```sh
 repro_dir="$(mktemp -d)"
