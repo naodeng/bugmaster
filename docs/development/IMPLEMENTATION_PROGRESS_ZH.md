@@ -1,7 +1,7 @@
 # BugMaster 工程实施进度矩阵
 
 **更新日期：** 2026-11-20
-**当前状态：** W6 Action Journal、Session revision 与 Checkpoint 持久化均为局部切片。PR #2–#4 已合入 `main`；PR #4 merge commit 为 `6c5d519`。PR #5 本地复审候选已完成安全修复和验证，独立安全复审无 P1/P2；等待更新至 `main` 基线与远端 Actions。完整产品仍为 Release No-Go。
+**当前状态：** W6 Action Journal、Session revision 与 Checkpoint 持久化均为局部切片。PR #2–#4 已合入 `main`；PR #4 merge commit 为 `6c5d519`。PR #5 已更新至 `main`，head `923f76f` 的 Actions Run `44671017598` 通过；独立安全复审无 P1/P2。完整产品仍为 Release No-Go。
 
 ## 仓库审计摘要
 
@@ -38,7 +38,7 @@
 | 品牌与 Skill 命名扫描 | PASS | `python3 scripts/check_branding.py`；命名契约包含 4 项 Skill ID 检查 |
 | Catalog/Registry | PASS | `python3 scripts/validate_catalog.py` |
 | Benchmark Manifest | PASS（结构） | `validate_benchmark.py` 明确提示场景未执行 |
-| GitHub Actions | PR #4 已合并检查通过；PR #5 更新后待 CI | PR #4 最终 head Run `44662457674` 通过；PR #5 新 head 的 Actions 结果将在合并前补录 |
+| GitHub Actions | PR #4、PR #5 当前 head 检查通过 | PR #4 最终 head Run `44662457674` 通过；PR #5 head `923f76f` 的 Run `44671017598` 通过。最新 head 与检查链接以 PR 页面为准 |
 | 单元测试 | 本地复审候选 PASS，239/239 | Python 3.12.16；全部 `bugmaster_core/` 生产模块行覆盖 100%、分支覆盖 100%。该目录仍只是 GATE-U100 初始样例范围，不代表全项目生产模块覆盖 |
 | R3 安全测试 | 本地候选 PASS，1/1 | `python -m unittest discover -s tests/security -v`；CI 单独执行，不并入单元覆盖率分母 |
 | 契约测试 | 本地候选 PASS，77/77 | Python 3.12 + `jsonschema[format-nongpl]==4.26.0`；最终命令见 Checkpoint TDD 记录 |

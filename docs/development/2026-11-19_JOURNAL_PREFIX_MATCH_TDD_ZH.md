@@ -6,7 +6,7 @@
 
 **风险：** R3；独立 Security Reviewer 已复审当前本地候选，未发现 P1/P2；更新远端 head 后仍需通过 Actions。
 
-**初始实现提交：** `b108b7c7f12d14a3f11d3a9f49fdd843afd2f8d1`；PR [#5](https://github.com/naodeng/bugmaster/pull/5) 当前开放。PR #4 已合入 `main`（merge `6c5d519`）；本地复审修复尚未推送，更新 PR 前会核对远端 head 并同步到 `main` 基线。
+**初始实现提交：** `b108b7c7f12d14a3f11d3a9f49fdd843afd2f8d1`；PR [#5](https://github.com/naodeng/bugmaster/pull/5) 当前开放并已更新到 `main` 基线。复审候选 head 为 `923f76fb876bc10822cb4c6c6135863cbc0f9f04`。
 
 ## Oracle 与范围
 
@@ -92,7 +92,7 @@ GREEN 在锁后和读写返回前重新遍历固定目录身份链，并比较�
 | Catalog / Benchmark / 品牌 | `python3.12 scripts/validate_catalog.py` PASS；`python3.12 scripts/validate_benchmark.py` 结构 PASS（场景未执行）；`python3.12 scripts/check_branding.py` PASS |
 | Release 门禁 | `python3.12 scripts/quality_gate.py --mode release --coverage /private/tmp/bugmaster-pr5-coverage-final.json`：No-Go；功能清单未冻结、真实业务覆盖未超过 60%、核心 Happy/Negative/Edge 缺少执行证据（预期门禁结果） |
 | 独立 R3 安全复审 | PASS：独立 Security Reviewer 对当前 ActionJournal 候选未发现 P1/P2 |
-| GitHub Actions | 本地候选验证通过；更新 PR #5 的远端 head 后仍待 Actions |
+| GitHub Actions | PASS：PR #5 head `923f76fb876bc10822cb4c6c6135863cbc0f9f04` 对应 [Run 44671017598](https://github.com/naodeng/bugmaster/actions/runs/44671017598) 的单元、契约、安全、覆盖、Catalog、Benchmark 结构和品牌步骤均通过 |
 | Diff 空白 | `git diff --check`：PASS |
 
 ## 未覆盖能力
