@@ -6,9 +6,9 @@
 
 **Workstream / 义务：** W6-02 Safe Resume；`F-RECOVERY`；`TDD-ACT-007`
 
-**风险：** R3；独立 Security Reviewer 已复审当前本地候选，未发现 P1/P2。最终远端 head 和 Actions 尚待更新。
+**风险：** R3；CodeX 独立安全复审角色 `pr3_security_review` 已对代码 head `a5af48f18b9fdded9b1515bf007f58cf4386442b` 做静态复审，未发现 P1/P2。针对同一 head 发起 `@codex security review` 后，GitHub 返回[复审回执](https://github.com/naodeng/bugmaster/pull/6#issuecomment-7033495382)，称未发现重大问题；GitHub review submission 列表为空，因此不代表人工批准。
 
-**初始实现提交：** `891885826ad4f392cecd6a21fa80d94ca00092e6`。PR [#6](https://github.com/naodeng/bugmaster/pull/6) 当前开放（非草稿）；旧 head `e5c443c` 仍以已合并 PR #5 的旧栈分支为 base。2026-11-20 复审修正后的最终提交 SHA 与 Actions 将在后续证据中补记。
+**初始实现提交：** `891885826ad4f392cecd6a21fa80d94ca00092e6`。PR [#6](https://github.com/naodeng/bugmaster/pull/6) 当前开放（非草稿），以当前 `main` 为 base。复审修正后的代码提交为 `a5af48f18b9fdded9b1515bf007f58cf4386442b`；其 Actions Run `44695141474` 全步骤通过。当前仅有文档证据同步尚待提交和重跑。
 
 ## Oracle 与范围
 
@@ -64,17 +64,38 @@ GREEN 后检查发现读取 Session 锚定 revision 与最新登记之间，Sess
 
 复审以已合入 PR #5 的 `main`（`59945424f5528645afd7ba725801dfe769f48591`）为验证基线，不沿用旧 head `e5c443c` 的 144 单测、77 契约测试和旧覆盖数据。
 
+为复现下列 RED，可在包含 PR #6 提交历史的 clone 中，把当前 head 的测试、Schema 和依赖复制到临时目录，再恢复旧 PR head 的三个存储源码文件：
+
+```sh
+repro_dir="$(mktemp -d)"
+git archive --format=tar a5af48f18b9fdded9b1515bf007f58cf4386442b | tar -x -C "$repro_dir"
+for path in bugmaster_core/checkpoint_reference_validator.py bugmaster_core/checkpoint_store.py bugmaster_core/session_store.py; do
+  git show e5c443c92217393e2aae9a80464a938c6692c7f0:"$path" > "$repro_dir/$path"
+done
+cd "$repro_dir"
+```
+
 ### RED
 
-1. **Session 快照混读：** 新增真实 POSIX 临时目录回归。测试在读取 Checkpoint 后将同一 Session ID 的目录 A 换成目录 B；A 的 Session 未登记 Checkpoint，B 登记了同 ID 但保存不同 Checkpoint。旧实现把 A 的 Checkpoint 与 B 的历史拼接后错误接受。命令：
+1. **Session 快照混读：** 测试 `CheckpointReferenceValidatorTests.test_rejects_references_mixed_from_different_session_snapshots` 使用真实 POSIX 临时目录，在读取 Checkpoint 后将同一 Session ID 的目录 A 换成目录 B；A 的 Session 未登记 Checkpoint，B 登记了同 ID 但保存不同 Checkpoint。旧实现把 A 的 Checkpoint 与 B 的历史拼接后错误接受。命令：
 
    `PYTHONDONTWRITEBYTECODE=1 python3.12 -m unittest discover -s tests/unit -p 'test_checkpoint_reference_validator.py' -k mixed_from_different_session_snapshots -v`
 
    RED：1 项失败，输出 `AssertionError: CheckpointReferenceError not raised`。
 
-2. **Schema 整值语义：** 新增真实 Checkpoint 与 Session Schema 的跨存储契约测试，Checkpoint 中 `sessionRevision=1.0`、`scopeRevision=1.0`、`journalSequence=0.0)。旧实现将 `1.0` 传给只接受 Python `int` 的 `SessionStore.read_revision`，实测以 `SessionStoreError: revision must be a positive integer` 失败。Journal 前缀 PR #5 已在当前 main 中把整值序号按 Schema 语义规范化。
+2. **Schema 整值语义：** 对应测试 `CheckpointSchemaTests.test_checkpoint_reference_validator_accepts_schema_integer_numbers`，用真实 Checkpoint 与 Session Schema 验证 `sessionRevision=1.0`、`scopeRevision=1.0`、`journalSequence=0.0`。在 PR #6 旧代码快照 `e5c443c` 上复现：
 
-3. **安全打开能力检查：** 新增从 Validator 入口临时移除 `os.O_NONBLOCK` 的测试。旧入口绕过 `CheckpointStore._locked`，未在打开锁前拒绝缺失能力，RED 暴露底层 `AttributeError`。
+   `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/private/tmp/bugmaster-jsonschema python3.12 -m unittest discover -s tests/contracts -p 'test_checkpoint_schema.py' -k accepts_schema_integer_numbers -v`
+
+   RED：1 项错误，`SessionStoreError: revision must be a positive integer`。Journal 前缀 PR #5 已在当前 main 中把整值序号按 Schema 语义规范化。
+
+3. **安全打开能力检查：** 对应测试 `CheckpointReferenceValidatorTests.test_requires_checkpoint_safe_open_flags_from_validator_entry`，临时移除 `os.O_NONBLOCK`，要求 Validator 入口在不具备安全打开能力时失败关闭。在 PR #6 旧代码快照 `e5c443c` 上运行：
+
+   `PYTHONDONTWRITEBYTECODE=1 python3.12 -m unittest discover -s tests/unit -p 'test_checkpoint_reference_validator.py' -k safe_open_flags_from_validator_entry -v`
+
+   RED：1 项失败，`AssertionError: CheckpointStoreError not raised`。
+
+以上两项及跨快照回归均使用 PR #6 旧 head `e5c443c` 中的 Validator、CheckpointStore 和 SessionStore 源文件，并以当前新增回归用例复现；失败不是从修复后源码推测得出。
 
 ### GREEN / REFACTOR
 
@@ -82,7 +103,7 @@ GREEN 后检查发现读取 Session 锚定 revision 与最新登记之间，Sess
 - Validator 先验证 Checkpoint ID 并计算文件名，再通过 `CheckpointStore._locked(create_directories=False)` 做平台安全能力检查并获取一次锁；Checkpoint、锚定 Session revision、最新 Session revision 都使用同一份 storage 目录描述符读取。A/B 目录替换后只会读到 A 的 Checkpoint 与 A 的 Session 历史，随后因 A 未登记而拒绝。
 - Schema 接受的整值浮点 `sessionRevision` 在调用 SessionStore 内部整数接口前规范化；分数、布尔和非正值仍失败关闭。
 - 将原有“两个 Session 读取间目录被移除”的测试改成“验证前 Session revision 缺失”负例。新实现以一次完整、已校验的 Session 快照为准；目录在快照返回后变化不改变这次快照的含义。验证器不执行恢复，调用方仍须在任何恢复决策前重新校验状态。
-- Validator 定向单测 17/17 PASS；Checkpoint Schema 定向契约测试 11/11 PASS。
+- Validator 定向单测 18/18 PASS；Checkpoint Schema 定向契约测试 11/11 PASS。
 
 ### VERIFY
 
@@ -96,8 +117,8 @@ GREEN 后检查发现读取 Session 锚定 revision 与最新登记之间，Sess
 | 行/分支覆盖 | `bugmaster_core` 1,437/1,437 行、532/532 分支（100% / 100%）；JSON：`/private/tmp/bugmaster-pr6-main-coverage.json`。仅为 GATE-U100 初始样例范围 |
 | Catalog / Benchmark / 品牌 | PASS；Benchmark 仅结构校验，50 个场景未执行 |
 | Release 门禁 | **No-Go**：功能义务清单未冻结、真实业务覆盖未超过 60%、核心 Happy/Negative/Edge 证据缺失 |
-| 独立安全复审 | PASS；最新本地候选无 P1/P2 |
-| GitHub Actions | 当前复审候选尚未推送，待最终 head 的 Actions 运行 |
+| 独立安全复审 | CodeX 安全复审角色 `pr3_security_review` 对代码 head `a5af48f18b9fdded9b1515bf007f58cf4386442b` 做静态复审，PASS、无 P1/P2；GitHub `@codex security review` 对同一 head 返回[无重大问题的复审回执](https://github.com/naodeng/bugmaster/pull/6#issuecomment-7033495382)，review submission 列表为空，不代表人工批准 |
+| GitHub Actions | 代码提交 `a5af48f18b9fdded9b1515bf007f58cf4386442b` 的 [Run 44695141474](https://github.com/naodeng/bugmaster/actions/runs/44695141474)：unit、contract、security、coverage、Catalog、Benchmark 结构和品牌步骤全部通过；文档同步提交后将再运行一次 |
 
 本地检查不代表完整产品 Go，也不替代远端 CI、真实 API/Browser、双宿主或 50 场景 Eval。Session `journalId` 与 Journal 路径绑定、权威 Scope/事件真实性、当前授权和预算核验、未知副作用只读对账及恢复流程仍未实现；此切片不是 Safe Resume 或 BLK-03 完成证明。
 
