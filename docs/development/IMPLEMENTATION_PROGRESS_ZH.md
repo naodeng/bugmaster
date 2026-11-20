@@ -1,7 +1,7 @@
 # BugMaster 工程实施进度矩阵
 
 **更新日期：** 2026-11-20
-**当前状态：** W6 Action Journal、Session revision 与 Checkpoint 持久化均为局部切片。Session Schema PR #2 和 SessionStore PR #3 已合入 `main`；PR #3 merge commit 为 `1368b1a`，Actions Run `44537417048` 成功。CheckpointStore PR #4 仍开放，远端旧 head `71620ba` 尚待复审修复推送并切换到 `main`。完整产品仍为 Release No-Go。
+**当前状态：** W6 Action Journal、Session revision 与 Checkpoint 持久化均为局部切片。Session Schema PR #2 和 SessionStore PR #3 已合入 `main`；PR #3 merge commit 为 `1368b1a`，Actions Run `44537417048` 成功。CheckpointStore PR #4 已切换到 `main`；代码候选 `685a967` 的 Actions Run `44661819969` 成功，旧的两条 review threads 已回复并解决，PR 等待合并。完整产品仍为 Release No-Go。
 
 ## 仓库审计摘要
 
@@ -38,7 +38,7 @@
 | 品牌与 Skill 命名扫描 | PASS | `python3 scripts/check_branding.py`；命名契约包含 4 项 Skill ID 检查 |
 | Catalog/Registry | PASS | `python3 scripts/validate_catalog.py` |
 | Benchmark Manifest | PASS（结构） | `validate_benchmark.py` 明确提示场景未执行 |
-| GitHub Actions | PR #3 检查通过；PR #4 新 head 待运行 | PR #3 Run `44537417048`：单测、合同、100% 行覆盖、Catalog、Benchmark 结构和品牌步骤均通过。PR #4 修复后需在目标 `main` 上重新运行 |
+| GitHub Actions | PR #3 与 PR #4 代码候选检查通过 | PR #3 Run `44537417048`；PR #4 代码提交 `685a967` 的 Run `44661819969`：单测、合同、安全套件、100% 行覆盖、Catalog、Benchmark 结构和品牌步骤均通过 |
 | 单元测试 | 本地候选 PASS，197/197 | Python 3.12；命令和 coverage 文件见 [Checkpoint TDD 记录](2026-11-19_CHECKPOINT_STORE_TDD_ZH.md)；`bugmaster_core` 1,214/1,214 行覆盖、448/448 分支覆盖，单元套件独立达到 100% |
 | R3 安全测试 | 本地候选 PASS，1/1 | `python -m unittest discover -s tests/security -v`；CI 单独执行，不并入单元覆盖率分母 |
 | 契约测试 | 本地候选 PASS，77/77 | Python 3.12 + `jsonschema[format-nongpl]==4.26.0`；最终命令见 Checkpoint TDD 记录 |

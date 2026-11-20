@@ -6,7 +6,7 @@
 
 **风险：** R3；合并前需要独立 Security Reviewer。PR #3 已于 2026-11-19 合入 `main`（merge `1368b1a`，Actions Run `44537417048` 成功）。
 
-**初始实现提交：** `ba8bc6a37d973af720519e200fb8fbdcb0e0b606`。PR [#4](https://github.com/naodeng/bugmaster/pull/4) 当前仍开放；远端旧 head 为 `71620ba285a4fc2f5fe868ac7e69de720eec5c32`，base 仍是 `codex/session-revision-store`。本轮已将 PR #3 合并后的实现作为本地基线，复审修复与最终同步、Actions 检查仍待完成。
+**初始实现提交：** `ba8bc6a37d973af720519e200fb8fbdcb0e0b606`。最终代码候选提交 `685a96724a1f6c6feaeb976deb1233129d7a73ce` 已推送至 `codex/checkpoint-store`；PR [#4](https://github.com/naodeng/bugmaster/pull/4) 已切换到 `main`（base `1368b1adc06361b10c6ca1f5448e0a708492e593`），目前开放待合并。该代码提交的 GitHub Actions Run `44661819969` 成功。
 
 ## Oracle 与范围
 
@@ -94,5 +94,6 @@
 | Catalog / Benchmark / 品牌 | `scripts/validate_catalog.py` PASS；`scripts/validate_benchmark.py` manifest 结构 PASS（场景未执行）；`scripts/check_branding.py` PASS |
 | Release 门禁 | `scripts/quality_gate.py --mode release --coverage /private/tmp/bugmaster-pr4-main-coverage.json` 仍为 No-Go；真实功能覆盖、冻结清单及核心 Happy/Negative/Edge 证据未满足 |
 | R3 复审 | PASS：独立 Security Reviewer 确认最终目录权限修复无剩余安全发现；Spec 与 Standards 复核确认权限要求、GATE-U100 单独覆盖及双语文档已闭环 |
-| 远端检查 | PR #4 修复后的 head 尚待推送并切换到 `main`；Actions 待新 head 触发 |
+| GitHub Actions | PASS | PR #4 代码提交 `685a96724a1f6c6feaeb976deb1233129d7a73ce` 的 [Run 44661819969](https://github.com/naodeng/bugmaster/actions/runs/44661819969) 成功；单元、契约、安全、行覆盖、Catalog、Benchmark 结构和品牌步骤全通过 |
+| Review threads | PASS | 两条未解决的 symlink-ancestor 与 FIFO-lock 评论已回复并解决；旧评论仍标记为过期 |
 | Diff 空白 | `git diff --check`：PASS |

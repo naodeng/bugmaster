@@ -19,8 +19,8 @@
 | API/Browser 自主探索 | **未完成** | 未建立真实执行闭环 |
 | Codex/Claude 双宿主 | **未验证** | 未提供可复查运行 ID |
 | GitHub 项目信息 | 已更新 | 上游 `AI-Native-QA-Lab/bugmaster` 与 fork `naodeng/bugmaster` 描述及 13 个 topics 已同步 |
-| GitHub 代码 | PR #1–#3 已合并；PR #4 开放 | PR #3 merge commit `1368b1a`，Actions Run `44537417048` 成功。PR #4 当前远端 head `71620ba`、base `codex/session-revision-store`；本地已合并 PR #3 实现并完成后续复审修复，推送后需切换 base 到 `main` 并等待新 Actions/审查 |
-| GitHub Issues / CI | PR #1–#3 检查通过；PR #4 新 head 待 CI | PR #4 旧 head 的 Actions 结果不覆盖本轮修复；需在修复提交和 `main` 基分支上重新检查。Issues 尚未导入 |
+| GitHub 代码 | PR #1–#3 已合并；PR #4 开放待合并 | PR #3 merge commit `1368b1a`，Actions Run `44537417048` 成功。PR #4 已切换 base 到 `main`；实现提交 `685a967` 的 Actions Run `44661819969` 成功，两个旧 review threads 已回复并解决 |
+| GitHub Issues / CI | PR #1–#4 代码检查通过 | PR #4 Run `44661819969` 在 `main` 基线通过单元、契约、安全、100% 行覆盖、Catalog、Benchmark 结构和品牌步骤。Issues 尚未导入 |
 | Release | **No-Go** | Q15/Q16 独立人工审批证据不存在 |
 
 最近一次本地质量门禁仍为 **No-Go**：功能义务清单未冻结、真实业务覆盖未超过 60%，核心功能 Happy/Negative/Edge 执行证据缺失。`bugmaster_core` 单元覆盖率不等于业务功能覆盖率。本文不把本地 Journal 切片表述成完整产品或 BLK-03 通过证明。
