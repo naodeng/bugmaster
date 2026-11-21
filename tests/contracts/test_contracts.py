@@ -33,7 +33,13 @@ class CoreContractTests(unittest.TestCase):
     def test_r3_never_dispatches(self):self.assertFalse(can_dispatch({'risk':'R3'}, {}, {'scopeValidated':True}))
     def test_unknown_outcome_never_replays(self):
         self.assertFalse(can_replay({'outcome':'unknown','newAuthorizationValid':True}))
-        self.assertTrue(can_replay({'outcome':'reconciled-not-executed','reconcilerVerified':True,'newAuthorizationValid':True}))
+    def test_self_asserted_reconciliation_cannot_authorize_replay(self):
+        action = {
+            'outcome': 'reconciled-not-executed',
+            'reconcilerVerified': True,
+            'newAuthorizationValid': True,
+        }
+        self.assertFalse(can_replay(action))
     def test_standalone_contains_patterns(self):
         with tempfile.TemporaryDirectory() as d:
             p=build('discover-api-idempotency-defects',pathlib.Path(d)/'skill')
