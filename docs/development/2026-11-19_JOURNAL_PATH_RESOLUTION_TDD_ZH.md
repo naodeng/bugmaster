@@ -283,3 +283,23 @@ PR #8 首次推送后 Actions Run [44486235780](https://github.com/naodeng/bugma
 | 远端 CI / 最终独立审查 | **NOT_RUN**：本地最终代码/文档尚未推送；R3 人工 Security Reviewer 签署也未获得，模型交叉审查不替代该签署 |
 
 `/private/tmp/bugmaster-pr8-review-final.json` 是本机覆盖证据，不是业务功能覆盖。50 个 Benchmark 场景未执行，远端 CI 与同一最终 head 上的独立审查尚未完成，Release 仍为 **No-Go**。
+
+## 2026-11-21 Linux CI 覆盖门禁补测
+
+本节记录 PR #8 推送后的 Linux Actions 反馈，更新上文当时“远端 CI 尚未运行”的状态。
+
+### RED
+
+- PR #8 Actions [Run 44903771541](https://github.com/naodeng/bugmaster/actions/runs/44903771541)，合并测试提交为 `4bd758debacc162f2e087867648def14cdd4bd73`（PR head `f6ca957f01262989ef73cae1ef2493cf82a7e2eb`）。399 个单元、79 个契约、1 个安全测试及覆盖数据采集步骤通过；100% 行覆盖断言失败：2,131/2,141 行、763/770 分支，失败率分别由未覆盖的 10 行和 7 个分支构成。
+- 未覆盖行为位于 `filesystem_security._has_extended_acl()` 的原生 ACL 结果/释放路径，以及 `ActionJournalStore` 和 pinned `ActionJournal` 的扩展 ACL 拒绝分支、可信 macOS `/tmp` 别名分支。根因是相关真实 ACL 集成测试只在 macOS 执行，Linux runner 会跳过，导致已有本机覆盖结果不能代表 CI 平台。
+
+### GREEN / REFACTOR
+
+- 测试专用提交 `215bfb2` 增加 7 个跨平台单元用例：模拟 ACL 不存在和 ACL 存在/释放；模拟可信 `/tmp` 系统别名；直接覆盖扩展 ACL 拒绝 helper；以及覆盖 Journal 创建、pinned 目录读取和文件读取遇到扩展 ACL 时的 fail-closed 行为。生产代码未变。
+- 定向命令 `PYTHONDONTWRITEBYTECODE=1 /private/tmp/bugmaster-review-venv/bin/python -m unittest discover -s tests/unit -p 'test_action_journal_store.py' -v`：83/83 PASS。
+
+### VERIFY
+
+新增测试后，本机 macOS/POSIX、Python 3.12.16 全量结果：单元 406/406、契约 79/79、安全 1/1 PASS；行覆盖 2,141/2,141、分支覆盖 770/770，均分别统计且为 100%；Catalog、Benchmark manifest 结构、品牌检查及 `git diff --check` PASS。覆盖 JSON：`/private/tmp/bugmaster-pr8-crossplatform.json`。
+
+上述跨平台 mock 用例覆盖 CI 暴露的条件路径，但该验证仍是在 macOS 本机执行；Linux 上的修复结果以新 head Actions 重跑为准。Release 质量门禁仍为 **NO-GO**：功能义务清单、真实业务覆盖和核心 Feature 的 Happy/Negative/Edge 实测证据缺失，50 个 Benchmark 场景未执行。R3 人工安全审查签署也仍未获得。

@@ -36,6 +36,52 @@ class ActionJournalStoreTests(unittest.TestCase):
         with patch("bugmaster_core.filesystem_security.sys.platform", "linux"):
             self.assertFalse(_has_extended_acl(-1))
 
+    def test_acl_probe_accepts_native_no_acl_result(self):
+        from bugmaster_core.filesystem_security import _has_extended_acl
+
+        class MissingAcl:
+            def __call__(self, _file_descriptor):
+                ctypes.set_errno(errno.ENOENT)
+                return None
+
+        class FakeLibc:
+            acl_get_fd = MissingAcl()
+            acl_free = MissingAcl()
+
+        with patch("bugmaster_core.filesystem_security.sys.platform", "darwin"):
+            with patch(
+                "bugmaster_core.filesystem_security.ctypes.CDLL",
+                return_value=FakeLibc(),
+            ):
+                self.assertFalse(_has_extended_acl(123))
+
+    def test_acl_probe_frees_and_reports_a_native_acl(self):
+        from bugmaster_core.filesystem_security import _has_extended_acl
+
+        freed_acls = []
+
+        class PresentAcl:
+            def __call__(self, _file_descriptor):
+                return 1234
+
+        class FreeAcl:
+            def __call__(self, acl):
+                freed_acls.append(acl)
+                return 0
+
+        class FakeLibc:
+            acl_get_fd = PresentAcl()
+            acl_free = FreeAcl()
+
+        with patch("bugmaster_core.filesystem_security.sys.platform", "darwin"):
+            with patch(
+                "bugmaster_core.filesystem_security.ctypes.CDLL",
+                return_value=FakeLibc(),
+            ):
+                self.assertTrue(_has_extended_acl(123))
+
+        self.assertEqual(freed_acls, [1234])
+
     def test_acl_probe_fails_closed_when_native_api_is_missing(self):
         from bugmaster_core.filesystem_security import _has_extended_acl
 
@@ -109,6 +155,35 @@ class ActionJournalStoreTests(unittest.TestCase):
             store = ActionJournalStore(directory, "session-1", "journal-1")
 
             self.assertEqual(store._resolved_root, Path(directory).resolve())
+
+    def test_normalizes_the_trusted_tmp_symlink_alias_on_every_platform(self):
+        from bugmaster_core.action_journal_store import _normalize_storage_root
+
+        alias_stat = SimpleNamespace(st_mode=stat.S_IFLNK | 0o777, st_uid=0)
+        with patch.object(Path, "lstat", return_value=alias_stat):
+            with patch(
+                "bugmaster_core.action_journal_store.os.readlink",
+                return_value="private/tmp",
+            ):
+                self.assertEqual(
+                    _normalize_storage_root(Path("/tmp/bugmaster-alias")),
+                    Path("/private/tmp/bugmaster-alias"),
+                )
+
+    def test_acl_rejection_helper_rejects_an_extended_acl_on_every_platform(self):
+        from bugmaster_core.action_journal_store import (
+            ActionJournalStoreError,
+            _reject_extended_acl,
+        )
+
+        with patch(
+            "bugmaster_core.action_journal_store._has_extended_acl",
+            return_value=True,
+        ):
+            with self.assertRaisesRegex(
+                ActionJournalStoreError, "must not have an extended access control list"
+            ):
+                _reject_extended_acl(-1, "Journal file")
 
     def test_rejects_an_untrusted_system_path_alias(self):
         _, ActionJournalStoreError = _store_types(self)
@@ -810,6 +885,56 @@ class ActionJournalStoreTests(unittest.TestCase):
             finally:
                 journal.close()
 
+    def test_pinned_journal_rejects_a_directory_acl_on_every_platform(self):
+        ActionJournalStore, _ = _store_types(self)
+        from bugmaster_core.action_journal import JournalCorruptionError
+
+        with tempfile.TemporaryDirectory() as directory:
+            journal = ActionJournalStore(
+                directory, "session-1", "journal-1"
+            ).initialize()
+
+            def has_acl_for_directories(file_descriptor):
+                return stat.S_ISDIR(os.fstat(file_descriptor).st_mode)
+
+            try:
+                with patch(
+                    "bugmaster_core.action_journal._has_extended_acl",
+                    side_effect=has_acl_for_directories,
+                ):
+                    with self.assertRaisesRegex(
+                        JournalCorruptionError,
+                        "must not have an extended access control list",
+                    ):
+                        journal.matches_prefix(0, None)
+            finally:
+                journal.close()
+
+    def test_pinned_journal_rejects_a_file_acl_on_every_platform(self):
+        ActionJournalStore, _ = _store_types(self)
+        from bugmaster_core.action_journal import JournalCorruptionError
+
+        with tempfile.TemporaryDirectory() as directory:
+            journal = ActionJournalStore(
+                directory, "session-1", "journal-1"
+            ).initialize()
+
+            def has_acl_for_regular_files(file_descriptor):
+                return stat.S_ISREG(os.fstat(file_descriptor).st_mode)
+
+            try:
+                with patch(
+                    "bugmaster_core.action_journal._has_extended_acl",
+                    side_effect=has_acl_for_regular_files,
+                ):
+                    with self.assertRaisesRegex(
+                        JournalCorruptionError,
+                        "must not have an extended access control list",
+                    ):
+                        journal.matches_prefix(0, None)
+            finally:
+                journal.close()
+
     @unittest.skipUnless(sys.platform == "darwin", "macOS ACL enforcement only")
     def test_pinned_journal_rejects_directory_acl_added_after_open(self):
         ActionJournalStore, _ = _store_types(self)
@@ -1504,6 +1629,26 @@ class ActionJournalStoreTests(unittest.TestCase):
                 side_effect=reject_file_acl_query,
             ):
                 with self.assertRaises(JournalCorruptionError):
+                    store.initialize()
+
+    def test_initialize_rejects_a_journal_file_with_an_extended_acl_on_every_platform(self):
+        ActionJournalStore, _ = _store_types(self)
+        from bugmaster_core.action_journal import JournalCorruptionError
+
+        with tempfile.TemporaryDirectory() as directory:
+            store = ActionJournalStore(directory, "session-1", "journal-1")
+
+            def has_acl_for_regular_files(file_descriptor):
+                return stat.S_ISREG(os.fstat(file_descriptor).st_mode)
+
+            with patch(
+                "bugmaster_core.action_journal_store._has_extended_acl",
+                side_effect=has_acl_for_regular_files,
+            ):
+                with self.assertRaisesRegex(
+                    JournalCorruptionError,
+                    "must not have an extended access control list",
+                ):
                     store.initialize()
 
     @unittest.skipUnless(sys.platform == "darwin", "macOS ACL enforcement only")
