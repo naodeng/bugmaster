@@ -1,6 +1,6 @@
 # W6 Session Revision 持久化 TDD 记录
 
-**日期：** 2026-11-19  
+**日期：** 2026-11-19
 **Workstream / 义务：** W6-01 Session Persistence；`F-RECOVERY`；`TDD-ACT-004`
 **风险：** R3；合并前需要独立 Security Reviewer。
 **实现提交：** `7d2e1957dc417146ed9559e75f04e9c694a3ebbb`（初版存储提交 `2e2101015d0ab062ed7b9a7a0301ba729bb6679b`）；草稿 PR [#3](https://github.com/naodeng/bugmaster/pull/3)，叠加于 Session Schema PR #2，尚未合并。
@@ -75,6 +75,104 @@ head 记录可发现 revision 尾部文件单独丢失或修改；它不是外�
 | GitHub Actions | [Run 44443870587](https://github.com/naodeng/bugmaster/actions/runs/44443870587)：最终代码提交 `7d2e1957dc417146ed9559e75f04e9c694a3ebbb`，结论 success、所有步骤通过。初版提交 `2e2101015d0ab062ed7b9a7a0301ba729bb6679b` 的 Run `44442603260` 也成功 |
 | Diff 空白 | `git diff --check`：PASS |
 
+## CodeX Security Review 修复：目录竞态、历史完整性与追加恢复
+
+**日期：** 2026-11-19
+
+**Workstream / 义务：** W6-01 Session Persistence；`F-RECOVERY`；`TDD-ACT-004`
+**复审：** PR #3 head `73dbf6fad5a26ea539f04a991c35bd8948af9234` 的 CodeX review 留下 3 项发现；修复后 head `cccf6cd39cec59320f4ee54115741abdf52bb037` 的复审又发现超长 Session ID 会生成不可读 head。随后沿同一崩溃路径发现首次创建也可能遗留无法重试的 revision 1。当前本地均已修复；最后一轮变更、新 head、Security Review 与 GitHub Actions 结果待推送后补录。
+
+### RED
+
+先加入三个行为测试，再针对原实现运行：
+
+```text
+python -m unittest \
+  tests.unit.test_session_store.SessionStoreTests.test_read_latest_uses_the_directory_that_owns_the_acquired_lock \
+  tests.unit.test_session_store.SessionStoreTests.test_head_binds_every_historical_revision \
+  tests.unit.test_session_store.SessionStoreTests.test_uncommitted_revision_after_head_write_failure_is_recoverable -v
+```
+
+3 项中 2 项失败、1 项报错：锁定后替换 `sessions` 目录会读到攻击者的预算（预期 12，实际 0）；改写早期 revision 后没有被 head 检出；head 发布失败留下的下一 revision 使后续读取报 `SessionCorruptionError`，重试无法恢复。
+
+随后 CodeX 对新 head 的常规复审发现：长度为 1,000 的 Session ID 可通过 Schema 与 Store 校验，但产生的 `session.head` 超过读取上限。新增 `test_long_session_id_keeps_the_persisted_head_readable` 后先得到 `SessionCorruptionError: Session revision head is too large`，随后再实现修复。
+
+再新增 `test_create_recovers_initial_revision_after_head_publication_failure`，模拟 revision 1 已发布而 head 发布失败；原实现重试 `create()` 时得到 `SessionCorruptionError: Session revision head is missing`。这是沿 CodeX 的崩溃一致性发现补出的相邻边界。
+
+### GREEN / REFACTOR
+
+- 根目录、`sessions`、Session 和 `revisions` 均通过目录描述符逐级打开；锁、head、revision 读取及发布都相对已打开的目录描述符完成。这样替换路径名或软链接不会把已锁定的 Store 操作重定向到另一目录。读锁使用 `O_NONBLOCK` 后再检查文件类型，避免 FIFO 在检查前阻塞。
+- `session.head` 除最新 revision 摘要外，再绑定从 revision 1 开始的规范化完整历史摘要。读取任一历史版本都会重新计算整条摘要链，早期内容被改写时失败关闭。
+- 追加若已发布一个连续、合法的下一 revision，但 head 发布失败，读取仍返回最后已提交版本；下一次追加校验这唯一的待提交 revision 后清理并重试。缺号、多余、非法或状态转换不合法的文件仍失败关闭。
+- 将 head 读取上限设为 Session 最大文档体积加固定元数据余量；head 只重复有界的 `sessionId` 和定长摘要。该上限与 Store 可接受的 Session 文档大小一致，长度 1,000 的 ID 可创建、读取并追加；超出上限的持久化 head 仍在读取正文前拒绝。
+- 若首次创建已耐久发布唯一的 revision 1、但尚未发布 head，下一次 `create()` 会读取并验证该初始 revision，恢复 head；相同创建请求可安全重试成功。存在其他文件、无效内容或不符合 revision 1 序号的状态仍失败关闭。
+
+### VERIFY（本地；远端结果待补）
+
+环境：macOS、Python 3.12.16；coverage.py 7.13.3；测试依赖位于 `/private/tmp/bugmaster-review-venv`。
+
+| 检查 | 结果 |
+|---|---|
+| SessionStore 单元 | `PYTHONDONTWRITEBYTECODE=1 /private/tmp/bugmaster-review-venv/bin/python -m unittest tests.unit.test_session_store`：66/66 PASS |
+| 全单元及覆盖率采集 | `PYTHONDONTWRITEBYTECODE=1 /private/tmp/bugmaster-review-venv/bin/python -m coverage run --branch --source=bugmaster_core --data-file=/private/tmp/session-pr3-final-v6.coverage -m unittest discover -s tests/unit`：122/122 PASS |
+| 全合同 | `PYTHONDONTWRITEBYTECODE=1 /private/tmp/bugmaster-review-venv/bin/python -m unittest discover -s tests/contracts -v`：75/75 PASS |
+| `bugmaster_core` 行覆盖 | 959/959（100%） |
+| `bugmaster_core` 分支覆盖 | 378/378（100%） |
+| `git diff --check` | PASS |
+| 远端状态 | Actions [Run 44524216279](https://github.com/naodeng/bugmaster/actions/runs/44524216279) 在上一 head `1db75b6` 通过；其后的首次创建恢复补强及验证已在本地完成。最终 head 的 CodeX 复审、Security Review 与 Actions 待推送后复核 |
+
+本修复只保护相对于当前 head 可重算的存储历史完整性，不引入外部签名或防止整个存储目录被回滚；已有文档中关于 Session/Journal 对账、审批真实性及 Release No-Go 的范围说明仍适用。
+
 ## 未覆盖的产品能力
 
-100% 单元行覆盖不是业务功能覆盖，也不是 BLK-03 完成证据。Checkpoint 持久化、崩溃断点注入、Windows 实现、进程/主机恢复、Approval 真实性验证、预算与 Journal 对账、可信只读核验及恢复授权仍未实现或未验证。未执行任何真实 API/Browser 目标测试、50 个 Benchmark 场景或双宿主验证。完整 Release 维持 **No-Go**；本 PR 不得在缺少独立 R2 质量审查时合并。
+100% 单元行覆盖不是业务功能覆盖，也不是 BLK-03 完成证据。Checkpoint 持久化、崩溃断点注入、Windows 实现、进程/主机恢复、Approval 真实性验证、预算与 Journal 对账、可信只读核验及恢复授权仍未实现或未验证。未执行任何真实 API/Browser 目标测试、50 个 Benchmark 场景或双宿主验证。完整 Release 维持 **No-Go**；本 R3 PR 不得在缺少独立安全审查时合并。
+
+## 独立安全与工程复审补充
+
+**日期：** 2026-11-19
+**复审范围：** PR #3 当前本地完整差异；W6-01 / `F-RECOVERY` / `TDD-ACT-004`；R3。
+
+### RED
+
+独立 Security Review 与 Engineering Review 交叉检查后，针对新发现分别新增回归测试并确认旧实现失败：
+
+- 根目录检查后被替换成软链接、首次 revision 恢复请求与孤立数据不一致、已有数据丢失锁时追加会重建新锁、根路径末级 `..` 别名无法读取既有 Session、`_fsync_directory(Path)` 堆叠兼容，以及根/子目录 `fsync` 失败后的重试没有补同步父目录。
+- 空 Session 目录在首次锁创建前被读取、旧版遗留的空 `revisions/` 无锁状态不能重试、锁并发创建时未重开锁、读取为并发首次提交误报损坏、深层 JSON 与超长整数把解析异常泄漏给调用方、超长历史读取累积全部 revision，以及进程中断遗留临时文件未清理。
+- 通过故障注入覆盖 `mkdir`、目录重开、目录扫描、fsync 与锁打开错误；并修正一项并发锁失败测试，明确断言三次 `open()`，避免只测试首次打开失败造成假阳性。
+
+### GREEN / REFACTOR
+
+- 首次创建恢复先比对磁盘 revision 1 与本次请求的规范字节，再发布 head；请求不一致时保留孤立状态，不能替请求确认另一份 Session。
+- 读写均先打开现有锁；只允许空目录，或仅含真实且为空的旧版 `revisions/` 目录时新建锁，并以 `O_EXCL` 处理并发初始化。已有数据缺锁仍失败关闭。锁初次打开未命中时检查目录；如果 revisions 扫描已看到并发发布的数据，会再打开锁并等待 `flock` 后读取。
+- 写入重试会重新同步已有根路径分量和子目录的父目录；目录创建及重开失败转换为 Store 层异常。保留 `_fsync_directory(Path)` 供叠加 PR #4 的 CheckpointStore 使用，SessionStore 内部使用描述符版本。
+- 只规范化根路径的末级 `..`；普通末级路径仍以 `O_NOFOLLOW` 打开，避免检查后被替换为软链接。revision 历史逐个扫描、校验并滚动摘要，只保留当前、前一和请求 revision，限制长历史读取内存。深层或整数过长的 JSON 统一映射为 `SessionCorruptionError`；下次独占写入时只清理匹配格式的普通临时文件并同步目录。
+
+### VERIFY（本地最终差异；远端 head 待更新）
+
+环境：macOS；Python 3.12.16；coverage.py 7.13.3；合同依赖位于 `/private/tmp/bugmaster-jsonschema`。
+
+| 检查 | 命令 / 结果 |
+|---|---|
+| 全单元及分支采集 | `PYTHONDONTWRITEBYTECODE=1 /private/tmp/bugmaster-review-venv/bin/python -m coverage run --branch --source=bugmaster_core --data-file=/private/tmp/session-pr3-final-v15.coverage -m unittest discover -s tests/unit`：156/156 PASS |
+| 合同测试 | `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/private/tmp/bugmaster-jsonschema /private/tmp/bugmaster-review-venv/bin/python -m unittest discover -s tests/contracts`：75/75 PASS |
+| 单元生产代码行覆盖 | `bugmaster_core` 1,045/1,045（100%） |
+| 单元生产代码分支覆盖 | `bugmaster_core` 406/406（100%）；与行覆盖分开报告 |
+| Release quality gate | Coverage 检查通过；整体 **No-Go**，原因仍是 Feature Inventory 未冻结、业务覆盖与核心 Happy/Negative/Edge 执行证据不足。本 PR 不声称 Release GO |
+| 独立 Security Reviewer（CodeX 安全角色） | 最新复审无待修复发现；覆盖锁重开竞态、无锁数据隔离及旧目录兼容 |
+| 独立 Engineering Reviewer | 最新复审无待修复发现；实测空目录竞态可线性化，进行中的首次提交会等待 writer lock 后读取 |
+| `git diff --check` | PASS |
+| GitHub Actions / GitHub 常规 CodeX Review / GitHub Security Review | 本地最终差异尚未推送；推送后须对新 head 重新核实 Actions、常规 review 与 Security review，再决定合并 |
+
+这份本地复审结论不替代新远端 head 的 CI、GitHub review 状态或 Release 级审计。PR #3 保持未合并，直到新 head 的远端门禁与安全审查复核完成。
+
+## GitHub Linux 覆盖率诊断跟进
+
+**日期：** 2026-11-19
+
+PR #3 head `5d398bb761233453c94cfa4d53d932a56e17e866` 的 Actions [Run 44533110359](https://github.com/naodeng/bugmaster/actions/runs/44533110359) 中，156 项单测和 75 项合同测试均通过；Ubuntu 26.04 / Python 3.12 的单元行覆盖率为 1,044/1,045（99.90%），因此 CI 按 100% 门槛失败。macOS 上相同 1,045 行全部覆盖，当前差异表明有一处平台执行路径尚未覆盖。
+
+为让下一次 CI 失败能直接给出文件和未覆盖行，先扩展 `WorkflowCoverageGateTests`，断言失败报告包含缺失行；旧 workflow 在新测试下得到预期 RED。随后更新合同 workflow 的失败信息以输出 `coverage.json` 中各文件的 `missing_lines`，不改变 100% 门槛。`python -m unittest tests.contracts.test_quality_gate -v`：5/5 PASS；`git diff --check`：PASS。
+
+首个诊断 head `0770f07ba08fabc7fda70a0aec4d860221eeafd2` 的 [Run 44534395315](https://github.com/naodeng/bugmaster/actions/runs/44534395315) 未创建 job。检查发现 YAML 普通标量中的 Python 字典冒号带空格会破坏 workflow 解析；本地 Ruby Psych 首次解析得到语法错误，移除冒号后的空格后解析通过，合同门禁回归仍为 5/5 PASS。
+
+修正格式后的 head `0e76caeb514688b19682f5a6d9c35c43fbac636f` 在 [Run 44535020463](https://github.com/naodeng/bugmaster/actions/runs/44535020463) 正常执行至覆盖率门禁，报告唯一未覆盖行是 `bugmaster_core/session_store.py:780`（`00000001.json` 后出现额外目录项时拒绝恢复）。根据前一检查点的控制流和 Linux `scandir` 的无序枚举，这项两 revision 防护测试会先遇到 `00000002.json` 并在行 778 返回，因此没有覆盖行 780；这是测试依赖目录顺序造成的平台差异，未发现生产行为缺陷。将该测试的目录项顺序固定为名称升序后，目标测试 1/1、全单元 156/156、全合同 75/75 PASS；本机 `bugmaster_core` 行覆盖 1,045/1,045（100%）、分支覆盖 406/406（100%），`git diff --check` PASS。修正后的覆盖率 CI、安全复审和常规 CodeX review 仍待新 head 验证；PR #3 暂不合并。

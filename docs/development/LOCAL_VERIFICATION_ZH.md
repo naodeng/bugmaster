@@ -1,5 +1,7 @@
 # BugMaster 本地验证记录（2026-11-18）
 
+本文其余日志是 2026-11-18 的历史基线。它最后的“仅覆盖初始核心模块”结论已由 2026-11-21 PR #8 候选覆盖记录更新；当前结果见 [工程实施进度矩阵](IMPLEMENTATION_PROGRESS_ZH.md) 与 [Journal 路径解析 TDD 记录](2026-11-19_JOURNAL_PATH_RESOLUTION_TDD_ZH.md)。
+
 ## unit — PASS
 ```text
 test_api_allowed (test_scope.ScopeTests.test_api_allowed) ... ok
@@ -81,4 +83,4 @@ NO-GO: unfrozen-or-empty-feature-inventory, functional-coverage-not-above-60-per
 ```
 
 
-单元行覆盖仅基于新增 `bugmaster_core` 初始代码范围，尚未覆盖所有生产脚本；不能宣称全项目 U100 达标。Release No-Go 是预期安全行为：没有真实功能及核心三类执行证据。
+当日单元行覆盖仅基于新增 `bugmaster_core` 初始代码范围，尚未覆盖所有生产脚本；该结果不代表全项目 U100 达标。Release No-Go 是预期安全行为：没有真实功能及核心三类执行证据。2026-11-21 的更新统计了 `bugmaster_core/` 与 `scripts/` 全部当前生产 Python 模块。
