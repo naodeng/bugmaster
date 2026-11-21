@@ -10,6 +10,7 @@ import threading
 import unittest
 from contextlib import contextmanager
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 
@@ -205,6 +206,22 @@ class CheckpointStoreTests(unittest.TestCase):
             with self.assertRaises(CheckpointCorruptionError):
                 store.read("checkpoint-1")
 
+    def test_read_rejects_checkpoint_directory_with_owner_only_nondefault_mode(self):
+        _, _, CheckpointCorruptionError = _checkpoint_store_types(self)
+        if os.name != "posix":
+            self.skipTest("POSIX directory permission contract")
+        with tempfile.TemporaryDirectory() as directory:
+            store = self.make_store(directory)
+            store.create(_valid_checkpoint())
+            os.chmod(store._checkpoints_dir, 0o500)
+
+            with self.assertRaises(CheckpointCorruptionError):
+                store.read("checkpoint-1")
+
+            self.assertEqual(
+                stat.S_IMODE(store._checkpoints_dir.stat().st_mode), 0o500
+            )
+
     def test_concurrent_duplicate_writers_cannot_replace_checkpoint(self):
         _, CheckpointStoreError, _ = _checkpoint_store_types(self)
         with tempfile.TemporaryDirectory() as directory:
@@ -301,7 +318,7 @@ class CheckpointStoreTests(unittest.TestCase):
 
             root.mkdir()
             self.assertIsNone(store.read("checkpoint-1"))
-            store._sessions_dir.mkdir()
+            store._sessions_dir.mkdir(mode=0o700)
             self.assertIsNone(store.read("checkpoint-1"))
 
     def test_read_returns_none_when_checkpoint_directory_is_missing(self):
@@ -311,6 +328,207 @@ class CheckpointStoreTests(unittest.TestCase):
             store._lock_path.touch(mode=0o600)
 
             self.assertIsNone(store.read("checkpoint-1"))
+
+    def test_read_rejects_checkpoint_directory_acl_without_repair(self):
+        _, _, CheckpointCorruptionError = _checkpoint_store_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            store = self.make_store(directory)
+            store.create(_valid_checkpoint())
+            checkpoint_directory = store._checkpoints_dir
+            checkpoint_inode = checkpoint_directory.stat().st_ino
+
+            def report_checkpoint_directory_acl(fd):
+                return os.fstat(fd).st_ino == checkpoint_inode
+
+            with patch(
+                "bugmaster_core.session_store._has_extended_acl",
+                side_effect=report_checkpoint_directory_acl,
+            ), self.assertRaises(CheckpointCorruptionError):
+                store.read("checkpoint-1")
+
+            self.assertEqual(
+                stat.S_IMODE(checkpoint_directory.stat().st_mode), 0o700
+            )
+
+    def test_read_rejects_checkpoint_directory_with_another_owner(self):
+        _, _, CheckpointCorruptionError = _checkpoint_store_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            store = self.make_store(directory)
+            store.create(_valid_checkpoint())
+            checkpoint_inode = store._checkpoints_dir.stat().st_ino
+            real_fstat = os.fstat
+
+            def report_another_checkpoint_directory_owner(fd):
+                metadata = real_fstat(fd)
+                if metadata.st_ino == checkpoint_inode:
+                    return SimpleNamespace(
+                        st_mode=metadata.st_mode,
+                        st_uid=metadata.st_uid + 1,
+                    )
+                return metadata
+
+            with patch(
+                "bugmaster_core.session_store.os.fstat",
+                side_effect=report_another_checkpoint_directory_owner,
+            ), self.assertRaises(CheckpointCorruptionError):
+                store.read("checkpoint-1")
+
+            self.assertEqual(
+                stat.S_IMODE(store._checkpoints_dir.stat().st_mode), 0o700
+            )
+
+    def test_read_rejects_checkpoint_file_acl_without_repair(self):
+        _, _, CheckpointCorruptionError = _checkpoint_store_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            store = self.make_store(directory)
+            checkpoint = _valid_checkpoint()
+            store.create(checkpoint)
+            checkpoint_path = (
+                store._checkpoints_dir / store._checkpoint_filename("checkpoint-1")
+            )
+            checkpoint_inode = checkpoint_path.stat().st_ino
+
+            def report_checkpoint_file_acl(fd):
+                return os.fstat(fd).st_ino == checkpoint_inode
+
+            with patch(
+                "bugmaster_core.session_store._has_extended_acl",
+                side_effect=report_checkpoint_file_acl,
+            ), self.assertRaises(CheckpointCorruptionError):
+                store.read("checkpoint-1")
+
+            self.assertEqual(stat.S_IMODE(checkpoint_path.stat().st_mode), 0o600)
+
+    def test_read_rejects_checkpoint_file_owned_by_another_user(self):
+        _, _, CheckpointCorruptionError = _checkpoint_store_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            store = self.make_store(directory)
+            store.create(_valid_checkpoint())
+            checkpoint_path = (
+                store._checkpoints_dir / store._checkpoint_filename("checkpoint-1")
+            )
+            checkpoint_inode = checkpoint_path.stat().st_ino
+            original_fstat = os.fstat
+
+            def report_foreign_owner(fd):
+                metadata = original_fstat(fd)
+                if metadata.st_ino != checkpoint_inode:
+                    return metadata
+                return SimpleNamespace(
+                    st_mode=metadata.st_mode,
+                    st_uid=os.geteuid() + 1,
+                    st_nlink=metadata.st_nlink,
+                    st_size=metadata.st_size,
+                )
+
+            with patch(
+                "bugmaster_core.session_store.os.fstat",
+                side_effect=report_foreign_owner,
+            ), self.assertRaises(CheckpointCorruptionError):
+                store.read("checkpoint-1")
+
+    def test_read_rejects_checkpoint_file_hard_link_without_repair(self):
+        _, _, CheckpointCorruptionError = _checkpoint_store_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            store = self.make_store(root)
+            store.create(_valid_checkpoint())
+            checkpoint_path = (
+                store._checkpoints_dir / store._checkpoint_filename("checkpoint-1")
+            )
+            external_file = root / "outside-checkpoint"
+            os.link(checkpoint_path, external_file)
+
+            with self.assertRaises(CheckpointCorruptionError):
+                store.read("checkpoint-1")
+
+            self.assertEqual(stat.S_IMODE(external_file.stat().st_mode), 0o600)
+
+    def test_read_accepts_checkpoint_file_linked_to_its_crash_temporary(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = self.make_store(directory)
+            checkpoint = store.create(_valid_checkpoint())
+            checkpoint_path = (
+                store._checkpoints_dir / store._checkpoint_filename("checkpoint-1")
+            )
+            temporary_link = store._session_dir / (".checkpoint-" + "a" * 32)
+            os.link(checkpoint_path, temporary_link)
+
+            self.assertEqual(store.read("checkpoint-1"), checkpoint)
+
+    def test_first_publication_sync_failure_preserves_temporary_link(self):
+        _, CheckpointStoreError, _ = _checkpoint_store_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            store = self.make_store(directory)
+            session_store = store._session_store
+            session_store.create(
+                {
+                    "schemaVersion": "1.0",
+                    "sessionId": "session-1",
+                    "revision": 1,
+                    "status": "created",
+                    "projectRef": "project-local-orders",
+                    "hostRef": "codex",
+                    "environmentRef": "env-isolated-test",
+                    "createdAt": "2026-11-19T08:00:00Z",
+                    "updatedAt": "2026-11-19T08:00:00Z",
+                    "scopeHistory": [{"scopeId": "scope-1", "revision": 1}],
+                    "approvalRefs": [],
+                    "actionBudget": {"maxActions": 20, "consumedActions": 0},
+                    "journalId": "journal-session-1",
+                    "checkpointRefs": [],
+                }
+            )
+            store._checkpoints_dir.mkdir(mode=0o700)
+            checkpoints_inode = store._checkpoints_dir.stat().st_ino
+            original_fsync = os.fsync
+
+            def fail_checkpoints_directory_sync(fd):
+                if os.fstat(fd).st_ino == checkpoints_inode:
+                    raise OSError("Checkpoint directory sync unavailable")
+                return original_fsync(fd)
+
+            with patch(
+                "bugmaster_core.session_store.os.fsync",
+                side_effect=fail_checkpoints_directory_sync,
+            ), self.assertRaises(CheckpointStoreError):
+                store.create(_valid_checkpoint())
+
+            checkpoint_path = (
+                store._checkpoints_dir / store._checkpoint_filename("checkpoint-1")
+            )
+            temporary_links = list(store._session_dir.glob(".checkpoint-*"))
+            self.assertEqual(len(temporary_links), 1)
+            self.assertEqual(temporary_links[0].stat().st_ino, checkpoint_path.stat().st_ino)
+
+            session_store.append_revision(
+                {
+                    "schemaVersion": "1.0",
+                    "sessionId": "session-1",
+                    "revision": 2,
+                    "status": "created",
+                    "projectRef": "project-local-orders",
+                    "hostRef": "codex",
+                    "environmentRef": "env-isolated-test",
+                    "createdAt": "2026-11-19T08:00:00Z",
+                    "updatedAt": "2026-11-19T08:01:00Z",
+                    "scopeHistory": [{"scopeId": "scope-1", "revision": 1}],
+                    "approvalRefs": [],
+                    "actionBudget": {"maxActions": 20, "consumedActions": 0},
+                    "journalId": "journal-session-1",
+                    "checkpointRefs": [],
+                },
+                expected_revision=1,
+            )
+
+            self.assertEqual(list(store._session_dir.glob(".checkpoint-*")), [])
+            self.assertEqual(store.read("checkpoint-1"), _valid_checkpoint())
 
     def test_read_wraps_storage_directory_inspection_failures(self):
         import bugmaster_core.checkpoint_store as checkpoint_store_module
@@ -742,11 +960,23 @@ class CheckpointStoreTests(unittest.TestCase):
                 with self.assertRaises(CheckpointCorruptionError):
                     store.read("checkpoint-1")
 
+            checkpoint_path = (
+                store._checkpoints_dir / store._checkpoint_filename("checkpoint-1")
+            )
+            checkpoint_inode = checkpoint_path.stat().st_ino
+            real_fstat = os.fstat
+
+            def report_checkpoint_as_fifo(file_descriptor):
+                metadata = real_fstat(file_descriptor)
+                if metadata.st_ino == checkpoint_inode:
+                    return SimpleNamespace(st_mode=stat.S_IFIFO)
+                return metadata
+
             with patch(
                 "bugmaster_core.checkpoint_store.os.fstat",
-                return_value=type("FileStat", (), {"st_mode": stat.S_IFIFO})(),
+                side_effect=report_checkpoint_as_fifo,
             ):
-                with self.assertRaises(CheckpointStoreError):
+                with self.assertRaises(CheckpointCorruptionError):
                     store.read("checkpoint-1")
 
             with patch("bugmaster_core.session_store.fcntl.flock", side_effect=OSError("lock failed")):

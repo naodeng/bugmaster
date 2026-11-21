@@ -118,7 +118,7 @@ class CheckpointSchemaTests(unittest.TestCase):
     def test_checkpoint_reference_validator_accepts_schema_integer_numbers(self):
         import tempfile
 
-        from bugmaster_core.action_journal import ActionJournal
+        from bugmaster_core.action_journal_store import ActionJournalStore
         from bugmaster_core.checkpoint_reference_validator import (
             CheckpointReferenceValidator,
         )
@@ -153,6 +153,10 @@ class CheckpointSchemaTests(unittest.TestCase):
                 "journalId": "session-1-journal",
                 "checkpointRefs": [],
             }
+            journal_store = ActionJournalStore(
+                directory, "session-1", "session-1-journal"
+            )
+            journal_store.initialize().close()
             session_store.create(session)
 
             checkpoint = self.valid_checkpoint()
@@ -175,14 +179,8 @@ class CheckpointSchemaTests(unittest.TestCase):
             latest["updatedAt"] = "2026-11-19T08:01:00Z"
             latest["checkpointRefs"] = ["checkpoint-1"]
             session_store.append_revision(latest, expected_revision=1)
-            journal = ActionJournal(
-                Path(directory) / "journals" / "journal-1.jsonl",
-                "session-1",
-                journal_id="session-1-journal",
-            )
-
             validator = CheckpointReferenceValidator(
-                checkpoint_store, session_store, journal
+                checkpoint_store, session_store, journal_store
             )
             self.assertEqual(validator.validate("checkpoint-1"), checkpoint)
 

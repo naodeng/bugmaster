@@ -17,7 +17,7 @@
 | Evidence | metadata and content-addressed artifacts | EV ID + artifact SHA-256 | hash proves integrity, not authenticity |
 | Finding | immutable revisions + current pointer | Finding ID + revision | report and indexes are generated |
 | Review | signed-off/host-attested review record | review ID + bound revision/digest | model cannot approve itself |
-| Session | revisions + `journal.jsonl` + checkpoint | session ID + revision | one local writer; safe resume gate |
+| Session | immutable revisions + `ActionJournalStore` + checkpoints | session ID + revision | deterministic local Journal identity mapping; safe resume gate remains separate |
 | Regression Recommendation | immutable revisions | REG ID + revision | no test code writes |
 | Eval Run | immutable run manifest | Run ID + dataset digest | private ground truth isolated |
 
@@ -49,7 +49,7 @@ The Approval and Action schemas capture scope/action references, scope revision,
 
 Persist action intent before dispatch, append journal events, and reconcile unknown effects with authoritative read-only state before allowing any replay. A prepared event without dispatched event does **not** prove non-execution. Do not promise exactly-once effects for external systems. Session recovery cannot reset budgets or approvals.
 
-Each Action Journal Event uses schema v1.1 and binds both `sessionId` and a required stable `journalId`; readers reject mismatches and ambiguous duplicate JSON keys. Checkpoint reference validation compares the configured Journal object's ID with the latest Session's declared `journalId` while reading the Checkpoint and Session snapshot under one shared lock. The caller still selects the Journal path, so this does not authenticate the mapping from an ID to a path or establish event provenance. v1.0 events lack `journalId` and are rejected without migration or in-place modification.
+Each Action Journal Event uses schema v1.1 and binds both `sessionId` and a required stable `journalId`; readers reject mismatches and ambiguous duplicate JSON keys. `ActionJournalStore` maps the pair to `<root>/journals/<sha256(sessionId)>/<sha256(journalId)>.jsonl`. It walks the configured root and ancestors with no-follow, directory-relative opens, verifies trusted ownership and private mode bits (including the filesystem root), and rejects extended ACLs on macOS. It normalizes only root-owned macOS `/tmp` and `/var` aliases with their expected targets; arbitrary ancestor symlinks fail closed. `initialize()` serializes Journal creation with Session publication using the per-Session lock. It creates and syncs a new private Journal only before a Session revision has been persisted; after a revision exists it only reopens the existing Journal and fails closed if the file or storage path is missing. It rejects unsafe existing files without changing their permissions. `open()` also requires an existing safe file and never creates or repairs paths. Returned Journal instances pin the Session-directory descriptor and recheck its ACL before every read and append. Checkpoint reference validation walks and validates the storage root's trusted ancestors, then passes the same root descriptor through the Checkpoint/Session snapshot and opens the canonical Journal relative to it before verifying its prefix. This binds local path selection to the declared IDs; it does not authenticate file content, event provenance, or external truth. v1.0 events lack `journalId` and are rejected without migration or in-place modification.
 
 ## Contract build order
 

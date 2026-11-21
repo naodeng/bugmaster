@@ -18,6 +18,8 @@ from .session_store import (
     _fsync_directory_fd,
     _nonempty,
     _open_child_directory,
+    _require_canonical_file_link,
+    _require_private_file,
     _write_all,
     SessionCorruptionError,
     SessionStore,
@@ -98,6 +100,7 @@ class CheckpointStore:
             create=False,
             error_type=CheckpointCorruptionError,
             label="Checkpoint storage",
+            private=True,
         )
         if checkpoints_fd is None:
             return None
@@ -108,7 +111,7 @@ class CheckpointStore:
                     "Checkpoint directory permissions are invalid"
                 )
             return self._read_checkpoint_file(
-                checkpoints_fd, filename, checkpoint_id
+                storage["session_fd"], checkpoints_fd, filename, checkpoint_id
             )
         finally:
             os.close(checkpoints_fd)
@@ -145,7 +148,7 @@ class CheckpointStore:
         return payload, normalized
 
     @contextmanager
-    def _locked(self, create_directories=True):
+    def _locked(self, create_directories=True, *, root_fd=None):
         try:
             if not all(
                 hasattr(os, name)
@@ -154,7 +157,9 @@ class CheckpointStore:
                 raise CheckpointStoreError(
                     "secure Checkpoint directory operations are unavailable"
                 )
-            with self._session_store._locked(create_directories) as storage:
+            with self._session_store._locked(
+                create_directories, root_fd=root_fd
+            ) as storage:
                 yield storage
         except CheckpointCorruptionError:
             raise
@@ -181,7 +186,9 @@ class CheckpointStore:
                 "cannot safely prepare Checkpoint Session storage"
             ) from error
 
-    def _read_checkpoint_file(self, checkpoints_fd, filename, expected_id):
+    def _read_checkpoint_file(
+        self, session_fd, checkpoints_fd, filename, expected_id
+    ):
         try:
             path_stat = os.stat(filename, dir_fd=checkpoints_fd, follow_symlinks=False)
         except FileNotFoundError:
@@ -199,9 +206,16 @@ class CheckpointStore:
         except OSError as error:
             raise CheckpointCorruptionError("cannot open persisted Checkpoint") from error
         try:
-            file_stat = os.fstat(fd)
-            if not stat.S_ISREG(file_stat.st_mode) or stat.S_IMODE(file_stat.st_mode) != 0o600:
-                raise CheckpointCorruptionError("Checkpoint file permissions are invalid")
+            file_stat = _require_private_file(
+                fd, CheckpointCorruptionError, "Checkpoint file"
+            )
+            _require_canonical_file_link(
+                file_stat,
+                session_fd,
+                ".checkpoint-",
+                CheckpointCorruptionError,
+                "Checkpoint file",
+            )
             if file_stat.st_size > _MAX_SESSION_BYTES + 1:
                 raise CheckpointCorruptionError("persisted Checkpoint is too large")
             raw = bytearray()
@@ -232,6 +246,7 @@ class CheckpointStore:
         fd, temporary_name = _create_temporary_file(
             storage["session_fd"], ".checkpoint-"
         )
+        publication_linked = False
         try:
             os.fchmod(fd, 0o600)
             _write_all(fd, payload + b"\n")
@@ -248,6 +263,7 @@ class CheckpointStore:
                 )
             except FileExistsError as error:
                 raise CheckpointStoreError("Checkpoint ID is already stored") from error
+            publication_linked = True
             _fsync_directory_fd(checkpoints_fd)
             os.unlink(temporary_name, dir_fd=storage["session_fd"])
             temporary_name = None
@@ -257,7 +273,7 @@ class CheckpointStore:
         finally:
             if fd is not None:
                 os.close(fd)
-            if temporary_name is not None:
+            if temporary_name is not None and not publication_linked:
                 try:
                     os.unlink(temporary_name, dir_fd=storage["session_fd"])
                 except FileNotFoundError:
