@@ -44,6 +44,23 @@ PYTHONDONTWRITEBYTECODE=1 python3.12 -m unittest discover -s tests/contracts -p 
 | Release 门禁 | **No-Go**：功能义务清单未冻结、真实业务覆盖未超过 60%、核心功能 Happy/Negative/Edge 执行证据缺失 |
 | GitHub Actions | [Run 44457678961](https://github.com/naodeng/bugmaster/actions/runs/44457678961)：单元、契约、行覆盖、Catalog、Benchmark 结构与品牌步骤全部成功 |
 
+## 最新 PR #8 基线整合验证（2026-11-21）
+
+验证对应代码与测试树提交 `42850bb49401a4090e0c8dc21ad2cdd4e0306bca`，其双亲为 PR #9 原 head `7a69db0e37eb7dc13b0324329208dbbdf346093e` 与最新 PR #8 head `58a601aa1dfa9639b38d9f9c6b0a62d9dbee2a4d`。以下本地命令在该提交树上重跑；本节在验证后补录，随后只变更开发记录文档。
+
+环境：macOS/POSIX、Python 3.12.16；测试依赖 `jsonschema[format-nongpl]==4.26.0` 与 `coverage==7.13.3` 位于 `/private/tmp`。
+
+| 检查 | 命令 / 结果 |
+|---|---|
+| 全单元 | `PYTHONDONTWRITEBYTECODE=1 python3.12 -m unittest discover -s tests/unit`：406/406 PASS |
+| 全契约 | `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/private/tmp/bugmaster-jsonschema python3.12 -m unittest discover -s tests/contracts`：80/80 PASS |
+| R3 安全测试 | `PYTHONDONTWRITEBYTECODE=1 python3.12 -m unittest discover -s tests/security`：1/1 PASS |
+| 全单元与分支覆盖采集 | `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/private/tmp/bugmaster-coverage python3.12 -m coverage run --branch --source=bugmaster_core,scripts --data-file=/private/tmp/bugmaster-pr9-integrated.coverage -m unittest discover -s tests/unit`：406/406 PASS |
+| 生产行/分支覆盖 | `PYTHONPATH=/private/tmp/bugmaster-coverage python3.12 -m coverage report --data-file=/private/tmp/bugmaster-pr9-integrated.coverage`：2,141/2,141 行、770/770 分支，均为 100%；JSON：`/private/tmp/bugmaster-pr9-integrated.json` |
+| 品牌 / Catalog / Benchmark | `python3.12 scripts/check_branding.py`、`python3.12 scripts/validate_catalog.py`、`python3.12 scripts/validate_benchmark.py`：均 PASS；Benchmark 只验证清单结构，50 场景未执行 |
+| Release 门禁 | `python3.12 scripts/quality_gate.py --mode release --coverage /private/tmp/bugmaster-pr9-integrated.json`：exit 1 / **No-Go**，功能清单未冻结、真实业务覆盖未超过 60%、核心 Happy/Negative/Edge 执行证据缺失 |
+| GitHub Actions | [Run 44907692817](https://github.com/naodeng/bugmaster/actions/runs/44907692817)：提交 `42850bb` 的单元 406 项中 402 通过、4 项 macOS ACL enforcement 测试在 Ubuntu 跳过；契约 80/80、安全 1/1、100% 行覆盖断言、Catalog、Benchmark 结构及品牌检查均通过 |
+
 ## 后续缺口
 
 可信只读 reconciliation verifier、当前授权真实性/修订绑定、预算与 Journal 消费对账、未知结果的权威状态来源以及安全恢复流程仍未实现。不能因为此 helper 当前全部拒绝重放，就把 W6 或 BLK-03 标记完成。Release 维持 **No-Go**。
