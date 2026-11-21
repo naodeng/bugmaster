@@ -302,4 +302,6 @@ PR #8 首次推送后 Actions Run [44486235780](https://github.com/naodeng/bugma
 
 新增测试后，本机 macOS/POSIX、Python 3.12.16 全量结果：单元 406/406、契约 79/79、安全 1/1 PASS；行覆盖 2,141/2,141、分支覆盖 770/770，均分别统计且为 100%；Catalog、Benchmark manifest 结构、品牌检查及 `git diff --check` PASS。覆盖 JSON：`/private/tmp/bugmaster-pr8-crossplatform.json`。
 
-上述跨平台 mock 用例覆盖 CI 暴露的条件路径，但该验证仍是在 macOS 本机执行；Linux 上的修复结果以新 head Actions 重跑为准。Release 质量门禁仍为 **NO-GO**：功能义务清单、真实业务覆盖和核心 Feature 的 Happy/Negative/Edge 实测证据缺失，50 个 Benchmark 场景未执行。R3 人工安全审查签署也仍未获得。
+PR #8 Actions [Run 44904474057](https://github.com/naodeng/bugmaster/actions/runs/44904474057) 在 Ubuntu 26.04 上针对 head `a20335a64224c208174cd06e908b2f77a4d0e06d` 全部通过：单元 406/406、契约 79/79、安全 1/1；全量单元覆盖采集和 100% 行覆盖断言通过；Catalog、Benchmark manifest 结构与品牌检查通过。分支覆盖 770/770（100%）由本机覆盖 JSON 单独测得；CI workflow 当前只断言行覆盖。
+
+Release 质量门禁仍为 **NO-GO**：功能义务清单、真实业务覆盖和核心 Feature 的 Happy/Negative/Edge 实测证据缺失，50 个 Benchmark 场景未执行。R3 人工安全审查签署也仍未获得。
