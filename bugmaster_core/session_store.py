@@ -14,9 +14,13 @@ import stat
 from contextlib import contextmanager
 from pathlib import Path
 
+from .filesystem_security import _has_extended_acl
+
 
 _REVISION_FILE = re.compile(r"^([0-9]{8,})\.json$")
-_TEMPORARY_FILE = re.compile(r"^\.(?:session-head|session-revision)-[a-f0-9]{32}$")
+_TEMPORARY_FILE = re.compile(
+    r"^\.(?:session-head|session-revision|checkpoint)-[a-f0-9]{32}$"
+)
 _MAX_SESSION_BYTES = 4 * 1024 * 1024
 # A head contains the bounded Session ID and a small fixed amount of metadata.
 _MAX_HEAD_BYTES = _MAX_SESSION_BYTES + 1024
@@ -129,8 +133,137 @@ def _open_directory_path(path, *, create, error_type, label):
             os.close(current_fd)
 
 
+def _require_private_directory(
+    directory_fd, error_type, label, *, allow_permission_repair=False
+):
+    metadata = os.fstat(directory_fd)
+    if not stat.S_ISDIR(metadata.st_mode):
+        raise error_type("{} is not a directory".format(label))
+    if metadata.st_uid != os.geteuid():
+        raise error_type("{} has an unsafe owner".format(label))
+    if not allow_permission_repair and metadata.st_mode & (0o077 | 0o7000):
+        raise error_type("{} permissions are unsafe".format(label))
+    try:
+        has_extended_acl = _has_extended_acl(directory_fd)
+    except OSError as error:
+        raise error_type(
+            "cannot inspect access control for {}".format(label)
+        ) from error
+    if has_extended_acl:
+        raise error_type("{} must not have an extended ACL".format(label))
+    return metadata
+
+
+def _require_private_file(file_descriptor, error_type, label):
+    metadata = os.fstat(file_descriptor)
+    if not stat.S_ISREG(metadata.st_mode):
+        raise error_type("{} is not a regular file".format(label))
+    if metadata.st_uid != os.geteuid():
+        raise error_type("{} has an unsafe owner".format(label))
+    if stat.S_IMODE(metadata.st_mode) != 0o600:
+        raise error_type("{} permissions are invalid".format(label))
+    try:
+        has_extended_acl = _has_extended_acl(file_descriptor)
+    except OSError as error:
+        raise error_type(
+            "cannot inspect access control for {}".format(label)
+        ) from error
+    if has_extended_acl:
+        raise error_type("{} must not have an extended ACL".format(label))
+    return metadata
+
+
+def _require_canonical_file_link(
+    metadata, session_fd, temporary_prefix, error_type, label
+):
+    if metadata.st_nlink == 1:
+        return
+    if metadata.st_nlink != 2 or temporary_prefix is None:
+        raise error_type("{} has an unsafe number of hard links".format(label))
+
+    temporary_name = re.compile(
+        r"^{}[a-f0-9]{{32}}$".format(re.escape(temporary_prefix))
+    )
+    try:
+        with os.scandir(session_fd) as entries:
+            for entry in entries:
+                if temporary_name.fullmatch(entry.name) is None:
+                    continue
+                linked_stat = entry.stat(follow_symlinks=False)
+                if (
+                    stat.S_ISREG(linked_stat.st_mode)
+                    and linked_stat.st_dev == metadata.st_dev
+                    and linked_stat.st_ino == metadata.st_ino
+                ):
+                    return
+    except OSError as error:
+        raise error_type(
+            "cannot inspect temporary links for {}".format(label)
+        ) from error
+    raise error_type("{} has an unrecognized hard link".format(label))
+
+
+def _sync_interrupted_publication(
+    session_fd, temporary_stat, directory_name, expected_filename, label
+):
+    directory_fd = _open_child_directory(
+        session_fd,
+        directory_name,
+        create=False,
+        error_type=SessionStoreError,
+        label=label,
+        private=True,
+    )
+    if directory_fd is None:
+        raise SessionStoreError("{} directory is missing".format(label))
+    try:
+        try:
+            published_stat = os.stat(
+                expected_filename, dir_fd=directory_fd, follow_symlinks=False
+            )
+        except FileNotFoundError as error:
+            raise SessionStoreError(
+                "{} canonical publication is missing".format(label)
+            ) from error
+        if (
+            not stat.S_ISREG(published_stat.st_mode)
+            or published_stat.st_dev != temporary_stat.st_dev
+            or published_stat.st_ino != temporary_stat.st_ino
+        ):
+            raise SessionStoreError(
+                "{} canonical publication does not match its temporary file".format(
+                    label
+                )
+            )
+        _fsync_directory_fd(directory_fd)
+    finally:
+        os.close(directory_fd)
+
+
+def _require_private_lock_file(file_descriptor):
+    metadata = os.fstat(file_descriptor)
+    if not stat.S_ISREG(metadata.st_mode):
+        raise SessionStoreError("Session lock is not a regular file")
+    if metadata.st_uid != os.geteuid():
+        raise SessionStoreError("Session lock has an unsafe owner")
+    if metadata.st_nlink != 1:
+        raise SessionStoreError("Session lock must not have hard links")
+    if metadata.st_mode & (0o077 | 0o7000):
+        raise SessionStoreError("Session lock permissions are unsafe")
+    try:
+        has_extended_acl = _has_extended_acl(file_descriptor)
+    except OSError as error:
+        raise SessionStoreError(
+            "cannot inspect access control for Session lock"
+        ) from error
+    if has_extended_acl:
+        raise SessionStoreError("Session lock must not have an extended ACL")
+    return metadata
+
+
 def _open_child_directory(parent_fd, name, *, create, error_type, label, private=False):
     flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
+    created = False
     try:
         fd = os.open(name, flags, dir_fd=parent_fd)
     except FileNotFoundError:
@@ -142,6 +275,8 @@ def _open_child_directory(parent_fd, name, *, create, error_type, label, private
             pass
         except OSError as error:
             raise error_type("cannot create {} directory".format(label)) from error
+        else:
+            created = True
         try:
             fd = os.open(name, flags, dir_fd=parent_fd)
         except OSError as error:
@@ -149,11 +284,31 @@ def _open_child_directory(parent_fd, name, *, create, error_type, label, private
     except OSError as error:
         raise error_type("cannot inspect {} path".format(label)) from error
     try:
-        if private and create:
-            os.fchmod(fd, 0o700)
+        if private:
+            _require_private_directory(
+                fd,
+                error_type,
+                label,
+                allow_permission_repair=create,
+            )
+            if create:
+                os.fchmod(fd, 0o700)
     except OSError as error:
         os.close(fd)
+        if created:
+            try:
+                os.rmdir(name, dir_fd=parent_fd)
+            except OSError:
+                pass
         raise error_type("cannot secure {} directory".format(label)) from error
+    except BaseException:
+        os.close(fd)
+        if created:
+            try:
+                os.rmdir(name, dir_fd=parent_fd)
+            except OSError:
+                pass
+        raise
     if create:
         try:
             _fsync_directory_fd(parent_fd)
@@ -245,6 +400,12 @@ class SessionStore:
             self._write_revision_locked(storage, 1, payload)
             self._write_head_locked(storage, head_payload)
         return normalized
+
+    @contextmanager
+    def lock_revisions(self, *, root_fd=None):
+        """Hold the exclusive Session lock while yielding its committed count."""
+        with self._locked(root_fd=root_fd) as storage:
+            yield self._read_revisions_locked(storage)["count"]
 
     def append_revision(self, document, expected_revision):
         """Append the next revision if the expected revision is still current."""
@@ -425,9 +586,11 @@ class SessionStore:
                 raise SessionStoreError("Session budget limit requires a new Scope revision")
 
     @contextmanager
-    def _locked(self, create_directories=True):
+    def _locked(self, create_directories=True, *, root_fd=None):
         error_type = SessionStoreError if create_directories else SessionCorruptionError
-        storage = self._open_storage_directories(create_directories, error_type)
+        storage = self._open_storage_directories(
+            create_directories, error_type, root_fd=root_fd
+        )
         if storage is None:
             yield None
             return
@@ -435,6 +598,7 @@ class SessionStore:
         flags = os.O_RDWR if create_directories else os.O_RDONLY
         flags |= getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
         fd = None
+        created_lock = False
         acquired = False
         try:
             try:
@@ -459,6 +623,7 @@ class SessionStore:
                         create=False,
                         error_type=error_type,
                         label="Session revisions",
+                        private=True,
                     )
                     if revisions_fd is not None:
                         try:
@@ -503,6 +668,7 @@ class SessionStore:
                             0o600,
                             dir_fd=storage["session_fd"],
                         )
+                        created_lock = True
                     except FileExistsError:
                         try:
                             fd = os.open(
@@ -520,9 +686,8 @@ class SessionStore:
                         ) from create_error
             except OSError as error:
                 raise error_type("cannot open Session lock") from error
-            if not stat.S_ISREG(os.fstat(fd).st_mode):
-                raise SessionStoreError("Session lock is not a regular file")
-            if create_directories:
+            _require_private_lock_file(fd)
+            if created_lock:
                 os.fchmod(fd, 0o600)
             fcntl.flock(fd, fcntl.LOCK_EX if create_directories else fcntl.LOCK_SH)
             acquired = True
@@ -546,15 +711,18 @@ class SessionStore:
                 os.close(fd)
             self._close_storage_directories(storage)
 
-    def _open_storage_directories(self, create_directories, error_type):
+    def _open_storage_directories(self, create_directories, error_type, *, root_fd=None):
         opened = []
         try:
-            root_fd = _open_directory_path(
-                self.root,
-                create=create_directories,
-                error_type=error_type,
-                label="Session root",
-            )
+            if root_fd is None:
+                root_fd = _open_directory_path(
+                    self.root,
+                    create=create_directories,
+                    error_type=error_type,
+                    label="Session root",
+                )
+            else:
+                root_fd = os.dup(root_fd)
             if root_fd is None:
                 return None
             opened.append(root_fd)
@@ -633,9 +801,41 @@ class SessionStore:
                 for entry in entries:
                     if _TEMPORARY_FILE.fullmatch(entry.name) is None:
                         continue
-                    if not stat.S_ISREG(entry.stat(follow_symlinks=False).st_mode):
+                    entry_stat = entry.stat(follow_symlinks=False)
+                    if not stat.S_ISREG(entry_stat.st_mode):
                         raise SessionStoreError(
                             "Session temporary file is not a regular file"
+                        )
+                    if entry.name.startswith(".session-revision-"):
+                        target_directory, target_label = "revisions", "Session revisions"
+                    elif entry.name.startswith(".checkpoint-"):
+                        target_directory, target_label = "checkpoints", "Checkpoint storage"
+                    else:
+                        target_directory, target_label = None, None
+                    if target_directory is None:
+                        if entry_stat.st_nlink != 1:
+                            raise SessionStoreError(
+                                "Session head temporary file has an unsafe link count"
+                            )
+                    elif entry_stat.st_nlink == 2:
+                        expected_filename = (
+                            self._expected_temporary_publication_filename(
+                                session_fd,
+                                entry.name,
+                                entry_stat,
+                                target_directory,
+                            )
+                        )
+                        _sync_interrupted_publication(
+                            session_fd,
+                            entry_stat,
+                            target_directory,
+                            expected_filename,
+                            target_label,
+                        )
+                    elif entry_stat.st_nlink != 1:
+                        raise SessionStoreError(
+                            "Session temporary file has an unsafe link count"
                         )
                     os.unlink(entry.name, dir_fd=session_fd)
                     removed = True
@@ -643,6 +843,83 @@ class SessionStore:
             raise SessionStoreError("cannot clean interrupted Session writes") from error
         if removed:
             _fsync_directory_fd(session_fd)
+
+    def _expected_temporary_publication_filename(
+        self, session_fd, temporary_name, expected_stat, target_directory
+    ):
+        flags = (
+            os.O_RDONLY
+            | getattr(os, "O_NOFOLLOW", 0)
+            | getattr(os, "O_NONBLOCK", 0)
+        )
+        try:
+            fd = os.open(temporary_name, flags, dir_fd=session_fd)
+        except OSError as error:
+            raise SessionStoreError(
+                "cannot open interrupted Session publication"
+            ) from error
+        try:
+            file_stat = _require_private_file(
+                fd, SessionStoreError, "Session temporary publication"
+            )
+            if (
+                file_stat.st_dev != expected_stat.st_dev
+                or file_stat.st_ino != expected_stat.st_ino
+                or file_stat.st_nlink != 2
+            ):
+                raise SessionStoreError(
+                    "Session temporary publication changed during inspection"
+                )
+            if file_stat.st_size > _MAX_SESSION_BYTES + 1:
+                raise SessionStoreError(
+                    "Session temporary publication exceeds the size limit"
+                )
+            raw = bytearray()
+            while True:
+                chunk = os.read(fd, 65536)
+                if not chunk:
+                    break
+                if len(raw) + len(chunk) > _MAX_SESSION_BYTES + 1:
+                    raise SessionStoreError(
+                        "Session temporary publication exceeds the size limit"
+                    )
+                raw.extend(chunk)
+        finally:
+            os.close(fd)
+
+        if not raw.endswith(b"\n"):
+            raise SessionStoreError("Session temporary publication is incomplete")
+        try:
+            document = json.loads(bytes(raw[:-1]).decode("utf-8"))
+            payload = _canonical_bytes(document)
+        except (
+            UnicodeDecodeError,
+            ValueError,
+            TypeError,
+            UnicodeEncodeError,
+            RecursionError,
+        ) as error:
+            raise SessionStoreError(
+                "Session temporary publication is invalid JSON"
+            ) from error
+        if bytes(raw[:-1]) != payload:
+            raise SessionStoreError(
+                "Session temporary publication is not canonical JSON"
+            )
+
+        if target_directory == "revisions":
+            _, normalized = self._validate_document(document, persisted=True)
+            return "{:08d}.json".format(normalized["revision"])
+        if (
+            not isinstance(document, dict)
+            or document.get("sessionId") != self.session_id
+            or not _nonempty(document.get("checkpointId"))
+        ):
+            raise SessionStoreError(
+                "Checkpoint temporary publication identity is invalid"
+            )
+        checkpoint_id = document["checkpointId"].encode("utf-8")
+        return hashlib.sha256(checkpoint_id).hexdigest() + ".json"
 
     def _read_revisions_locked(
         self, storage, *, recover_pending=False, requested_revision=None
@@ -817,9 +1094,16 @@ class SessionStore:
         except OSError as error:
             raise SessionCorruptionError("cannot open Session revision head") from error
         try:
-            head_stat = os.fstat(fd)
-            if not stat.S_ISREG(head_stat.st_mode) or stat.S_IMODE(head_stat.st_mode) != 0o600:
-                raise SessionCorruptionError("Session revision head permissions are invalid")
+            head_stat = _require_private_file(
+                fd, SessionCorruptionError, "Session revision head"
+            )
+            _require_canonical_file_link(
+                head_stat,
+                storage["session_fd"],
+                None,
+                SessionCorruptionError,
+                "Session revision head",
+            )
             if head_stat.st_size > _MAX_HEAD_BYTES:
                 raise SessionCorruptionError("Session revision head is too large")
             raw = bytearray()
@@ -866,9 +1150,16 @@ class SessionStore:
         except OSError as error:
             raise SessionCorruptionError("cannot open persisted Session revision") from error
         try:
-            file_stat = os.fstat(fd)
-            if not stat.S_ISREG(file_stat.st_mode) or stat.S_IMODE(file_stat.st_mode) != 0o600:
-                raise SessionCorruptionError("Session revision file permissions are invalid")
+            file_stat = _require_private_file(
+                fd, SessionCorruptionError, "Session revision file"
+            )
+            _require_canonical_file_link(
+                file_stat,
+                storage["session_fd"],
+                ".session-revision-",
+                SessionCorruptionError,
+                "Session revision file",
+            )
             if file_stat.st_size > _MAX_SESSION_BYTES + 1:
                 raise SessionCorruptionError("persisted Session revision is too large")
             raw = bytearray()
@@ -898,6 +1189,7 @@ class SessionStore:
         fd, temporary_name = _create_temporary_file(
             storage["session_fd"], ".session-revision-"
         )
+        publication_linked = False
         try:
             os.fchmod(fd, 0o600)
             _write_all(fd, payload + b"\n")
@@ -914,6 +1206,7 @@ class SessionStore:
                 )
             except FileExistsError as error:
                 raise SessionCorruptionError("Session revision file already exists") from error
+            publication_linked = True
             _fsync_directory_fd(storage["revisions_fd"])
             os.unlink(temporary_name, dir_fd=storage["session_fd"])
             temporary_name = None
@@ -923,7 +1216,7 @@ class SessionStore:
         finally:
             if fd is not None:
                 os.close(fd)
-            if temporary_name is not None:
+            if temporary_name is not None and not publication_linked:
                 try:
                     os.unlink(temporary_name, dir_fd=storage["session_fd"])
                 except FileNotFoundError:

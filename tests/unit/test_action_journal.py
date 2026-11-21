@@ -1079,6 +1079,17 @@ class ActionJournalRecoveryTests(unittest.TestCase):
             with self.assertRaises(JournalError):
                 ActionJournal("/missing/journal.jsonl", "session-1")
 
+    def test_require_existing_rejects_a_missing_parent_directory(self):
+        ActionJournal, JournalCorruptionError, _ = _journal_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertRaises(JournalCorruptionError):
+                ActionJournal(
+                    Path(directory) / "missing" / "journal.jsonl",
+                    "session-1",
+                    require_existing=True,
+                )
+
     def test_parent_open_and_directory_identity_failures_are_corruption(self):
         ActionJournal, JournalCorruptionError, _ = _journal_types(self)
         from bugmaster_core import action_journal

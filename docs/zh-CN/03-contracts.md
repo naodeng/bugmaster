@@ -17,7 +17,7 @@
 | Evidence | 元数据 + 内容哈希 Artifact | 哈希证明完整性，不单独证明真实性 |
 | Finding | 不可变 Revision + `current.json` | 报告/索引由权威数据生成 |
 | Review | 真实审核记录 | 绑定 Finding、Oracle 和证据摘要 |
-| Session | 不可变版本 + Journal + Checkpoint | 单写者；恢复重新核查权限 |
+| Session | 不可变版本 + `ActionJournalStore` + Checkpoint | Session 身份确定本地 Journal 路径；恢复门禁仍独立 |
 | Regression Recommendation | 不可变版本 | 只提供建议，不写测试代码 |
 | Eval Run | 不可变运行记录 | 隔离 Ground Truth |
 
@@ -45,7 +45,7 @@ Scope JSON Schema 按目标记录 `in_scope`、`pending_authorization` 或 `out_
 
 Approval 和 Action Schema 记录 Scope/Action 引用、Scope Revision、目标、环境、规范化操作与参数摘要、风险、次数、有效期及生命周期状态。在宿主核验来源事件和动作绑定前，引用字段仍是不可信数据；当前 helper 在真实网关实现前拒绝 R2，R3 不能进入已派发或已完成状态。
 
-每条 Action Journal Event 使用 Schema v1.1，必须同时绑定 `sessionId` 和稳定的 `journalId`；读取器拒绝身份不匹配或含重复 JSON 键的记录。Checkpoint 引用验证会在同一共享锁下读取 Checkpoint 与 Session 快照，并比较调用方配置的 Journal 对象 ID 与最新 Session 声明的 `journalId`。Journal 文件路径仍由调用方选择，因此此检查不认证 ID 到路径的映射，也不证明事件来源。缺少 `journalId` 的 v1.0 事件会被拒绝；本轮不提供迁移，也不会原地改写旧文件。
+每条 Action Journal Event 使用 Schema v1.1，必须同时绑定 `sessionId` 和稳定的 `journalId`；读取器拒绝身份不匹配或含重复 JSON 键的记录。`ActionJournalStore` 将这对身份映射到 `<root>/journals/<sha256(sessionId)>/<sha256(journalId)>.jsonl`，逐级以 no-follow 目录相对方式打开配置根及其祖先，校验可信所有者和私有模式位（包括文件系统根目录），并在 macOS 上拒绝扩展 ACL。它只规范化由 root 所有且目标符合预期的 macOS `/tmp`、`/var` 系统别名；其他祖先软链接会失败关闭。`initialize()` 通过每个 Session 共用的锁与 Session 发布串行化；只有在该 Session 尚无持久化 revision 时，才创建并同步新的私有 Journal。revision 持久化后，它只重新打开已有 Journal，文件或存储路径缺失时失败关闭。不安全的既有文件会被拒绝且权限保持原样。`open()` 同样要求安全文件已存在，绝不创建或修复路径。返回的 Journal 实例会固定 Session 目录描述符，并在每次读取和追加前重新检查该目录的 ACL。Checkpoint 引用验证会逐级验证存储根的可信祖先，再把同一个根目录描述符传给 Checkpoint/Session 快照，并据此相对打开规范 Journal、校验其前缀。这样固定了本地路径选择与声明 ID 的关系，但不认证文件内容、事件来源或外部事实。缺少 `journalId` 的 v1.0 事件会被拒绝；本轮不提供迁移，也不会原地改写旧文件。
 
 ## 实现顺序
 

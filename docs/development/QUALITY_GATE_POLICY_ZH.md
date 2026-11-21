@@ -3,7 +3,7 @@
 ## 定义与统计口径
 
 ### GATE-U100：单元测试 100%
-- 分母为全部**需要单测的生产 Python 模块**可执行语句行，不能只挑选容易覆盖的模块；当前 `bugmaster_core/` 是初始测试样例范围，并非全项目生产模块。
+- 分母为全部**需要单测的生产 Python 模块**可执行语句行，不能只挑选容易覆盖的模块。当前生产 Python 清单为 `bugmaster_core/` 与 `scripts/`；对应单元测试共同统计，仓库门禁明确列出两者。
 - 行覆盖率必须 `covered_lines / measured_lines == 1.0`，基于 coverage.py JSON `totals.covered_lines / totals.num_statements`；新增生产 Python 包必须纳入 `--source`。分支覆盖率独立披露并推动提高，不混称为 100% 行覆盖。
 - 若以后存在 TypeScript/其他语言，需分别建立同等 100% 单测门禁，并在汇总中检查所有生产代码的非豁免范围。
 - 非生产生成文件、第三方依赖可以有经审查的明确豁免；不能以忽略文件、`pragma: no cover`、调整分母掩盖缺陷。
@@ -25,7 +25,7 @@
 
 ## 工具命令
 ```bash
-python -m coverage run --source=bugmaster_core -m unittest discover -s tests/unit
+python -m coverage run --branch --source=bugmaster_core,scripts -m unittest discover -s tests/unit
 python -m coverage json -o coverage.json
 python scripts/quality_gate.py --mode release --coverage coverage.json
 ```

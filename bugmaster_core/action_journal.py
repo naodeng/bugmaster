@@ -14,6 +14,8 @@ import stat
 from datetime import datetime, timezone
 from pathlib import Path
 
+from .filesystem_security import _has_extended_acl
+
 
 _DIGEST = re.compile(r"^[a-f0-9]{64}$")
 _TIMESTAMP = re.compile(
@@ -268,7 +270,15 @@ class ActionJournal:
     dispatch; a trusted read-only verifier is not implemented here.
     """
 
-    def __init__(self, path, session_id, journal_id=None):
+    def __init__(
+        self,
+        path,
+        session_id,
+        journal_id=None,
+        *,
+        require_existing=False,
+        directory_fd=None,
+    ):
         if not _nonempty(session_id):
             raise JournalError("session ID must be a non-empty string")
         try:
@@ -284,63 +294,158 @@ class ActionJournal:
         except UnicodeEncodeError as error:
             raise JournalError("journal ID must be valid UTF-8") from error
         requested_path = Path(path).absolute()
-        anchor_path = requested_path.parent
-        missing_parent_parts = []
-        while True:
-            try:
-                anchor_stat = anchor_path.stat()
-            except FileNotFoundError:
-                if anchor_path.parent == anchor_path:
-                    raise JournalError("journal path has no existing parent directory")
-                missing_parent_parts.append(anchor_path.name)
-                anchor_path = anchor_path.parent
-                continue
-            except OSError as error:
-                raise JournalError("journal parent path cannot be inspected") from error
-            if not stat.S_ISDIR(anchor_stat.st_mode):
-                raise JournalError("journal parent path is not a directory")
-            try:
-                anchor_path = anchor_path.resolve(strict=True)
-                anchor_stat = anchor_path.stat()
-            except OSError as error:
-                raise JournalError("journal parent path cannot be resolved") from error
-            if not stat.S_ISDIR(anchor_stat.st_mode):
-                raise JournalError("journal parent path is not a directory")
-            existing_parent_parts = anchor_path.parts[1:]
-            self._anchor_path = Path("/")
-            root_stat = self._anchor_path.stat()
-            self._anchor_identity = (root_stat.st_dev, root_stat.st_ino)
-            self._relative_parent_parts = (
-                *existing_parent_parts,
-                *reversed(missing_parent_parts),
-            )
-            self._directory_identities = {}
-            existing_path = Path("/")
-            for index, component in enumerate(existing_parent_parts, start=1):
-                existing_path /= component
-                component_stat = existing_path.stat()
-                self._directory_identities[
-                    tuple(self._relative_parent_parts[:index])
-                ] = (component_stat.st_dev, component_stat.st_ino)
-            self._directory_chain_synced = False
-            self.path = Path("/").joinpath(
-                *self._relative_parent_parts, requested_path.name
-            )
-            break
-        self.session_id = session_id
-        self._journal_id = journal_id
-        self._parent_identity = None
-        self._file_identity = None
-        self._prepared_in_process = set()
-        self._dispatched_in_process = set()
-        self._load_current()
+        self.path = requested_path
+        self._directory_fd = directory_fd
+        self._closed = False
+        self._require_existing = require_existing
+        try:
+            if directory_fd is None:
+                anchor_path = requested_path.parent
+                missing_parent_parts = []
+                while True:
+                    try:
+                        anchor_stat = anchor_path.stat()
+                    except FileNotFoundError:
+                        if anchor_path.parent == anchor_path:
+                            raise JournalError(
+                                "journal path has no existing parent directory"
+                            )
+                        missing_parent_parts.append(anchor_path.name)
+                        anchor_path = anchor_path.parent
+                        continue
+                    except OSError as error:
+                        raise JournalError(
+                            "journal parent path cannot be inspected"
+                        ) from error
+                    if not stat.S_ISDIR(anchor_stat.st_mode):
+                        raise JournalError("journal parent path is not a directory")
+                    try:
+                        anchor_path = anchor_path.resolve(strict=True)
+                        anchor_stat = anchor_path.stat()
+                    except OSError as error:
+                        raise JournalError(
+                            "journal parent path cannot be resolved"
+                        ) from error
+                    if not stat.S_ISDIR(anchor_stat.st_mode):
+                        raise JournalError("journal parent path is not a directory")
+                    existing_parent_parts = anchor_path.parts[1:]
+                    self._anchor_path = Path("/")
+                    root_stat = self._anchor_path.stat()
+                    self._anchor_identity = (root_stat.st_dev, root_stat.st_ino)
+                    self._relative_parent_parts = (
+                        *existing_parent_parts,
+                        *reversed(missing_parent_parts),
+                    )
+                    self._directory_identities = {}
+                    existing_path = Path("/")
+                    for index, component in enumerate(
+                        existing_parent_parts, start=1
+                    ):
+                        existing_path /= component
+                        component_stat = existing_path.stat()
+                        self._directory_identities[
+                            tuple(self._relative_parent_parts[:index])
+                        ] = (component_stat.st_dev, component_stat.st_ino)
+                    self._directory_chain_synced = False
+                    self.path = Path("/").joinpath(
+                        *self._relative_parent_parts, requested_path.name
+                    )
+                    break
+                self._parent_identity = None
+            else:
+                directory_stat = os.fstat(directory_fd)
+                if not stat.S_ISDIR(directory_stat.st_mode):
+                    raise JournalCorruptionError(
+                        "pinned Journal storage descriptor is not a directory"
+                    )
+                if (
+                    directory_stat.st_uid != os.geteuid()
+                    or directory_stat.st_mode & (0o077 | 0o7000)
+                ):
+                    raise JournalCorruptionError(
+                        "pinned Journal storage directory is unsafe"
+                    )
+                self._anchor_path = Path("/")
+                self._anchor_identity = None
+                self._relative_parent_parts = ()
+                self._directory_identities = {}
+                self._directory_chain_synced = True
+                self._parent_identity = (directory_stat.st_dev, directory_stat.st_ino)
+
+            self.session_id = session_id
+            self._journal_id = journal_id
+            self._file_identity = None
+            self._prepared_in_process = set()
+            self._dispatched_in_process = set()
+            self._load_current()
+        except BaseException:
+            self.close()
+            raise
 
     @property
     def journal_id(self):
         """Return the stable Journal identity selected when this reader was created."""
         return self._journal_id
 
+    def close(self):
+        """Close the pinned storage directory owned by this Journal, if any."""
+        directory_fd = getattr(self, "_directory_fd", None)
+        if directory_fd is not None:
+            self._directory_fd = None
+            self._closed = True
+            os.close(directory_fd)
+
+    def __enter__(self):
+        if self._closed:
+            raise JournalError("journal is closed")
+        return self
+
+    def __exit__(self, _exception_type, _exception, _traceback):
+        self.close()
+
+    def __del__(self):
+        try:
+            self.close()
+        except OSError:
+            pass
+
     def _open_parent(self, *, create=False):
+        if self._closed:
+            raise JournalCorruptionError("journal storage descriptor is closed")
+        if self._directory_fd is not None:
+            fd = None
+            try:
+                fd = os.dup(self._directory_fd)
+                directory_stat = os.fstat(fd)
+            except OSError as error:
+                if fd is not None:
+                    os.close(fd)
+                raise JournalCorruptionError(
+                    "pinned Journal storage directory cannot be opened"
+                ) from error
+            if (
+                not stat.S_ISDIR(directory_stat.st_mode)
+                or directory_stat.st_uid != os.geteuid()
+                or directory_stat.st_mode & (0o077 | 0o7000)
+            ):
+                os.close(fd)
+                raise JournalCorruptionError(
+                    "pinned Journal storage directory is unsafe"
+                )
+            try:
+                has_extended_acl = _has_extended_acl(fd)
+            except OSError as error:
+                os.close(fd)
+                raise JournalCorruptionError(
+                    "pinned Journal storage directory access control cannot be verified"
+                ) from error
+            if has_extended_acl:
+                os.close(fd)
+                raise JournalCorruptionError(
+                    "pinned Journal storage directory must not have an extended access control list"
+                )
+            return fd
+
         flags = os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_NOFOLLOW", 0)
         try:
             fd = os.open(str(self._anchor_path), flags)
@@ -427,15 +532,17 @@ class ActionJournal:
     def _load_current(self):
         parent_fd = self._open_parent()
         if parent_fd is None:
+            if self._require_existing:
+                raise JournalCorruptionError("canonical journal file is missing")
             return [], {}
         flags = os.O_RDONLY | getattr(os, "O_NONBLOCK", 0) | getattr(os, "O_NOFOLLOW", 0)
         try:
             try:
                 fd = os.open(self.path.name, flags, dir_fd=parent_fd)
             except FileNotFoundError as error:
-                if self._file_identity is not None:
+                if self._require_existing or self._file_identity is not None:
                     raise JournalCorruptionError(
-                        "journal file disappeared after observation"
+                        "canonical journal file is missing or disappeared"
                     ) from error
                 return [], {}
             except OSError as error:
@@ -468,6 +575,24 @@ class ActionJournal:
             raise JournalCorruptionError("journal path is not a regular file")
         if file_stat.st_nlink != 1:
             raise JournalCorruptionError("journal path must not be hard linked")
+        if self._directory_fd is not None and (
+            file_stat.st_uid != os.geteuid()
+            or file_stat.st_mode & (0o077 | 0o7000)
+        ):
+            raise JournalCorruptionError(
+                "journal file ownership or permissions are unsafe"
+            )
+        if self._directory_fd is not None:
+            try:
+                has_extended_acl = _has_extended_acl(fd)
+            except OSError as error:
+                raise JournalCorruptionError(
+                    "journal file access control cannot be verified"
+                ) from error
+            if has_extended_acl:
+                raise JournalCorruptionError(
+                    "journal file must not have an extended access control list"
+                )
         identity = (file_stat.st_dev, file_stat.st_ino)
         if self._file_identity is None:
             self._file_identity = identity
@@ -540,7 +665,18 @@ class ActionJournal:
             | getattr(os, "O_NOFOLLOW", 0)
         )
         try:
-            if self._file_identity is None:
+            if self._require_existing:
+                try:
+                    fd = os.open(self.path.name, flags, dir_fd=parent_fd)
+                except FileNotFoundError as error:
+                    raise JournalCorruptionError(
+                        "canonical journal file is missing or disappeared"
+                    ) from error
+                except OSError as error:
+                    raise JournalCorruptionError(
+                        "journal path cannot be opened safely"
+                    ) from error
+            elif self._file_identity is None:
                 try:
                     fd = os.open(
                         self.path.name,
