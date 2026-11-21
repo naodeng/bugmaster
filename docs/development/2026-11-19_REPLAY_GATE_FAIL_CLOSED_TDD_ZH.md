@@ -24,6 +24,8 @@ PYTHONDONTWRITEBYTECODE=1 python3.12 -m unittest discover -s tests/contracts -p 
 
 测试失败：`AssertionError: True is not false`，明确证明普通字典中的自报字段当前可以开放重放。检查原测试后发现它还要求上述输入返回 True，与“没有可信核验器，不可盲目重放”的已冻结不变量冲突；在实现前移除该错误正向期望，并保留单独负例来约束 fail-closed 行为。
 
+**2026-11-21 复核补充：** 原始 RED 记录未保存该次运行的 Git SHA。为补足可复现证据，在生产代码基线 `99fe47e808a01c6b9964a3da38a59a506de16bc9` 上重建仅含该合同测试变更的测试专用提交 `0c607ae10b9f2742a31ebc702ec9b82954c99de1`；测试文件内容取自实现提交 `91e79ee1857f7e986f97431d850a1e2b6faa0037`，未改动生产代码。环境为 macOS/POSIX、Python 3.12.16，工作目录 `/private/tmp/bugmaster-pr9-red`。运行上方命令的输出为 `Ran 1 test`、`FAILED (failures=1)`，断言仍为 `AssertionError: True is not false`。这是针对旧生产代码的补充重现，不冒充 2026-11-19 原始运行快照。
+
 ## GREEN / REFACTOR
 
 `can_replay()` 在可信只读 verifier 和当前授权门禁接入前固定返回 False，并注明调用方布尔字段不能授权重放。没有添加模拟的可信状态、签名或 verifier 参数，也没有扩大到真实工具执行。

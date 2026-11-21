@@ -38,7 +38,7 @@
 | 品牌与 Skill 命名扫描 | PASS | `python3 scripts/check_branding.py`；命名契约包含 4 项 Skill ID 检查 |
 | Catalog/Registry | PASS | `python3 scripts/validate_catalog.py` |
 | Benchmark Manifest | PASS（结构） | `validate_benchmark.py` 明确提示场景未执行 |
-| GitHub Actions | PR #1–#9 实现检查通过（均为草稿） | 原 Run `44300382541` 因错误 JSON key 失败；PR #1/#2/#3/#4/#5/#6/#7/#8/#9 最终代码 Run `44304702509` / `44438620887` / `44443870587` / `44446002412` / `44448388986` / `44450205158` / `44452742738` / `44455794738` / `44457678961` 均成功。PR #3 文档同步 Run `44444315594`、ID 对齐 Run `44444585372`，PR #7/#8 文档 Runs `44453393220` / `44456146768` / `44456483137` 均成功。PR #3 为 R2、PR #4–#9 为 R3，仍需独立质量/安全审查 |
+| GitHub Actions | PR #1–#9 实现检查通过（均为草稿） | 原 Run `44300382541` 因错误 JSON key 失败；PR #1/#2/#3/#4/#5/#6/#7/#8/#9 最终代码 Run `44304702509` / `44438620887` / `44443870587` / `44446002412` / `44448388986` / `44450205158` / `44452742738` / `44455794738` / `44457678961` 均成功。PR #3 文档同步 Run `44444315594`、ID 对齐 Run `44444585372`，PR #7/#8 文档 Runs `44453393220` / `44456146768` / `44456483137` 均成功。PR #1–#2 为 R2，PR #3–#9 为 R3，分别需要独立 Quality/Security Reviewer |
 | 单元测试 | PASS，145/145 | Python 3.12；SessionStore 36/36、CheckpointStore 19/19、ActionJournal 定向测试 38/38、ActionJournalStore 10/10、CheckpointReferenceValidator 15/15 |
 | 契约测试 | PASS，78/78 | Python 3.12 + `jsonschema[format-nongpl]==4.26.0`：包含 SessionStore、CheckpointStore Schema 集成测试及 replay gate 负例 |
 | 当前核心模块行/分支覆盖率 | PASS，100% / 100% | `bugmaster_core`：1060/1060 语句、428/428 分支；`session_store.py` 320/320 语句、130/130 分支；`checkpoint_store.py` 187/187 语句、60/60 分支；`action_journal.py` 301/301 语句、140/140 分支；`action_journal_store.py` 59/59 语句、10/10 分支；`checkpoint_reference_validator.py` 37/37 语句、20/20 分支。行/分支口径分开报告，不等于业务功能覆盖；replay gate helper 由合同测试单独覆盖 |

@@ -20,7 +20,7 @@
 | Codex/Claude 双宿主 | **未验证** | 未提供可复查运行 ID |
 | GitHub 项目信息 | 已更新 | 上游 `AI-Native-QA-Lab/bugmaster` 与 fork `naodeng/bugmaster` 描述及 13 个 topics 已同步 |
 | GitHub 代码 | W6 PR #3–#9 已推送 | SessionStore PR #3、CheckpointStore PR #4、Journal 前缀 PR #5、跨存储引用校验 PR #6、Journal ID 绑定 PR #7、路径解析 PR #8 和 fail-closed replay gate 草稿 [#9](https://github.com/naodeng/bugmaster/pull/9) 均未合并；PR 逐层叠加 |
-| GitHub Issues / CI | PR #1–#9 实现检查通过（均为草稿） | PR #1/#2/#3/#4/#5/#6/#7/#8/#9 最终代码 Run `44304702509` / `44438620887` / `44443870587` / `44446002412` / `44448388986` / `44450205158` / `44452742738` / `44455794738` / `44457678961` 均成功。PR #3 为 R2，PR #4–#9 为 R3，需独立质量/安全审查；Issues 尚未导入 |
+| GitHub Issues / CI | PR #1–#9 实现检查通过（均为草稿） | PR #1/#2/#3/#4/#5/#6/#7/#8/#9 最终代码 Run `44304702509` / `44438620887` / `44443870587` / `44446002412` / `44448388986` / `44450205158` / `44452742738` / `44455794738` / `44457678961` 均成功。PR #1–#2 为 R2、PR #3–#9 为 R3，分别需独立 Quality/Security Reviewer；Issues 尚未导入 |
 | Release | **No-Go** | Q15/Q16 独立人工审批证据不存在 |
 
 最近一次本地质量门禁仍为 **No-Go**：功能义务清单未冻结、真实业务覆盖未超过 60%，核心功能 Happy/Negative/Edge 执行证据缺失。`bugmaster_core` 单元覆盖率不等于业务功能覆盖率。本文不把本地 Checkpoint 引用校验表述成完整产品或 BLK-03 通过证明。
