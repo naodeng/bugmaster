@@ -90,6 +90,7 @@
 | CodeX 安全扫描 | PASS（源码审查） | 未发现当前可确认的漏洞；重点检查 Candidate 输入、Oracle/Evidence 来源、拒绝决策、Review Event 和 Confirmed Gate。此项为只读源码扫描，未执行目标代码。 |
 | 本地全量单元、契约、安全测试与覆盖率 | NOT_RUN | 当前本机沙箱无法同时强制安全审查要求的累计磁盘配额等隔离限制，因此没有在本机执行目标测试代码。提交后的 GitHub Actions 必须对准确 PR head 执行这些工作流；其结果在 PR 记录。 |
 | 本地差异空白检查 | PASS | `git diff --cached --check`，当前工作树；未报告空白错误。 |
-| PR Actions | PENDING | 尚未在远端 PR head 执行。仅在准确 head 的所需 Actions 全部成功后合并。 |
+| PR #12 首次 Actions（head `bc40b929`，Run `45012754683`） | FAIL（覆盖率） | 单元 477 项运行、4 项跳过且无失败；契约 96/96、security 1/1 通过。覆盖率为 2374/2375 行、877/878 分支；唯一缺行为 `scripts/validate_gates.py:7`。后续清单步骤因门禁失败而跳过。 |
+| PR Actions 修复后 | PENDING | 增加 unit 行为断言覆盖 `candidateAssessment` 字段存在时的阻断分支；等待准确新 head 的 Actions 结果。仅在所需 Actions 全部成功后合并。 |
 
 扫描命令的固定点与结论按本节记录；GitHub Actions 的提交 SHA、Run 链接和结果在 PR 中补充。Release Gate 仍按真实业务覆盖和执行证据单独判定，现有 Release 状态保持 No-Go。
