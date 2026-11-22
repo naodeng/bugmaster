@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bugmaster.dev/schemas/candidate-assessment.schema.json",
+  "title": "BugMaster Candidate Assessment",
+  "description": "A provisional screening decision for a versioned candidate. It cannot represent a confirmed Finding; a host must verify provenance and duplicate references before treating results as authoritative.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "candidateId",
+    "revision",
+    "observedSurface",
+    "patternId",
+    "decision",
+    "reasonCodes",
+    "oracleRef",
+    "evidenceRefs",
+    "falsePositiveChecks",
+    "review"
+  ],
+  "properties": {
+    "schemaVersion": {"const": "1.0"},
+    "candidateId": {"type": "string", "minLength": 1},
+    "revision": {"type": "integer", "minimum": 1},
+    "observedSurface": {"type": "string", "minLength": 1},
+    "patternId": {"type": "string", "pattern": "^BP-[A-Z]+-[0-9]{3}$"},
+    "decision": {"enum": ["candidate", "needs_review", "rejected", "duplicate"]},
+    "reasonCodes": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "ORACLE_UNCONFIRMED",
+          "EVIDENCE_INSUFFICIENT",
+          "ENVIRONMENT_UNSTABLE",
+          "FALSE_POSITIVE_CHECK_INCONCLUSIVE",
+          "COUNTEREVIDENCE_MISSING",
+          "EVIDENCE_PROVENANCE_UNVERIFIED",
+          "ORACLE_PROVENANCE_UNVERIFIED",
+          "TRUSTED_COUNTEREVIDENCE",
+          "CONTRADICTORY_EVIDENCE",
+          "DUPLICATE_CANDIDATE",
+          "HUMAN_REVIEW_REQUIRED"
+        ]
+      }
+    },
+    "oracleRef": {"type": ["string", "null"], "minLength": 1},
+    "evidenceRefs": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "falsePositiveChecks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["check", "result"],
+        "properties": {
+          "check": {"type": "string", "minLength": 1},
+          "result": {"enum": ["clear", "detected", "unknown"]},
+          "evidenceRefs": {"type": "array", "items": {"type": "string", "minLength": 1}}
+        }
+      }
+    },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["targetRef", "businessObjectRef", "operationRef", "oracleRef", "violationSignature"],
+      "properties": {
+        "targetRef": {"type": "string", "minLength": 1},
+        "businessObjectRef": {"type": "string", "minLength": 1},
+        "operationRef": {"type": "string", "minLength": 1},
+        "oracleRef": {"type": "string", "minLength": 1},
+        "violationSignature": {"type": "string", "minLength": 1}
+      }
+    },
+    "counterEvidenceRefs": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "duplicateOf": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["candidateId", "revision"],
+      "properties": {
+        "candidateId": {"type": "string", "minLength": 1},
+        "revision": {"type": "integer", "minimum": 1}
+      }
+    },
+    "review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required", "events"],
+      "properties": {
+        "required": {"type": "boolean"},
+        "events": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["eventId", "candidateId", "candidateRevision", "reviewerId", "decision", "reason", "evidenceRefs", "reviewedAt"],
+            "properties": {
+              "eventId": {"type": "string", "minLength": 1},
+              "candidateId": {"type": "string", "minLength": 1},
+              "candidateRevision": {"type": "integer", "minimum": 1},
+              "reviewerId": {"type": "string", "minLength": 1},
+              "decision": {"enum": ["accept", "reject", "needs_evidence"]},
+              "reason": {"type": "string", "minLength": 1},
+              "evidenceRefs": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+              "reviewedAt": {"type": "string", "format": "date-time"}
+            }
+          }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"decision": {"const": "rejected"}}, "required": ["decision"]},
+      "then": {
+        "required": ["counterEvidenceRefs"],
+        "properties": {
+          "oracleRef": {"type": "string", "minLength": 1},
+          "reasonCodes": {"contains": {"const": "TRUSTED_COUNTEREVIDENCE"}}
+        }
+      }
+    },
+    {
+      "if": {"properties": {"decision": {"const": "duplicate"}}, "required": ["decision"]},
+      "then": {
+        "required": ["duplicateOf", "identity"],
+        "properties": {"reasonCodes": {"contains": {"const": "DUPLICATE_CANDIDATE"}}}
+      }
+    }
+  ]
+}

@@ -34,7 +34,7 @@ W9-01,Reference order API/UI and faulty variants,Task,R2,"W1-01,W5-01",Reference
 W9-02,"Fifty benchmark tasks, separated answers and scorer",Task,R3,W9-01,BLK-05 answers inaccessible
 W9-03,G0–G3 comparative runs and metric report,Task,R2,W9-02,Reproducible records and denominators
 W10-01,Codex/Claude Code packaging and clean installs,Task,R2,"W2-02,W3-02",BLK-01 logs and hashes
-W10-02,Dual-host API/Browser/permission evaluation,Task,R3,"W5-02,W7-02,W9-02",BLK-06 real run IDs
+W10-02,"Browser tool research and dual-host API/Browser/permission evaluation",Task,R3,"W5-02,W7-02,W9-02","First compare Codex Computer Use, ego-browser, agent-browser, Playwright CLI/MCP and alternatives; document local-first, evidence, isolation and permission trade-offs; then run dual-host Browser/permission cases with real run IDs. No new BugMaster Skill or Agent Runtime"
 W11-01,CI rules and governed PR workflows,Task,R3,W0-03,Fork isolation; protected release
 W11-02,VS-01 and full release-candidate dry run,Task,R3,"W2-02,W3-02,W4-02,W5-02,W6-02,W7-02,W8-01,W9-03,W10-02",BLK-07 complete scope and evidence
 W11-03,"Release manifest, licensing, bilingual docs, rollback",Task,R3,W11-02,No-Go unless every gate passed

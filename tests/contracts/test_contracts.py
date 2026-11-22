@@ -8,6 +8,23 @@ from validate_benchmark import validate as validate_benchmark
 class CoreContractTests(unittest.TestCase):
     def test_catalog(self): self.assertEqual(validate(),[])
     def test_50_planned_cases_not_execution_claims(self):self.assertEqual(validate_benchmark(),[])
+    def test_candidate_assessment_scenarios_refine_existing_50_cases(self):
+        manifest=json.loads((ROOT/'benchmark/datasets/v0.1/manifest.json').read_text())
+        self.assertEqual(len(manifest['cases']),50)
+        cases={case['id']:case for case in manifest['cases']}
+        expected={
+            'BENCH-API-BUSINESS-01':'candidate-positive',
+            'BENCH-API-BUSINESS-02':'counterevidence-normal-behavior',
+            'BENCH-API-BUSINESS-03':'ambiguous-oracle-needs-review',
+            'BENCH-API-BUSINESS-04':'model-disagrees-with-execution',
+            'BENCH-API-BUSINESS-05':'false-negative-rejection-risk',
+            'BENCH-API-BUSINESS-06':'human-review-feedback',
+            'BENCH-BROWSER-UI-API-01':'cross-surface-deduplication',
+        }
+        for case_id,focus in expected.items():
+            self.assertEqual(cases[case_id].get('assessmentFocus'),focus)
+            self.assertEqual(cases[case_id]['status'],'planned')
+            self.assertFalse(cases[case_id]['executionVerified'])
     def test_model_assertion_is_not_evidence(self):
         x=eligible_confirmed({'evidenceLevel':'E3','oracleViolation':True,'causalCheck':'passed','environmentCheck':'passed','reviewRequired':False},[{'source':'model-analysis','provenanceVerified':True,'integrityVerified':True}],{'status':'validated','sourceRef':'req.md'})
         self.assertFalse(x['eligible']);self.assertIn('no-verifiable-execution',x['reasons'])
@@ -17,6 +34,31 @@ class CoreContractTests(unittest.TestCase):
     def test_review_blocks(self):
         x=eligible_confirmed({'evidenceLevel':'E3','oracleViolation':True,'causalCheck':'passed','environmentCheck':'passed','reviewRequired':True,'reviewStatus':'pending'},[{'source':'tool-execution','provenanceVerified':True,'integrityVerified':True}],{'status':'validated','sourceRef':'req.md'})
         self.assertFalse(x['eligible'])
+    def test_candidate_assessment_cannot_be_confirmed(self):
+        x=eligible_confirmed(
+            {
+                'evidenceLevel':'E3','oracleViolation':True,'causalCheck':'passed',
+                'environmentCheck':'passed','reviewRequired':False,
+                'candidateAssessment':{'decision':'candidate','candidateId':'CF-001'},
+            },
+            [{'source':'tool-execution','provenanceVerified':True,'integrityVerified':True}],
+            {'status':'validated','sourceRef':'req.md'},
+        )
+        self.assertFalse(x['eligible'])
+        self.assertIn('candidate-assessment-not-confirmed-finding',x['reasons'])
+    def test_any_candidate_assessment_field_blocks_confirmed_gate(self):
+        for malformed_assessment in (None, 'candidate'):
+            x=eligible_confirmed(
+                {
+                    'evidenceLevel':'E3','oracleViolation':True,'causalCheck':'passed',
+                    'environmentCheck':'passed','reviewRequired':False,
+                    'candidateAssessment':malformed_assessment,
+                },
+                [{'source':'tool-execution','provenanceVerified':True,'integrityVerified':True}],
+                {'status':'validated','sourceRef':'req.md'},
+            )
+            self.assertFalse(x['eligible'])
+            self.assertIn('candidate-assessment-not-confirmed-finding',x['reasons'])
     def test_r2_without_enforcement_denied(self):
         a={'risk':'R2','digest':'x','scopeRevision':1}
         p={'status':'approved','provenanceVerified':True,'actionDigest':'x','scopeRevision':1}
