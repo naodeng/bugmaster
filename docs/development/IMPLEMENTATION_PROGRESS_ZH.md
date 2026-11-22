@@ -1,7 +1,7 @@
 # BugMaster 工程实施进度矩阵
 
 **更新日期：** 2026-11-22
-**当前状态：** 2026-11-22 已核验 PR #9、#10 均显示合并。PR #9 合并到 `main`；PR #10 的 base 是 `codex/replay-gate-fail-closed`，本次 fetch 时该分支为 `1f974bc`，`origin/main` 为 `1498b04`，因此 PR #10 目前在该功能分支上、尚未进入 `main`。本地新增 W7 Candidate Assessment 筛选契约/helper，细化 W9 既有场景并完成 W10-02 浏览器工具调研初稿；完整 Finding/Evidence 存储、可信 Evidence Adapter、浏览器运行时和真实 Benchmark 仍未完成。完整产品仍为 Release No-Go。
+**当前状态：** 2026-11-22 已核验 PR #9、#10 均显示合并。PR #9 合并到 `main`；PR #10 的 base 是 `codex/replay-gate-fail-closed`，本次 fetch 时该分支为 `1f974bc`，`origin/main` 为 `1498b04`，因此 PR #10 目前在该功能分支上、尚未进入 `main`。本次变更新增 W7 Candidate Assessment 筛选契约/helper，细化 W9 既有场景并完成 W10-02 浏览器工具调研初稿；完整 Finding/Evidence 存储、可信 Evidence Adapter、浏览器运行时和真实 Benchmark 仍未完成。完整产品仍为 Release No-Go。
 
 ## 仓库审计摘要
 
@@ -39,10 +39,10 @@
 | Catalog/Registry | PASS | `python3 scripts/validate_catalog.py` |
 | Benchmark Manifest | PASS（结构） | `validate_benchmark.py` 明确提示场景未执行 |
 | GitHub PR / Actions | PR #9 合并到 `main`；PR #10 合并到其功能分支 | 本次 fetch 时 `origin/main=1498b04`、`codex/replay-gate-fail-closed=1f974bc`；PR #10 尚未进入 `main`。此前 Actions Run `44986287358` / `44989084262` 成功记录是历史 CI 证据 |
-| 单元测试 | PASS，182/182（本次合并前工作树） | Python 3.12；包含 Candidate Assessment Happy/Negative/Edge、可信拒绝 fail-closed、重复项审核成本用例；整合 PR #10 基线后需复跑 |
+| 单元测试 | PASS，474/474 | Python 3.12；在 PR #10 合并基线与 Candidate Assessment 变更整合后的工作树运行 |
 | R3 安全测试 | 历史 PR #9/#10 记录 PASS | PR #9 Run `44986287358`、PR #10 Run `44989084262`；独立人工 Q15 审核结论不由 CI 证明 |
-| 契约测试 | PASS，92/92（本次合并前工作树） | Python 3.12 + `jsonschema[format-nongpl]==4.26.0`；整合 PR #10 基线后需复跑 |
-| 当前核心模块行/分支覆盖率 | PASS，100% / 100%（本次合并前工作树） | `bugmaster_core`：1272/1272 语句、544/544 分支；整合 PR #10 基线后需复跑。行/分支覆盖不等于业务功能覆盖 |
+| 契约测试 | PASS，96/96 | Python 3.12 + `jsonschema[format-nongpl]==4.26.0`；包含 Candidate Assessment Schema 与 50 个场景的结构映射检查 |
+| 当前核心模块行/分支覆盖率 | PASS，100% / 100% | `bugmaster_core`：2198/2198 语句、824/824 分支；Candidate Assessment：212/212 语句、116/116 分支。行/分支覆盖不等于业务功能覆盖 |
 | 业务功能覆盖率 >60% | 未达成 | 目前没有真实业务执行证据 |
 | 核心 Happy / Negative / Edge | 未达成 | 需每个核心功能有三类实际通过证据 |
 | Release | No-Go | 全量功能、真实 Benchmark、双宿主和独立审批均未完成 |

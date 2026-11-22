@@ -3,7 +3,7 @@
 **日期：** 2026-11-22
 **工作流：** W3 / W7 / W9；对应既有 Feature ID `F-FINDING`、`F-DEDUP`、`F-BENCHMARK`。本记录不新增 Feature Inventory 分母或正式 TDD ID。
 **验证基线 HEAD：** `336ce6277f0965c36fcbe61fbb90f50ea01ea2bf`
-**工作树状态：** 本轮修改尚未提交；上述 SHA 是验证前基线，不代表本轮实现提交。
+**实现提交：** `6f122d1`（基于 PR #10 合并分支 `1f974bc` 重放）
 
 ## 变更范围
 
@@ -36,11 +36,14 @@
 
 | 检查 | 命令 / 结果 |
 |---|---|
-| Unit + 核心覆盖率 | `python -m coverage run --branch --source=bugmaster_core -m unittest discover -s tests/unit` — PASS，182/182；`coverage report -m` — `bugmaster_core` 1272/1272 语句、544/544 分支；Candidate Assessment 212/212 语句、116/116 分支 |
-| Contract | `python -m unittest discover -s tests/contracts` — PASS，92/92 |
+| Candidate 初始单测与核心覆盖率（基线 `336ce627`） | `python -m coverage run --branch --source=bugmaster_core -m unittest discover -s tests/unit` — PASS，182/182；`coverage report -m` — `bugmaster_core` 1272/1272 语句、544/544 分支；Candidate Assessment 212/212 语句、116/116 分支 |
+| Candidate 初始契约测试（基线 `336ce627`） | `python -m unittest discover -s tests/contracts` — PASS，92/92 |
 | Benchmark 结构 | `python scripts/validate_benchmark.py` — PASS；输出明确为 `NOT executed` |
 | Patch whitespace | `git diff --check` — PASS |
 | Release Quality Gate | `python scripts/quality_gate.py --mode release --coverage /private/tmp/bugmaster-candidate-coverage.json` — NO-GO：Feature Inventory 未冻结/无验证执行记录、业务功能覆盖未超过 60%、核心 `F-*` 缺少 Happy/Negative/Edge 执行证据 |
+| PR #10 基线整合后复核 | `python -m coverage run --branch --source=bugmaster_core -m unittest discover -s tests/unit` — PASS，474/474；`coverage report -m` — 2198/2198 语句、824/824 分支；Candidate Assessment 212/212 语句、116/116 分支；`python -m unittest discover -s tests/contracts` — PASS，96/96 |
+| 品牌、Catalog、Benchmark 与差异检查 | `scripts/check_branding.py`、`scripts/validate_catalog.py`、`scripts/validate_benchmark.py` 和 `git diff origin/codex/replay-gate-fail-closed...HEAD --check` — PASS；Benchmark 场景明确为 NOT executed |
+| 整合后 Release Quality Gate | `python scripts/quality_gate.py --mode release --coverage /private/tmp/bugmaster-candidate-final-coverage.json` — NO-GO：Feature Inventory 未冻结、真实业务覆盖未超过 60%、核心 `F-*` 的 Happy/Negative/Edge 执行证据缺失 |
 
 行覆盖和分支覆盖都达到 100%，不代表业务功能覆盖达到门槛。没有运行 API/Browser 真目标、50 个正式 Benchmark、双宿主集成或独立真人审查。
 
