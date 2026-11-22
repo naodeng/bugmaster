@@ -6,6 +6,8 @@
 **本轮 PR 基线：** `f97ca8fb002f17e51986b91269a3df0556cd63a6`（`origin/main`）
 **实现来源：** 原始实现提交 `6f122d1` 位于 `develop@513c107d4d51aa8b8359261ab340d4f1c3383c00` 的提交历史中；最终 PR 从 `main` 重新应用文件差异，不迁移原分支历史。`1f974bc` 不是该 `main` 基线的祖先；本 PR 不包含 W6 Journal 生产代码或相关测试的差异。
 
+**远端验证记录约定：** 下表按已完成验证的提交记录历史快照。PR 描述是当前 PR head 的 Actions 与 CodeX 扫描状态来源；后续仅文档提交可能推进 head，不会改动代码验证范围，但仍以 PR 描述中的最新提交门禁结果为准。
+
 ## 变更范围
 
 - 增加 `Candidate Assessment` Schema 和纯本地筛选 helper；Schema 决策允许 `candidate`、`needs_review`、`rejected`、`duplicate`，不会生成 `confirmed`。2026-11-22 所有者复核后，当前运行时仅输出 `candidate`、`needs_review` 或 `duplicate`；Schema 的 `rejected` 仅为未来 Host verifier 集成保留。
@@ -149,10 +151,11 @@ git diff --check
 | PR #12 审查评论 GREEN（同一临时分支，生产修复后） | PASS | 同一 Python 3.12 命令 — 2/2 PASS；完整 Candidate Assessment 单测 45/45 PASS；Schema 契约 11/11 PASS；`git diff --check` PASS。 |
 | 首轮 CodeX Spec 扫描发现项（head `fa1a7d5`） | FIXED | unhashable `groundTruth` / `decision` 会抛出 `TypeError`；Review Event 追加会保留 Schema 无效的 `review` 对象。均在 `b6c029b` 修复，新增负例并通过 full unit/coverage。 |
 | 第二轮 CodeX Spec 扫描发现项（head `5546d71`） | FIXED | 与候选 Oracle 不匹配的 counter-evidence 引用不得加入结果；现有 assessment `evidenceRefs` 必须非空且唯一。均在 `a694bdd` 修复，两个新回归测试以及全量本地验证通过。 |
-| CodeX Security 扫描（head `fa1a7d5`） | PASS，无已确认漏洞 | 只读源码扫描；Candidate Assessment 结果保持暂定，counter-evidence 不自动拒绝，也不能通过 Confirmed Gate。Host 来源认证、规范重复引用验证及 reviewer 身份认证仍待集成。最终 PR head `c368ad8` 的复扫结果见下行。 |
-| PR #13 head `c368ad8e366bfef951f6244df7ecc3e93163df8f` 的 Actions 与 CodeX 扫描 | PASS | Actions run `45018667091`（#111）成功：单元 488、契约 96、安全 1；行覆盖 2384/2384、分支覆盖 880/880；Catalog、Benchmark Manifest、Branding 通过，Benchmark 正式场景未执行。Spec/代码扫描与 Security Reviewer 均对该 head PASS，无合并阻断项。PR 描述记录此 head 的完整门禁与后续 head 验证。 |
+| CodeX Security 扫描（head `fa1a7d5`） | PASS，无已确认漏洞 | 只读源码扫描；Candidate Assessment 结果保持暂定，counter-evidence 不自动拒绝，也不能通过 Confirmed Gate。Host 来源认证、规范重复引用验证及 reviewer 身份认证仍待集成。最终 PR head `fde3415` 的复扫结果见下行。 |
+| PR #13 head `c368ad8e366bfef951f6244df7ecc3e93163df8f`（前一验证快照） | PASS | Actions run `45018667091`（#111）成功：单元 488、契约 96、安全 1；行覆盖 2384/2384、分支覆盖 880/880；Catalog、Benchmark Manifest、Branding 通过，Benchmark 正式场景未执行。Spec/代码扫描与 Security Reviewer 均对该 head PASS。 |
+| PR #13 head `fde3415cb1104f5d04591e80784b15cece4badb2` 的 Actions 与 CodeX 扫描 | PASS | Actions run `45018961112`（#112）成功；Spec/代码扫描与 Security Reviewer 均对该 head PASS。与 `c368ad8` 相比仅 TDD 文档不同，`bugmaster_core/`、`tests/`、`schemas/`、CI workflow 和 scripts 没有变化。 |
 
-扫描命令的固定点与结论按本节记录；本 PR 由 `main@f97ca8f` 重建，不包含 `1f974bc` 作为祖先提交。head `c368ad8e366bfef951f6244df7ecc3e93163df8f` 的 Actions 与 Q15 扫描已通过，详见上表及 PR 描述。Release Gate 仍按真实业务覆盖和执行证据单独判定，现有 Release 状态保持 No-Go。
+扫描命令的固定点与结论按本节记录；本 PR 由 `main@f97ca8f` 重建，不包含 `1f974bc` 作为祖先提交。已验证快照 `fde3415cb1104f5d04591e80784b15cece4badb2` 的 Actions 与 Q15 扫描已通过，详见上表；当前 PR head 的最新状态以 PR 描述为准。Release Gate 仍按真实业务覆盖和执行证据单独判定，现有 Release 状态保持 No-Go。
 
 ### 最终复扫发现与候选提交 `03b30529`
 
@@ -162,7 +165,7 @@ CodeX 最终复扫在前一候选 head `5f7e9d67e6c6b240c7102bbfc81876874b03c8fa
 - `/private/tmp/bugmaster-candidate-check/bin/python -m unittest discover -s tests/unit -p 'test_candidate_assessment.py' -k invalid_candidate_and_duplicate_inputs_are_rejected -v`：`duplicate_of.decision` 为 list 或 object 时分别抛出 `TypeError`，而不是稳定的输入校验错误。
 - `/private/tmp/bugmaster-candidate-check/bin/python -m unittest discover -s tests/unit -p 'test_candidate_assessment.py' -k review_event_rejects_invalid_assessment_header -v`：6 种 schema 无效的 assessment header 未被 `append_review_event()` 拒绝。
 
-GREEN 提交 `03b30529c8b86a6cf5ba19737046083618f279ee`：显式 null 被视为无效 Evidence 引用并移除相应误报检查；duplicate decision 在集合成员判断前校验字符串类型；Review Event 追加前验证 assessment 的 schemaVersion、candidateId、revision、observedSurface、patternId 和 decision。以上三条定向命令均通过。完整复验：Python 3.12.16，单元 487/487、契约 96/96、安全 1/1；受维护范围行覆盖 2381/2381、分支覆盖 880/880；Catalog、Benchmark Manifest、Branding 与 `git diff --check` 均 PASS。Benchmark 结构通过但正式场景仍为 NOT executed。此提交时的远端门禁待运行；后续 PR head `723170d` 的 Actions 与 CodeX 扫描均 PASS，详见本节 VERIFY 表。
+GREEN 提交 `03b30529c8b86a6cf5ba19737046083618f279ee`：显式 null 被视为无效 Evidence 引用并移除相应误报检查；duplicate decision 在集合成员判断前校验字符串类型；Review Event 追加前验证 assessment 的 schemaVersion、candidateId、revision、observedSurface、patternId 和 decision。以上三条定向命令均通过。完整复验：Python 3.12.16，单元 487/487、契约 96/96、安全 1/1；受维护范围行覆盖 2381/2381、分支覆盖 880/880；Catalog、Benchmark Manifest、Branding 与 `git diff --check` 均 PASS。Benchmark 结构通过但正式场景仍为 NOT executed。此提交时的远端门禁待运行；后续 PR head `fde3415` 的 Actions 与 CodeX 扫描均 PASS，详见本节 VERIFY 表。
 
 ### 最终 Spec 复扫：重复项必须绑定同一顶层 Oracle
 
@@ -171,4 +174,4 @@ GREEN 提交 `03b30529c8b86a6cf5ba19737046083618f279ee`：显式 null 被视为�
 - **RED 结果：** 2 个子用例均失败：候选顶层 Oracle 与现有候选不同、以及现有 assessment 顶层 Oracle 与 identity 不一致时，均未抛出 `duplicate-identity-mismatch`。
 - **GREEN 提交：** `0dd3f940a49dc23ba24113206eb71f9d04874749`；重复关联现在要求两条记录的顶层 Oracle 相同，且候选顶层 Oracle 与嵌套 identity Oracle 一致。定向测试 1/1、Candidate Assessment 单测 50/50 通过。
 - **完整验证：** Python 3.12.16，单元 488/488、契约 96/96、安全 1/1；受维护范围行覆盖 2384/2384、分支覆盖 880/880；Catalog、Benchmark Manifest、Branding 与 `git diff --check` PASS。Benchmark 仍为 NOT executed。
-- **最终候选状态：** PR #13 head `c368ad8e366bfef951f6244df7ecc3e93163df8f` 的 Actions #111、Spec/代码扫描及 Security Reviewer 均 PASS；该 head 已包含 `0dd3f940a49dc23ba24113206eb71f9d04874749` 的修复，复扫未发现阻断问题。本记录汇总该 head 与其前序代码提交的 RED/GREEN 和本地 VERIFY。PR 描述保留每次 PR head 对应的最新 Actions 和 CodeX 扫描结果，文档记录变化后也按新 head 重新验证。
+- **已验证快照：** PR #13 head `fde3415cb1104f5d04591e80784b15cece4badb2` 的 Actions #112、Spec/代码扫描及 Security Reviewer 均 PASS；该 head 已包含 `0dd3f940a49dc23ba24113206eb71f9d04874749` 的修复，复扫未发现阻断问题。本记录汇总该快照与其前序代码提交的 RED/GREEN 和本地 VERIFY。当前 PR head 的最新 Actions 与 CodeX 扫描状态由 PR 描述记录。
