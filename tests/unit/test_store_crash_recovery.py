@@ -73,29 +73,51 @@ if scenario == "partial-write":
     original_write = os.write
     os.write = partial_write
 elif scenario == "before-link":
-    os.link = lambda source, destination: os._exit(71)
+    os.link = lambda source, destination, **kwargs: os._exit(71)
 elif scenario == "after-link-before-directory-sync":
-    store_module._fsync_directory = lambda directory: os._exit(71)
+    original_link = os.link
+
+    def link_then_exit(*args, **kwargs):
+        original_link(*args, **kwargs)
+        os._exit(71)
+
+    os.link = link_then_exit
 elif scenario == "after-directory-sync-before-cleanup":
-    original_sync_directory = store_module._fsync_directory
+    original_link = os.link
+    original_sync_directory = store_module._fsync_directory_fd
+    linked = False
+
+    def link_then_mark(*args, **kwargs):
+        global linked
+        result = original_link(*args, **kwargs)
+        linked = True
+        return result
 
     def sync_then_exit(directory):
         original_sync_directory(directory)
-        os._exit(71)
-
-    store_module._fsync_directory = sync_then_exit
-elif scenario == "after-head-directory-sync":
-    original_sync_directory = store_module._fsync_directory
-    sync_count = 0
-
-    def sync_then_exit_after_head(directory):
-        global sync_count
-        sync_count += 1
-        original_sync_directory(directory)
-        if sync_count == 3:
+        if linked:
             os._exit(71)
 
-    store_module._fsync_directory = sync_then_exit_after_head
+    os.link = link_then_mark
+    store_module._fsync_directory_fd = sync_then_exit
+elif scenario == "after-head-directory-sync":
+    original_replace = os.replace
+    original_sync_directory = store_module._fsync_directory_fd
+    head_replaced = False
+
+    def replace_then_mark(*args, **kwargs):
+        global head_replaced
+        result = original_replace(*args, **kwargs)
+        head_replaced = True
+        return result
+
+    def sync_then_exit_after_head(directory):
+        original_sync_directory(directory)
+        if head_replaced:
+            os._exit(71)
+
+    os.replace = replace_then_mark
+    store_module._fsync_directory_fd = sync_then_exit_after_head
 else:
     raise AssertionError("unknown crash scenario: " + scenario)
 
@@ -114,13 +136,17 @@ class StoreCrashRecoveryTests(unittest.TestCase):
 
     def _run_crashed_worker(self, root, store_kind, scenario):
         if store_kind == "session":
-            self._session_store(root)._ensure_directories()
+            session_store = self._session_store(root)
+            session_store._ensure_directories()
+            with session_store._locked():
+                pass
         else:
             checkpoint_store = self._checkpoint_store(root)
             checkpoint_store._ensure_directories()
-            checkpoint_store._ensure_private_directory(
-                checkpoint_store._checkpoints_dir
-            )
+            with checkpoint_store._session_store._locked():
+                pass
+            checkpoint_store._checkpoints_dir.mkdir(mode=0o700, exist_ok=True)
+            checkpoint_store._checkpoints_dir.chmod(0o700)
         result = subprocess.run(
             [sys.executable, "-c", _WORKER, str(root), store_kind, scenario],
             cwd=Path(__file__).resolve().parents[2],

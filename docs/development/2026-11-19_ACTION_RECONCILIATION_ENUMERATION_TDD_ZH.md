@@ -1,12 +1,12 @@
 # Action 待对账枚举与进程崩溃注入 TDD 记录
 
-**日期：** 2026-11-19  
-**Workstream / 义务：** W6 安全恢复；`F-RECOVERY` / `TDD-ACT-011`  
-**风险：** R3（恢复诊断；不授权执行）  
-**实现提交：** `8129838d0165115a78bf7435f1cdced7fa3de601`  
-**崩溃注入测试提交：** `72157f7e9d8df73f324d8432555d16e3ac1ef988`
-**PR：** [#10](https://github.com/naodeng/bugmaster/pull/10)，基于 PR #9  
-**状态：** 本地交叉审核修复已验证；当前代码与测试已推送，PR #10 Actions Run `44487187776` 全步骤通过。只读待对账 Action 枚举，以及 Journal/SessionStore/CheckpointStore 进程崩溃注入不提供可信外部核验、恢复授权或真实 API/Browser 执行。
+**日期：** 2026-11-19<br>
+**Workstream / 义务：** W6 安全恢复；`F-RECOVERY` / `TDD-ACT-011`<br>
+**风险：** R3（恢复诊断；不授权执行）<br>
+**实现提交：** `8129838d0165115a78bf7435f1cdced7fa3de601`<br>
+**崩溃注入测试提交：** `72157f7e9d8df73f324d8432555d16e3ac1ef988`<br>
+**PR：** [#10](https://github.com/naodeng/bugmaster/pull/10)，基于 PR #9<br>
+**状态：** 初始实现曾在旧基线通过 Actions Run `44487187776`，但该 run 不验证当前 PR #9 head。PR #10 原 head `ffe52dc6c523e2eb4503d0d9a979dde515659fef` 仍以旧基线 `f69c61b8c52d471774ae8b212605e3dadd182eda` 为父系；本记录末尾补入了基于 PR #9 当前 head `c8f0f6e061ed55909e656b30a125d5f9cf2042d3` 的本地整合验证。新 head 的 Actions 与独立人工 Q15 Security Review 仍待完成。只读待对账 Action 枚举及进程崩溃注入不提供可信外部核验、恢复授权或真实 API/Browser 执行。
 
 ## 需求与边界
 
@@ -16,7 +16,7 @@ W6 要求 Journal/安全恢复、未知副作用对账和崩溃故障注入。Jo
 
 ## RED
 
-先加入 9 个 Journal 子进程退出故障注入场景，覆盖准备/派发/结果事件的部分写入、事件写完但未同步、同步后退出、未知结果、未验证对账声明及已记录完成结果。定向运行 9/9 PASS，说明现有 Journal 对这些进程退出状态已经采取保守处理。
+先加入 10 个 Journal 子进程退出故障注入场景，覆盖准备/派发/结果事件的部分写入、事件写完但未同步、同步后退出、未知结果、未验证对账声明、枚举顺序及已记录完成结果。定向运行 10/10 PASS，说明现有 Journal 对这些进程退出状态已经采取保守处理。
 
 随后增加枚举接口行为测试，并在生产代码修改前运行：
 
@@ -26,7 +26,7 @@ PYTHONDONTWRITEBYTECODE=1 python3.12 -m unittest discover -s tests/unit -p 'test
 
 结果：按预期失败，`AttributeError: 'ActionJournal' object has no attribute 'actions_needing_reconciliation'`。
 
-另新增 SessionStore 与 CheckpointStore 各 4 个崩溃注入点：临时文件部分写入、发布 hard link 前、发布后目录同步前、目录同步后临时文件清理前。首次执行：
+另新增 SessionStore 5 个、CheckpointStore 4 个崩溃注入点：临时文件部分写入、发布 hard link 前、发布后目录同步前、目录同步后临时文件清理前；SessionStore 还覆盖 `session.head` 已同步的提交点。首次执行：
 
 ```text
 PYTHONDONTWRITEBYTECODE=1 python3.12 -m unittest discover -s tests/unit -p 'test_store_crash_recovery.py' -v
@@ -36,11 +36,11 @@ PYTHONDONTWRITEBYTECODE=1 python3.12 -m unittest discover -s tests/unit -p 'test
 
 ## GREEN
 
-实现只读枚举：重读并验证本地 Journal，再用现有 `_needs_reconciliation` 状态判定返回 Action ID 元组。损坏日志仍抛出既有 `JournalCorruptionError`；不完整、不可信或恢复声明状态仍不会被转成可重放。SessionStore/CheckpointStore 的 8 个注入场景验证了已发布记录可完整读回，发布前中断不会暴露记录且允许重试；这部分只增加验证，没有修改既有存储实现。
+实现只读枚举：重读并验证本地 Journal，再用现有 `_needs_reconciliation` 状态判定返回 Action ID 元组。损坏日志仍抛出既有 `JournalCorruptionError`；不完整、不可信或恢复声明状态仍不会被转成可重放。SessionStore/CheckpointStore 的 9 个注入场景验证了已发布记录可完整读回，发布前中断不会暴露记录且允许重试；这部分只增加验证，没有修改既有存储实现。
 
 ## REFACTOR
 
-保持最小 API，不添加外部核验器、批准状态或 Session 预算计算。同步英文和中文合同说明，注明 API 的诊断性质与失效关闭行为。总计 17 个进程崩溃场景使用子进程 `os._exit` 模拟应用进程突然退出，不等价于断电、内核崩溃、文件系统故障或 Windows 验证。
+保持最小 API，不添加外部核验器、批准状态或 Session 预算计算。同步英文和中文合同说明，注明 API 的诊断性质与失效关闭行为。总计 19 个进程崩溃场景使用子进程 `os._exit` 模拟应用进程突然退出，不等价于断电、内核崩溃、文件系统故障或 Windows 验证。
 
 ## VERIFY
 
@@ -82,7 +82,7 @@ PYTHONDONTWRITEBYTECODE=1 python3.12 -m unittest discover -s tests/unit -p 'test
 
 本轮测试提交：`605297156e006e9b6f7f9aacccb4755bc820d62b`。其中包含测试、TDD 记录和进度状态更新；本地全量验证在该测试内容提交前运行，随后只修改了中文证据的命令和路径记录。
 
-合入 PR #8 覆盖边界测试后的全量验证基于提交 `301c7e79ab325a64d2bc935131900beb6bdc530d`：198 项单测、78 项契约和 1196/1196 语句、474/474 分支均通过。PR #10 Actions [Run 44487187776](https://github.com/naodeng/bugmaster/actions/runs/44487187776) 在代码与测试 head `8f498d38d81c4fe8127c5c35759f27eb7ceffb32` 全步骤通过。随后只同步 PR #8 的工作流证据，未改动代码或测试；`git diff --check` 通过。
+合入 PR #8 覆盖边界测试后的历史全量验证基于提交 `301c7e79ab325a64d2bc935131900beb6bdc530d`：198 项单测、78 项契约和 1196/1196 语句、474/474 分支均通过。PR #10 Actions [Run 44487187776](https://github.com/naodeng/bugmaster/actions/runs/44487187776) 验证代码与测试 head `8f498d38d81c4fe8127c5c35759f27eb7ceffb32`；后续 docs-only head `ffe52dc6…` 对应 Run `44488992365`。两次均基于旧 PR #9 提交 `f69c61b8…`，只作为历史证据，不证明当前 PR #9/#10 叠加树。
 
 | 检查 | 命令 / 结果 |
 |---|---|
@@ -93,7 +93,28 @@ PYTHONDONTWRITEBYTECODE=1 python3.12 -m unittest discover -s tests/unit -p 'test
 | 行 / 分支覆盖 | `PYTHONDONTWRITEBYTECODE=1 /private/tmp/bugmaster-review-venv/bin/python -m coverage report --data-file=/private/tmp/bugmaster-pr10-final.coverage --include='bugmaster_core/*'`：1196/1196 语句、474/474 分支，均为 100%；无排除项 |
 | 品牌 / Catalog / Benchmark | `/private/tmp/bugmaster-review-venv/bin/python scripts/check_branding.py`、`/private/tmp/bugmaster-review-venv/bin/python scripts/validate_catalog.py`、`/private/tmp/bugmaster-review-venv/bin/python scripts/validate_benchmark.py` 均 PASS；Benchmark 仅结构检查，场景未执行 |
 | 发布门禁 | `PYTHONDONTWRITEBYTECODE=1 /private/tmp/bugmaster-review-venv/bin/python scripts/quality_gate.py --mode release --coverage /private/tmp/bugmaster-pr10-final-coverage.json` 按预期 NO-GO：义务清单未冻结，真实功能覆盖与核心 Happy/Negative/Edge 证据缺失 |
-| GitHub Actions | PR #10 代码/测试 head [Run 44487187776](https://github.com/naodeng/bugmaster/actions/runs/44487187776)：PASS；PR #1–#9 对应当前代码/测试 head 的工作流也通过，见 [Actions 列表](https://github.com/naodeng/bugmaster/actions) |
+| GitHub Actions | PR #10 旧基线代码/测试 head [Run 44487187776](https://github.com/naodeng/bugmaster/actions/runs/44487187776)：PASS，但不覆盖当前 PR #9 基线；PR #9 最新 docs head Run `44908476017` 成功。PR #10 新整合 head Actions 待推送后验证 |
 | 补丁格式 | `git diff --check`：PASS |
 
 崩溃模拟仍只覆盖应用进程 `os._exit`；不代表断电、内核崩溃、文件系统失效、真实外部副作用或 Windows 行为。PR #10 仍需独立 R3 Security Reviewer 审核。
+
+## PR #9 最新基线整合复验（2026-11-22）
+
+交叉审核确认 PR #10 旧 head 落后当前 PR #9，GitHub 标记 `dirty`；旧 Actions 不覆盖当前叠加树。以远端 PR #9 head `c8f0f6e061ed55909e656b30a125d5f9cf2042d3` 的 tree `df2c515215dc3228957475a430be16eb37121221` 为基线整合 PR #10 的变更，同时保留 PR #9 的 Journal 路径、目录描述符、ACL 和 fail-closed replay hardening。
+
+最新基线复验首先新增「Journal 文件缺失时不得返回空列表」测试。RED 测试-only tree `251cfa25f4c7861f83d3dcaff3809fe812ea54ad` 基于上述 PR #9 基线和 PR #10 现有枚举实现，但不包含缺失文件 guard；在 Python 3.12.16/macOS POSIX 环境运行 `PYTHONDONTWRITEBYTECODE=1 python3.12 -m unittest tests.unit.test_action_journal_crash_recovery.ActionJournalCrashRecoveryTests.test_enumeration_fails_closed_when_journal_is_missing -v`，按预期失败：`AssertionError: JournalCorruptionError not raised`。随后让 `actions_needing_reconciliation()` 在完整加载后检查已验证的文件身份；缺少规范 Journal 时抛出既有 `JournalCorruptionError`，同一测试 1/1 PASS。崩溃测试注入器也改为识别成功发布的硬链接、`session.head` 替换和目标目录同步；此前 PR #8 的目录 fd 同步、Session 锁和 `os.link(..., src_dir_fd=..., dst_dir_fd=...)` 使旧注入点不能命中预期发布阶段。没有改变 SessionStore/CheckpointStore 生产逻辑。
+
+环境：隔离本地克隆 `/private/tmp/bugmaster-pr10-integrated`，macOS POSIX，Python 3.12.16；`coverage.py` 和 `jsonschema` 从 `/private/tmp` 加载。合并后本地完整验证：
+
+| 检查 | 命令 / 结果 |
+|---|---|
+| Journal/Session/Checkpoint 恢复定向测试 | `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/private/tmp/bugmaster-jsonschema python3.12 -m unittest tests.unit.test_action_journal_crash_recovery tests.unit.test_store_crash_recovery -v`：22/22 PASS |
+| 全单元与覆盖采集 | `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/private/tmp/bugmaster-jsonschema:/private/tmp/bugmaster-coverage python3.12 -m coverage run --branch --source=bugmaster_core,scripts --data-file=/private/tmp/bugmaster-pr10-integrated.coverage -m unittest discover -s tests/unit`：428/428 PASS |
+| 全契约 | `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/private/tmp/bugmaster-jsonschema python3.12 -m unittest discover -s tests/contracts -v`：80/80 PASS |
+| R3 安全测试 | `PYTHONDONTWRITEBYTECODE=1 python3.12 -m unittest discover -s tests/security -v`：1/1 PASS |
+| 生产行 / 分支覆盖 | `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/private/tmp/bugmaster-coverage python3.12 -m coverage json --data-file=/private/tmp/bugmaster-pr10-integrated.coverage -o /private/tmp/bugmaster-pr10-integrated.json`；`PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/private/tmp/bugmaster-coverage python3.12 -m coverage report --data-file=/private/tmp/bugmaster-pr10-integrated.coverage --include='bugmaster_core/*,scripts/*'`：2146/2146 语句、772/772 分支，100%，无排除项 |
+| 品牌 / Catalog / Benchmark manifest | `PYTHONDONTWRITEBYTECODE=1 python3.12 scripts/check_branding.py`、`PYTHONDONTWRITEBYTECODE=1 python3.12 scripts/validate_catalog.py`、`PYTHONDONTWRITEBYTECODE=1 python3.12 scripts/validate_benchmark.py`：均 PASS；Benchmark 只查结构，50 场景未执行 |
+| Diff 格式 | `git diff --check`：PASS |
+| Release Gate | `scripts/quality_gate.py --mode release --coverage /private/tmp/bugmaster-pr10-integrated.json`：按预期 NO-GO；功能义务清单未冻结、真实业务覆盖未超过 60%，核心 Happy/Negative/Edge 证据缺失 |
+
+以上为本地合并树证据，推送后的 GitHub Actions、CodeX 当前 head 复审和 PR 说明更新仍待完成。所有 PR #3–#10 仍需独立人工 R3 Security Reviewer；AI 角色复核不构成 Q15 签署。

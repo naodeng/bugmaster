@@ -9,6 +9,7 @@ from pathlib import Path
 
 _WORKER = r"""
 import os
+import stat
 import sys
 
 from bugmaster_core.action_journal import ActionJournal
@@ -45,7 +46,8 @@ def exit_after_fsync():
 
     def fsync_then_exit(fd):
         original_fsync(fd)
-        os._exit(71)
+        if not stat.S_ISDIR(os.fstat(fd).st_mode):
+            os._exit(71)
 
     os.fsync = fsync_then_exit
 
@@ -217,6 +219,18 @@ class ActionJournalCrashRecoveryTests(unittest.TestCase):
                 journal_path, session_id="session-1", journal_id="journal-1"
             )
             self.assertEqual(recovered.actions_needing_reconciliation(), ())
+
+    def test_enumeration_fails_closed_when_journal_is_missing(self):
+        from bugmaster_core.action_journal import ActionJournal, JournalCorruptionError
+
+        with tempfile.TemporaryDirectory() as directory:
+            recovered = ActionJournal(
+                Path(directory) / "missing.jsonl",
+                session_id="session-1",
+                journal_id="journal-1",
+            )
+            with self.assertRaises(JournalCorruptionError):
+                recovered.actions_needing_reconciliation()
 
     def test_completed_outcome_survives_process_crash_as_terminal(self):
         from bugmaster_core.action_journal import ActionJournal

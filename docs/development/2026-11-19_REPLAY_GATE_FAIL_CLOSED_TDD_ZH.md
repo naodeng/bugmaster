@@ -24,6 +24,8 @@ PYTHONDONTWRITEBYTECODE=1 python3.12 -m unittest discover -s tests/contracts -p 
 
 测试失败：`AssertionError: True is not false`，明确证明普通字典中的自报字段当前可以开放重放。检查原测试后发现它还要求上述输入返回 True，与“没有可信核验器，不可盲目重放”的已冻结不变量冲突；在实现前移除该错误正向期望，并保留单独负例来约束 fail-closed 行为。
 
+**2026-11-21 复核补充：** 原始 RED 记录未保存该次运行的 Git SHA。为补足可复现证据，在生产代码基线 `99fe47e808a01c6b9964a3da38a59a506de16bc9` 上重建仅含该合同测试变更的测试专用提交 `0c607ae10b9f2742a31ebc702ec9b82954c99de1`；测试文件内容取自实现提交 `91e79ee1857f7e986f97431d850a1e2b6faa0037`，未改动生产代码。环境为 macOS/POSIX、Python 3.12.16，工作目录 `/private/tmp/bugmaster-pr9-red`。运行上方命令的输出为 `Ran 1 test`、`FAILED (failures=1)`，断言仍为 `AssertionError: True is not false`。这是针对旧生产代码的补充重现，不冒充 2026-11-19 原始运行快照。
+
 ## GREEN / REFACTOR
 
 `can_replay()` 在可信只读 verifier 和当前授权门禁接入前固定返回 False，并注明调用方布尔字段不能授权重放。没有添加模拟的可信状态、签名或 verifier 参数，也没有扩大到真实工具执行。
@@ -41,6 +43,23 @@ PYTHONDONTWRITEBYTECODE=1 python3.12 -m unittest discover -s tests/contracts -p 
 | Catalog / Benchmark / 品牌 / Diff | Catalog PASS；Benchmark 清单结构 PASS（50 场景未执行）；品牌扫描 PASS；`git diff --check` PASS |
 | Release 门禁 | **No-Go**：功能义务清单未冻结、真实业务覆盖未超过 60%、核心功能 Happy/Negative/Edge 执行证据缺失 |
 | GitHub Actions | [Run 44457678961](https://github.com/naodeng/bugmaster/actions/runs/44457678961)：单元、契约、行覆盖、Catalog、Benchmark 结构与品牌步骤全部成功 |
+
+## 最新 PR #8 基线整合验证（2026-11-21）
+
+验证对应代码与测试树提交 `42850bb49401a4090e0c8dc21ad2cdd4e0306bca`，其双亲为 PR #9 原 head `7a69db0e37eb7dc13b0324329208dbbdf346093e` 与最新 PR #8 head `58a601aa1dfa9639b38d9f9c6b0a62d9dbee2a4d`。以下本地命令在该提交树上重跑；本节在验证后补录，随后只变更开发记录文档。
+
+环境：macOS/POSIX、Python 3.12.16；测试依赖 `jsonschema[format-nongpl]==4.26.0` 与 `coverage==7.13.3` 位于 `/private/tmp`。
+
+| 检查 | 命令 / 结果 |
+|---|---|
+| 全单元 | `PYTHONDONTWRITEBYTECODE=1 python3.12 -m unittest discover -s tests/unit`：406/406 PASS |
+| 全契约 | `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/private/tmp/bugmaster-jsonschema python3.12 -m unittest discover -s tests/contracts`：80/80 PASS |
+| R3 安全测试 | `PYTHONDONTWRITEBYTECODE=1 python3.12 -m unittest discover -s tests/security`：1/1 PASS |
+| 全单元与分支覆盖采集 | `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/private/tmp/bugmaster-coverage python3.12 -m coverage run --branch --source=bugmaster_core,scripts --data-file=/private/tmp/bugmaster-pr9-integrated.coverage -m unittest discover -s tests/unit`：406/406 PASS |
+| 生产行/分支覆盖 | `PYTHONPATH=/private/tmp/bugmaster-coverage python3.12 -m coverage report --data-file=/private/tmp/bugmaster-pr9-integrated.coverage`：2,141/2,141 行、770/770 分支，均为 100%；JSON：`/private/tmp/bugmaster-pr9-integrated.json` |
+| 品牌 / Catalog / Benchmark | `python3.12 scripts/check_branding.py`、`python3.12 scripts/validate_catalog.py`、`python3.12 scripts/validate_benchmark.py`：均 PASS；Benchmark 只验证清单结构，50 场景未执行 |
+| Release 门禁 | `python3.12 scripts/quality_gate.py --mode release --coverage /private/tmp/bugmaster-pr9-integrated.json`：exit 1 / **No-Go**，功能清单未冻结、真实业务覆盖未超过 60%、核心 Happy/Negative/Edge 执行证据缺失 |
+| GitHub Actions | [Run 44907692817](https://github.com/naodeng/bugmaster/actions/runs/44907692817)：提交 `42850bb` 的单元 406 项中 402 通过、4 项 macOS ACL enforcement 测试在 Ubuntu 跳过；契约 80/80、安全 1/1、100% 行覆盖断言、Catalog、Benchmark 结构及品牌检查均通过 |
 
 ## 后续缺口
 

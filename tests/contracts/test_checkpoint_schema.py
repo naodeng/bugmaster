@@ -115,6 +115,76 @@ class CheckpointSchemaTests(unittest.TestCase):
                 store.create(checkpoint)
             self.assertEqual(list(Path(directory).iterdir()), [])
 
+    def test_checkpoint_reference_validator_accepts_schema_integer_numbers(self):
+        import tempfile
+
+        from bugmaster_core.action_journal_store import ActionJournalStore
+        from bugmaster_core.checkpoint_reference_validator import (
+            CheckpointReferenceValidator,
+        )
+        from bugmaster_core.checkpoint_store import CheckpointStore
+        from bugmaster_core.session_store import SessionStore
+
+        session_schema = json.loads(
+            (REPOSITORY_ROOT / "schemas" / "session.schema.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        session_validator = Draft202012Validator(
+            session_schema, format_checker=FormatChecker()
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            session_store = SessionStore(
+                directory, "session-1", session_validator.validate
+            )
+            session = {
+                "schemaVersion": "1.0",
+                "sessionId": "session-1",
+                "revision": 1,
+                "status": "created",
+                "projectRef": "project-local-orders",
+                "hostRef": "codex",
+                "environmentRef": "env-isolated-test",
+                "createdAt": "2026-11-19T08:00:00Z",
+                "updatedAt": "2026-11-19T08:00:00Z",
+                "scopeHistory": [{"scopeId": "scope-1", "revision": 1}],
+                "approvalRefs": [],
+                "actionBudget": {"maxActions": 20, "consumedActions": 0},
+                "journalId": "session-1-journal",
+                "checkpointRefs": [],
+            }
+            journal_store = ActionJournalStore(
+                directory, "session-1", "session-1-journal"
+            )
+            journal_store.initialize().close()
+            session_store.create(session)
+
+            checkpoint = self.valid_checkpoint()
+            checkpoint.update(
+                {
+                    "checkpointId": "checkpoint-1",
+                    "sessionRevision": 1.0,
+                    "scopeRevision": 1.0,
+                    "journalSequence": 0.0,
+                    "journalHeadHash": None,
+                }
+            )
+            checkpoint_store = CheckpointStore(
+                directory, "session-1", self.validator.validate
+            )
+            checkpoint_store.create(checkpoint)
+
+            latest = dict(session)
+            latest["revision"] = 2
+            latest["updatedAt"] = "2026-11-19T08:01:00Z"
+            latest["checkpointRefs"] = ["checkpoint-1"]
+            session_store.append_revision(latest, expected_revision=1)
+            validator = CheckpointReferenceValidator(
+                checkpoint_store, session_store, journal_store
+            )
+            self.assertEqual(validator.validate("checkpoint-1"), checkpoint)
+
 
 if __name__ == "__main__":
     unittest.main()
+

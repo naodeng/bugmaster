@@ -1,12 +1,12 @@
 # W6 Checkpoint 持久化 TDD 记录
 
-**日期：** 2026-11-19
+**日期：** 2026-11-20（持续更新）
 
 **Workstream / 义务：** W6-01 Checkpoint Persistence；`F-RECOVERY`；`TDD-ACT-005`
 
-**风险：** R3；合并前需要独立 Security Reviewer。
+**风险：** R3；合并前需要独立 Security Reviewer。PR #3 已于 2026-11-19 合入 `main`（merge `1368b1a`，Actions Run `44537417048` 成功）。
 
-**实现提交：** `ba8bc6a37d973af720519e200fb8fbdcb0e0b606`；草稿 PR [#4](https://github.com/naodeng/bugmaster/pull/4)，以 SessionStore PR #3 的 `codex/session-revision-store` 为 base，尚未合并。
+**初始实现提交：** `ba8bc6a37d973af720519e200fb8fbdcb0e0b606`。最终代码候选提交 `685a96724a1f6c6feaeb976deb1233129d7a73ce` 已推送至 `codex/checkpoint-store`；PR [#4](https://github.com/naodeng/bugmaster/pull/4) 于 2026-11-20 合入 `main`，merge commit `6c5d519`。最终 PR head `2215bc9` 对应 Actions Run `44662457674` 成功。以下验证记录为 PR 合并时的候选快照。
 
 ## Oracle 与范围
 
@@ -64,3 +64,36 @@
 ### VERIFY
 
 实现提交：`af9a92c059eccaf0ffb3e2dac607b29a0ff2b848`。修复后证据：CheckpointStore 定向测试 22/22 PASS；全单元 127/127 PASS；全契约 77/77 PASS；`bugmaster_core` 行覆盖 1017/1017（100%）、分支覆盖 414/414（100%）；`git diff --check` PASS。运行环境为 macOS/POSIX、Python 3.12.16、coverage.py 7.13.3、`jsonschema[format-nongpl]==4.26.0`，测试依赖安装于 `/private/tmp/bugmaster-review-venv`。本次没有新增安全测试目录或报告；Release 门禁仍按上文记录为 No-Go。
+
+## 2026-11-20 第二轮安全复审修复
+
+### RED
+
+在同步 PR #3 最新 SessionStore 基线后，先为复审发现增加回归测试并运行原 CheckpointStore：末级 `..` 根路径读不到现有记录；目录在“未持锁的缺失分支”后出现时仍被本次读取返回；取得旧 Session 锁后替换 Session 路径会读到另一目录的 Checkpoint；删除已有记录的共享锁后写入会重建锁；普通文件在类型检查后被替换为 FIFO 时，读取子进程超时。后续测试还证实重复解析根目录会漏出 SessionStore 异常，深层 JSON 和超长整数会分别漏出 `RecursionError` 与 `ValueError`，文件在 `fstat` 后增长可使读取超过内存上限；无权限父目录下构造和深层 `create()` 会分别漏出 `PermissionError` 与 `RecursionError`。超限写入原先会先调用 JSON 解码器，再因体积过大被拒绝；新增断言要求解码前拒绝。最终 Spec 复审还发现：把已创建的 `checkpoints/` 目录权限改为 `0755` 后，读取仍成功。新增 `tests/security/test_checkpoint_store_security.py` 后先运行失败（期望 `CheckpointCorruptionError`，实际未抛错），证明读取端没有维护 `0700` 私有目录约束。以上各项修复前均以针对性测试复现。
+
+### GREEN / REFACTOR
+
+- 根路径解析与 SessionStore 保持一致：解析并固定已有父级软链接，同时规范末级 `..`；若平台缺少目录相对、非跟随所需的 POSIX 标志，则失败关闭。
+- CheckpointStore 复用 SessionStore 的 `_locked()` 上下文、目录描述符和共享锁初始化规则。Session 与 Checkpoint 目录切换不会让操作脱离已加锁目录；缺失目录返回 `None`，已有数据却缺锁则报存储损坏，不重建锁。
+- Checkpoint 目录及记录文件使用目录描述符相对操作。记录文件以 `O_NONBLOCK | O_NOFOLLOW` 打开，并在打开后再次通过 `fstat` 验证常规文件类型；发布仍以同步临时文件和不覆盖硬链接完成。
+- 原始根路径只交给 SessionStore 解析一次，CheckpointStore 直接复用解析结果，并将构造期间的 SessionStore 与文件系统异常统一转换为 CheckpointStoreError。持久化解析、创建时规范编码/归一化及流式读取都捕获递归异常；超出 4 MiB 的创建输入在 JSON 归一化前拒绝，读取循环在追加数据前核对累计字节上限。
+- 读取时通过已打开的 Checkpoint 目录描述符核验权限必须为 `0700`；权限被放宽或改动时按存储损坏失败关闭。该边界测试归入 `tests/security/`，并加入 CI。
+
+### VERIFY
+
+环境：macOS/POSIX；Python 3.12.16；coverage.py 7.13.3；`jsonschema[format-nongpl]==4.26.0`（`/private/tmp/bugmaster-jsonschema`）。
+
+| 检查 | 命令 / 结果 |
+|---|---|
+| CheckpointStore 单元 | `PYTHONDONTWRITEBYTECODE=1 /private/tmp/bugmaster-review-venv/bin/python -m unittest tests.unit.test_checkpoint_store -v`：41/41 PASS |
+| 全单元 | `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/private/tmp/bugmaster-jsonschema /private/tmp/bugmaster-review-venv/bin/python -m coverage run --branch --source=bugmaster_core --data-file=/private/tmp/bugmaster-pr4-main.coverage -m unittest discover -s tests/unit`：197/197 PASS；`bugmaster_core/` 初始样例模块行覆盖 100%，不代表全项目 GATE-U100 已达成 |
+| R3 安全测试 | `PYTHONDONTWRITEBYTECODE=1 /private/tmp/bugmaster-review-venv/bin/python -m unittest discover -s tests/security -v`：1/1 PASS；CI 单独执行，不并入单元覆盖率报告 |
+| 行覆盖率 | `bugmaster_core` 1214/1214 行（100%）；`checkpoint_store.py` 169/169 行（100%） |
+| 分支覆盖率 | `bugmaster_core` 448/448（100%）；`checkpoint_store.py` 42/42（100%） |
+| 全契约 | `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/private/tmp/bugmaster-jsonschema /private/tmp/bugmaster-review-venv/bin/python -m unittest discover -s tests/contracts`：77/77 PASS |
+| Catalog / Benchmark / 品牌 | `scripts/validate_catalog.py` PASS；`scripts/validate_benchmark.py` manifest 结构 PASS（场景未执行）；`scripts/check_branding.py` PASS |
+| Release 门禁 | `scripts/quality_gate.py --mode release --coverage /private/tmp/bugmaster-pr4-main-coverage.json` 仍为 No-Go；真实功能覆盖、冻结清单及核心 Happy/Negative/Edge 证据未满足 |
+| R3 复审 | PASS：独立 Security Reviewer 确认最终目录权限修复无剩余安全发现；Spec 与 Standards 复核确认权限要求及双语文档一致。`bugmaster_core/` 100% 仅覆盖 GATE-U100 初始样例范围，不代表全项目门禁已达成 |
+| GitHub Actions | PASS | PR #4 代码提交 `685a96724a1f6c6feaeb976deb1233129d7a73ce` 的 [Run 44661819969](https://github.com/naodeng/bugmaster/actions/runs/44661819969) 成功；单元、契约、安全、行覆盖、Catalog、Benchmark 结构和品牌步骤全通过 |
+| Review threads | PASS | 两条未解决的 symlink-ancestor 与 FIFO-lock 评论已回复并解决；旧评论仍标记为过期 |
+| Diff 空白 | `git diff --check`：PASS |

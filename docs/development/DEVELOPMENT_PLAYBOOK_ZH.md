@@ -37,7 +37,7 @@
 ## 5. 本地命令
 ```bash
 python -m unittest discover -s tests/unit -v
-python -m coverage run --branch --source=bugmaster_core -m unittest discover -s tests/unit
+python -m coverage run --branch --source=bugmaster_core,scripts -m unittest discover -s tests/unit
 python -m coverage report --fail-under=100
 python scripts/quality_gate.py --mode release
 python scripts/validate_catalog.py
