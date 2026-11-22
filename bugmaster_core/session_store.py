@@ -402,11 +402,16 @@ class SessionStore:
         return normalized
 
     @contextmanager
-    def lock_revision_snapshot(self, *, root_fd=None):
-        """Hold the exclusive Session lock while yielding count and latest revision."""
-        with self._locked(root_fd=root_fd) as storage:
-            history = self._read_revisions_locked(storage)
-            yield history["count"], history["latest"]
+    def lock_revision_snapshot(self, *, root_fd=None, create_directories=True):
+        """Hold the Session lock while yielding count and latest revision."""
+        with self._locked(
+            create_directories=create_directories, root_fd=root_fd
+        ) as storage:
+            history = self._read_revisions_locked(storage) if storage else None
+            yield (
+                history["count"] if history else 0,
+                history["latest"] if history else None,
+            )
 
     @contextmanager
     def lock_revisions(self, *, root_fd=None):

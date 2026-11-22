@@ -15,11 +15,9 @@ def eligible_confirmed(finding, evidences, oracle):
     return {'eligible':not reasons,'reasons':reasons}
 
 def can_dispatch(action, approval, policy):
-    # This helper has no trusted scope or approval verifier yet. Caller-supplied
-    # dictionaries cannot establish authorization for any risk level.
+    # Caller-supplied dictionaries cannot establish authorization for any risk.
     return False
 
 def can_replay(action):
-    # This helper has no trusted read-only reconciler or authorization gateway.
     # Caller-supplied booleans cannot authorize replay of an unknown effect.
     return False
