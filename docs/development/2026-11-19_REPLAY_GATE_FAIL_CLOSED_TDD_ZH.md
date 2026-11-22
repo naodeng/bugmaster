@@ -121,3 +121,19 @@ PR #8 的最新 head `21ed1b9281566bb28c72f1708d40ad84cd6dce3e` 修复了 `Actio
 | Release Gate | `PYTHONDONTWRITEBYTECODE=1 python3.12 scripts/quality_gate.py --mode release --coverage /private/tmp/bugmaster-pr9-current.json`：按预期 NO-GO，Feature Inventory 未冻结、真实业务覆盖不足、核心 Happy/Negative/Edge 证据缺失 |
 
 PR #9 整合代码 tree `00f2b6ae995279fa6bf1d7e40dd5a1d8c209cc55` 的 Actions Run `44985928795`（最新证据 head `d904e4d`）全部通过。CodeX 通用与安全辅助审查请求已提交至 d904e4d，结果待返回；旧 head 上的 AI 结论不代表当前代码。独立真人 Q15 Security Reviewer 仍未签署，V-2 至 V-6 继续标记为待验证证据或威胁模型问题。
+
+## 2026-11-22：接入 PR #8 open() 绑定与 fail-closed gate 修复
+
+PR #8 新 head `907f03ef017ac438f2f0dd82732789ce59257cbe` 增加公开 `ActionJournalStore.open()` 的 Session `journalId` 绑定，并让 PR #8 自身的 dispatch、replay、confirmed Finding gates 在可信验证器接入前失败关闭。PR #9 原先基于 PR #8 head `21ed1b9`；本次合入新基线，生成整合提交 `4dac5546ce2533442ce8c8afb24b4084e4e3dc38`。冲突文件按 PR #8 最终行为合并，并保留 PR #9 的全自述 replay 契约负例。
+
+环境：macOS / Darwin，Python 3.12.16。当前整合树本地验证：
+
+| 检查 | 结果 |
+|---|---|
+| 全量单元 / 契约 / 安全 | 单元 412/412、契约 82/82、安全 1/1 PASS |
+| 行 / 分支覆盖 | `bugmaster_core/` 与 `scripts/` 共 2,154/2,154 语句、766/766 分支，分别统计，均 100%；覆盖 JSON：`/private/tmp/bugmaster-pr9-remediation.json` |
+| 原生 macOS ACL / 清单检查 | 完整单元与验证器测试在 Darwin 上运行；其中 `chmod +a` ACL 用例实际执行。Catalog、Benchmark manifest 结构、品牌扫描及 `git diff --check` PASS；Benchmark 场景未执行 |
+| Release Gate | **NO-GO（预期）**：Feature Inventory 未冻结、业务覆盖未超过 60%、核心 Happy/Negative/Edge 执行证据缺失 |
+| 远端 CI | 新 PR #8/#9 head 的 Actions **待运行/核验**；本地结果不代表远端 CI 或真人 Q15 批准 |
+
+PR #9 对 `can_dispatch()`、`can_replay()` 与 `eligible_confirmed()` 的增量仍保持 fail-closed。报告中的 V-2、V-3、V-5 为未证实的平台证据/DoS/legacy 可达性事项，V-4 属同 UID 威胁模型与测试覆盖事项，V-6 需按最终远端 head 核对 macOS 执行证据；本节不把它们记为已确认跨用户漏洞。
