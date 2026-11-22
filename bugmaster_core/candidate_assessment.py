@@ -350,7 +350,11 @@ def append_review_event(assessment, event):
 
     copied = deepcopy(assessment)
     review = copied.get("review")
-    if not isinstance(review, dict):
+    if (
+        not isinstance(review, dict)
+        or set(review) != {"required", "events"}
+        or not isinstance(review.get("required"), bool)
+    ):
         raise ValueError("review-history-invalid")
     events = review.get("events")
     if not isinstance(events, list):
@@ -408,7 +412,12 @@ def score_candidate_quality(outcomes):
             raise ValueError("outcome-must-be-an-object")
         truth = outcome.get("groundTruth")
         decision = outcome.get("decision")
-        if truth not in _GROUND_TRUTH or decision not in _CANDIDATE_DECISIONS:
+        if (
+            not isinstance(truth, str)
+            or truth not in _GROUND_TRUTH
+            or not isinstance(decision, str)
+            or decision not in _CANDIDATE_DECISIONS
+        ):
             raise ValueError("outcome-value-invalid")
         review_required = outcome.get("humanReviewRequired", False)
         if not isinstance(review_required, bool):

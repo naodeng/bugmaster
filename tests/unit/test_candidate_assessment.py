@@ -427,15 +427,33 @@ class CandidateAssessmentTests(unittest.TestCase):
         corrupt["review"] = "invalid"
         with self.assertRaises(ValueError):
             append_review_event(corrupt, review_event())
-        corrupt["review"] = {"events": "invalid"}
+        corrupt["review"] = {"required": False, "events": "invalid"}
         with self.assertRaises(ValueError):
             append_review_event(corrupt, review_event())
-        corrupt["review"] = {"events": ["invalid-event"]}
+        corrupt["review"] = {"required": False, "events": ["invalid-event"]}
         with self.assertRaises(ValueError):
             append_review_event(corrupt, review_event())
-        corrupt["review"] = {"events": [{"eventId": "REV-OLD", "candidateId": "CF-OTHER"}]}
+        corrupt["review"] = {
+            "required": False,
+            "events": [{"eventId": "REV-OLD", "candidateId": "CF-OTHER"}],
+        }
         with self.assertRaises(ValueError):
             append_review_event(corrupt, review_event())
+
+    def test_review_event_rejects_invalid_review_record_shape(self):
+        assessment = assess_candidate(candidate(), oracle(), [evidence()])
+        invalid_reviews = (
+            {"events": []},
+            {"required": "false", "events": []},
+            {"required": False, "events": [], "source": "untrusted"},
+        )
+
+        for review in invalid_reviews:
+            with self.subTest(review=review):
+                corrupt = copy.deepcopy(assessment)
+                corrupt["review"] = review
+                with self.assertRaisesRegex(ValueError, "review-history-invalid"):
+                    append_review_event(corrupt, review_event())
 
     def test_candidate_quality_reports_precision_recall_and_review_cost(self):
         metrics = score_candidate_quality(
@@ -493,6 +511,10 @@ class CandidateAssessmentTests(unittest.TestCase):
             score_candidate_quality([None])
         with self.assertRaises(ValueError):
             score_candidate_quality([{"groundTruth": "unknown", "decision": "candidate"}])
+        with self.assertRaisesRegex(ValueError, "outcome-value-invalid"):
+            score_candidate_quality([{"groundTruth": [], "decision": "candidate"}])
+        with self.assertRaisesRegex(ValueError, "outcome-value-invalid"):
+            score_candidate_quality([{"groundTruth": "bug", "decision": {}}])
         with self.assertRaises(ValueError):
             score_candidate_quality([{"groundTruth": "bug", "decision": "confirmed"}])
         with self.assertRaises(ValueError):
