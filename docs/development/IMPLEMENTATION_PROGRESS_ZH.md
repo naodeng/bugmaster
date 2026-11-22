@@ -1,7 +1,7 @@
 # BugMaster 工程实施进度矩阵
 
-**更新日期：** 2026-11-21
-**当前状态：** PR #1–#7 已合入 `main`，PR #7 merge commit 为 `c7fcfca24856eeb981389785d09bb4b84ca4bce4`。PR #8（W6-03）当前远端 head `58a601aa1dfa9639b38d9f9c6b0a62d9dbee2a4d` 的 Actions Run `44904668163` 成功；单测 406 项中 402 通过、4 项 macOS ACL 测试在 Ubuntu 跳过，三条历史 review 线程均已修复并解决；仍需 Q15 独立人工 Security Reviewer。PR #9（W6-04）已以提交 `42850bb49401a4090e0c8dc21ad2cdd4e0306bca` 接入最新 PR #8 head；Actions Run `44907692817` 成功，本地整合验证为单元 406/406、契约 80/80、安全 1/1、生产行/分支覆盖率 100%。命令、环境和结果见 [回放门禁 TDD 记录](2026-11-19_REPLAY_GATE_FAIL_CLOSED_TDD_ZH.md)。可信只读 verifier 和当前授权门禁仍未实现；完整产品仍为 Release No-Go。
+**更新日期：** 2026-11-22
+**当前状态：** PR #1–#7 已合入 `main`，PR #7 merge commit 为 `c7fcfca24856eeb981389785d09bb4b84ca4bce4`。PR #8 当前 head `21ed1b9281566bb28c72f1708d40ad84cd6dce3e`；代码/测试提交 `77d3a9c` 修复了已持久化 Session 与 Journal ID 不匹配仍可初始化的缺陷。Actions Run `44983187716` 验证代码/测试提交，Run `44983456594` 验证后续证据文档提交，均成功；独立人工 Q15 签署仍未记录。PR #9 当前代码/测试 head `e9e336b77e8e3ffb5aa42109857b8d7d436af27b`，使无可信验证器的派发与 Finding helper fail-closed；Actions Run `44983997546` 成功，本地单元 406/406、契约 82/82、安全 1/1、生产行/分支覆盖率 100%。RED/GREEN/VERIFY 证据见 [回放门禁 TDD 记录](2026-11-19_REPLAY_GATE_FAIL_CLOSED_TDD_ZH.md)。可信 Scope、Approval、Evidence 与只读 reconciliation verifier、授权、预算对账和安全恢复仍未实现；完整产品仍为 Release No-Go。
 
 ## 仓库审计摘要
 
@@ -23,8 +23,8 @@
 | W2 | 11 个独立 Skills | 本地闭包验证通过 | 11 个包均含规范 Skill/Pattern 闭包且 manifest 摘要一致；Codex/Claude 干净安装和真实 Eval 未验证 |
 | W3 | 16 个 Bug Patterns | 候选规则 | 需适用/排除、Oracle、反例和真实对照 Eval |
 | W4 | 风险路由与有界自主探索 | 部分实现 | `scripts/discover_openapi.py` 可从本地 OpenAPI 3 JSON 输出稳定 ID 和 JSON Pointer 来源清单；URL/Browser 发现、风险路由与动态执行仍待实现 |
-| W5 | R0–R3 动作级授权 | 部分实现 | R0/R1 基础 helper 已 fail-closed；无可信网关时 R2 现在 fail-closed；真实网关、审批摘要和修订绑定仍待实现 |
-| W6 | Action Journal、Session/Checkpoint 持久化与安全恢复 | 部分实现 | PR #3–#7 已合入 `main`，PR #3–#9 按 Q15 均属 R3。PR #8 以确定性身份映射 Journal 路径，固定 no-follow 目录描述符、检查可信祖先/私有模式与 ACL，并在缺失历史或存在不安全记录时失败关闭；Session 崩溃恢复只接受规范发布目标及同 inode，目录 `fsync` 失败后保留临时链接供后续恢复。PR #9 的 `can_replay()` 在可信只读 verifier 和当前授权门禁接入前恒返回 False，不实现权威 reconciliation、预算对账或安全恢复。代码/测试树提交 `42850bb49401a4090e0c8dc21ad2cdd4e0306bca` 的本地整合验证为 406/406 单元、80/80 契约、1/1 安全及 100% 生产行/分支覆盖；PR #8 Actions Run `44904668163` 和 PR #9 Run `44907692817` 均成功（Ubuntu 单元各有 4 项 macOS ACL 测试跳过）。详细命令、环境和结果见 [回放门禁 TDD 记录](2026-11-19_REPLAY_GATE_FAIL_CLOSED_TDD_ZH.md)。事件来源真实性、可信 Safe Resume、权威 Scope、授权与预算对账仍未实现。 |
+| W5 | R0–R3 动作级授权 | 部分实现 | `scripts/validate_gates.py` 的 `can_dispatch()` 在可信 Scope/Approval verifier 接入前对所有风险等级恒拒绝；自述 `scopeValidated` 不再授权。真实 Scope 解析、授权网关、审批摘要和修订绑定仍待实现 |
+| W6 | Action Journal、Session/Checkpoint 持久化与安全恢复 | 部分实现 | PR #3–#7 已合入 `main`；PR #8–#10 按 Q15 均属 R3。PR #8 以确定性身份映射 Journal 路径、固定 no-follow 目录描述符、检查可信祖先/私有模式与 ACL，并在缺失历史、Journal ID 不匹配或不安全记录时失败关闭；Session 崩溃恢复只接受规范发布目标及同 inode，目录 `fsync` 失败后保留临时链接供后续恢复。PR #9 的 `can_replay()`、`can_dispatch()` 与 `eligible_confirmed()` 在可信 verifier 接入前均 fail-closed；未实现权威 reconciliation、可信 Evidence/Oracle/Scope、预算对账或安全恢复。PR #8 本地验证为单元 408/408、契约 79/79、安全 1/1、生产行/分支 2,148/2,148 与 772/772；PR #9 本地验证为 406/406、82/82、1/1、2,138/2,138 与 766/766。PR #8 Actions Run `44983187716`、`44983456594` 和 PR #9 Run `44983997546` 均成功。详细命令、环境和结果见 [回放门禁 TDD 记录](2026-11-19_REPLAY_GATE_FAIL_CLOSED_TDD_ZH.md)。事件来源真实性、可信 Safe Resume 与预算对账仍未实现。 |
 | W7 | Finding、跨入口去重与报告 | 待实现 | 需 Oracle、来源、E3+ 证据和剩余风险追踪 |
 | W8 | 回归建议 | 待实现 | 只输出建议，不自动修改/提交测试代码 |
 | W9 | 50 场景 Benchmark | 计划中 | 需真实运行、隔离 Ground Truth 和 G0–G3 对照 |
@@ -38,11 +38,11 @@
 | 品牌与 Skill 命名扫描 | PASS | `python3 scripts/check_branding.py`；命名契约包含 4 项 Skill ID 检查 |
 | Catalog/Registry | PASS | `python3 scripts/validate_catalog.py` |
 | Benchmark Manifest | PASS（结构） | `validate_benchmark.py` 明确提示场景未执行 |
-| GitHub Actions | PR #4–#7 历史 head 检查通过；PR #8/#9 最新 head PASS | PR #4 Run `44662457674`、PR #5 最终 head Run `44690535886`、PR #6 最终文档 head Run `44697609761`、PR #7 代码 head Run `44748455778` 均成功；PR #8 Run `44904668163`、PR #9 Run `44907692817` 成功，两个 Ubuntu 单元步骤均为 406 项中 402 通过、4 项 macOS ACL 检查跳过 |
-| 单元测试 | PR #9 代码/测试树 SHA `42850bb49401a4090e0c8dc21ad2cdd4e0306bca` 本地 PASS，406/406 | 命令、环境与 PR #9 Actions 的 4 项平台跳过说明见 [回放门禁 TDD 记录](2026-11-19_REPLAY_GATE_FAIL_CLOSED_TDD_ZH.md)；覆盖 JSON：`/private/tmp/bugmaster-pr9-integrated.json` |
-| R3 安全测试 | PR #9 代码/测试树本地与 Actions PASS，1/1 | `python3.12 -m unittest discover -s tests/security`；Actions Run `44907692817` 通过。Q15 独立人工 Security Reviewer 尚未签署；不并入单元覆盖率分母 |
-| 契约测试 | PR #9 代码/测试树本地与 Actions PASS，80/80 | Python 3.12 + `jsonschema[format-nongpl]==4.26.0`；覆盖 Event v1.1、跨存储快照、确定性 Journal 路径和 replay gate 负例 |
-| 当前生产 Python 行/分支覆盖率 | PR #9 代码/测试树本地 PASS，100% / 100% | `bugmaster_core` + `scripts` 共 2141/2141 行、770/770 分支；JSON：`/private/tmp/bugmaster-pr9-integrated.json`。行/分支口径分开报告，不等于业务功能覆盖 |
+| GitHub Actions | PR #4–#7 历史 head 检查通过；PR #8/#9 当前代码均 PASS | PR #4 Run `44662457674`、PR #5 最终 head Run `44690535886`、PR #6 最终文档 head Run `44697609761`、PR #7 代码 head Run `44748455778` 均成功；PR #8 Runs `44983187716`、`44983456594` 与 PR #9 Run `44983997546` 全部成功 |
+| 单元测试 | PR #8 与 PR #9 代码/测试树本地 PASS | PR #8 408/408；PR #9 406/406。命令、环境与 4 项 macOS ACL 的 Ubuntu 跳过说明见 [回放门禁 TDD 记录](2026-11-19_REPLAY_GATE_FAIL_CLOSED_TDD_ZH.md)；PR #9 覆盖 JSON：`/private/tmp/bugmaster-pr9-v1.json` |
+| R3 安全测试 | PR #8/#9 本地与 Actions PASS，1/1 | `tests/security` 独立运行；Q15 独立人工 Security Reviewer 尚未签署；不并入单元覆盖率分母 |
+| 契约测试 | PR #8 79/79；PR #9 82/82，均 PASS | Python 3.12 + `jsonschema[format-nongpl]==4.26.0`；覆盖 Event v1.1、跨存储快照、确定性 Journal 路径、replay/dispatch/Finding fail-closed 合同 |
+| 当前生产 Python 行/分支覆盖率 | PR #8/#9 代码/测试树本地 PASS，100% / 100% | PR #8 `bugmaster_core` + `scripts` 共 2,148/2,148 语句、772/772 分支；PR #9 为 2,138/2,138、766/766。行/分支口径分开报告，不等于业务功能覆盖 |
 | 业务功能覆盖率 >60% | 未达成 | 目前没有真实业务执行证据 |
 | 核心 Happy / Negative / Edge | 未达成 | 需每个核心功能有三类实际通过证据 |
 | Release | No-Go | 全量功能、真实 Benchmark、双宿主和独立审批均未完成 |
