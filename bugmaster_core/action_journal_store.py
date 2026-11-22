@@ -271,8 +271,17 @@ class ActionJournalStore:
             session_store = SessionStore(
                 self._root, self._session_id, lambda _document: None
             )
-            with session_store.lock_revisions(root_fd=root_fd) as revision_count:
+            with session_store.lock_revision_snapshot(
+                root_fd=root_fd
+            ) as (revision_count, latest_session):
                 session_exists = revision_count > 0
+                if (
+                    session_exists
+                    and latest_session["journalId"] != self._journal_id
+                ):
+                    raise JournalCorruptionError(
+                        "canonical Journal ID does not match the stored Session"
+                    )
                 try:
                     directory_fd = self._open_store_directory_at(
                         root_fd, create=not session_exists
