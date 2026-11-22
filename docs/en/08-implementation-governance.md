@@ -37,7 +37,7 @@ These are **roles to be staffed**, not claims that reviewers have been assigned.
 | W10 Hosts | IM | QR+SR | W2–W9 | TDD-HOST-001..030, Codex/Claude Code evidence, BLK-01/06 |
 | W11 Release | RA | QR+SR | W1–W10 | CI, full benchmark, manifests, rollback and Go/No-Go, BLK-07 |
 
-Parallel implementation is permitted after interface freeze; no intermediate partial MVP release is authorized. VS-01 covers a real order-idempotency API flow, risk-based human R2 approval, write-ahead action intent, authentic evidence, E3 plus separate gates, immutable findings, redacted report/bundle, recommendation only, and safe resume against correct, faulty and unknown-timeout variants.
+Feature implementation is sequential, one PR at a time. Complete, verify, review, approve, and merge the active PR before starting the next feature; do not stack feature branches or open parallel implementation PRs. Workstream dependencies still define order and acceptance, but interface freeze is not permission to parallelize implementation. No intermediate partial MVP release is authorized. VS-01 covers a real order-idempotency API flow, risk-based human R2 approval, write-ahead action intent, authentic evidence, E3 plus separate gates, immutable findings, redacted report/bundle, recommendation only, and safe resume against correct, faulty and unknown-timeout variants.
 
 ## Blocking spikes (Q14 identifiers)
 

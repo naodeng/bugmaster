@@ -13,7 +13,7 @@
 | W7 | 发现与报告 | 确认可追溯 Bug、跨入口去重、Feature Coverage、Session Summary、中英文 Finding 报告与 Redaction |
 | W8 | 回归建议 | 基于 Confirmed Finding 给可执行测试建议但不修改测试代码 |
 | W9 | Benchmark | 50 场景 real-run correct/defect/ambiguous 变体，隔离 Ground Truth，G0–G3 对照；BLK-05 |
-| W10 | 双宿主 | Codex 和 Claude Code 实际安装、API/Browser 与权限/兼容矩阵；BLK-01/06 |
+| W10 | 双宿主 | 先比较 Codex Computer Use、ego-browser、agent-browser、Playwright CLI/MCP 等浏览器工具并记录 local-first / 证据 / 隔离 / 权限取舍，再做 Codex 和 Claude Code 实际安装、API/Browser 与权限/兼容矩阵；BLK-01/06；不新增 BugMaster Skill 或 Agent Runtime |
 | W11 | 发布治理 | 风险独立审核、Tag/Attestation、双人发行批准、恢复演练；BLK-07 |
 
 ## 阻断 Spikes

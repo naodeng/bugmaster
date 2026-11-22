@@ -22,7 +22,7 @@ W9-01,W9,Reference order API/UI and faulty variants,R2,EC,QR,"W1-01,W5-01",TDD-E
 W9-02,W9,"Fifty benchmark tasks, separated answers and scorer",R3,EC,SR,W9-01,TDD-EVAL-001..050,BLK-05 answers inaccessible,planned
 W9-03,W9,G0–G3 comparative runs and metric report,R2,EC,QR,W9-02,TDD-EVAL-026..050,Reproducible records and denominators,planned
 W10-01,W10,Codex/Claude Code packaging and clean installs,R2,IM,QR,"W2-02,W3-02",TDD-HOST-001..015,BLK-01 logs and hashes,planned
-W10-02,W10,Dual-host API/Browser/permission evaluation,R3,IM,SR,"W5-02,W7-02,W9-02",TDD-HOST-016..030,BLK-06 real run IDs,planned
+W10-02,W10,Browser tool research and dual-host API/Browser/permission evaluation,R3,IM,SR,"W5-02,W7-02,W9-02",TDD-HOST-016..030,"First compare Codex Computer Use, ego-browser, agent-browser, Playwright CLI/MCP and alternatives; document local-first, evidence, isolation and permission trade-offs; then run dual-host Browser/permission cases with real run IDs. No new BugMaster Skill or Agent Runtime",planned
 W11-01,W11,CI rules and governed PR workflows,R3,RA,SR,W0-03,GOV-001..010,Fork isolation; protected release,planned
 W11-02,W11,VS-01 and full release-candidate dry run,R3,RA,SR,"W2-02,W3-02,W4-02,W5-02,W6-02,W7-02,W8-01,W9-03,W10-02",REL-001..010,BLK-07 complete scope and evidence,planned
 W11-03,W11,"Release manifest, licensing, bilingual docs, rollback",R3,RA,SR,W11-02,REL-001..010,No-Go unless every gate passed,planned

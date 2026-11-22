@@ -16,6 +16,8 @@
 
 API 入口发现的问题不一定是 API 层根因；Web 上观察到异常也未必是前端问题。分别保存 testSurface、observedLayer、failureType、suspectedComponent、rootCauseStatus。
 
+候选筛选与 Finding 确认分开：候选结果只允许 `candidate`、`needs_review`、`rejected` 或 `duplicate`，不能直接确认 Finding。自动拒绝必须由绑定同一 Oracle 的 E3+ 反证支持正常行为，并通过可信 Oracle 与 Evidence 来源校验。规则缺失或模糊、证据弱、来源未验证、环境不稳或观察矛盾时继续 Review。人工反馈须绑定候选 revision 和证据；没有可信宿主审核记录时，反馈不能作为已认证批准。
+
 ## 规则在哪看
 - `patterns/taxonomy.json` 分类；`patterns/<domain>/<pattern-id>/pattern.json` 单条规则；`registry/capabilities.json` Skill 路由。
 - 正式规则应补齐适用条件、反例排除、业务 Oracle 来源、具体实验、证据、误报防护，并对正常/缺陷实现执行 Eval；当前 16 条仍是 Candidate。

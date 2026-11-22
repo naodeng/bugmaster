@@ -3,6 +3,8 @@
 VALID_LEVELS={'E0','E1','E2','E3','E4'}
 def eligible_confirmed(finding, evidences, oracle):
     reasons=['trusted-evidence-verifier-unavailable']
+    if 'candidateAssessment' in finding:
+        reasons.append('candidate-assessment-not-confirmed-finding')
     if finding.get('evidenceLevel') not in {'E3','E4'}: reasons.append('evidence-level-below-E3')
     if oracle.get('status')!='validated' or not oracle.get('sourceRef'): reasons.append('oracle-not-validated')
     valid_tool_evidence=[e for e in evidences if e.get('source')=='tool-execution' and e.get('provenanceVerified') is True and e.get('integrityVerified') is True]

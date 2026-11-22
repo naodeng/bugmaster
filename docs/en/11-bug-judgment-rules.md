@@ -18,5 +18,7 @@
 ## Verdict
 `confirmed` requires validated Oracle and E3+ authentic evidence; otherwise `suspected`/`needs_review`. A violation found in Browser does not automatically mean root cause is frontend. Record observed surface separately from suspected layer and actual root-cause verification.
 
+Candidate screening is a separate decision layer: `candidate`, `needs_review`, `rejected`, or `duplicate`; it never confirms a Finding. Automatic rejection requires same-Oracle E3+ counter-evidence that supports expected behavior, plus trusted Oracle and Evidence verification. Missing or ambiguous rules, weak evidence, unverified sources, unstable environments, or conflicting observations stay in review. Human feedback is recorded against the candidate revision and evidence, but is not treated as authenticated approval without a trusted host review record.
+
 ## Rule discovery
 Machine-readable rules live in `patterns/<domain>/<BP-ID>/pattern.json`, indexing in `patterns/taxonomy.json` and `registry/capabilities.json`. They are **candidate skeletons** requiring applicability, exclusions, evaluator, false-positive branches, a positive case and a correct-implementation negative case for release.

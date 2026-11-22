@@ -4,7 +4,7 @@
 
 ## Scope contract
 
-Ship all: 11 canonical Skills, 16 Patterns, 50 benchmark cases, API and basic browser real paths, Codex and Claude Code verified core, Finding/Evidence/Oracle/Session contracts, recovery, export, regression recommendations and CI governance. **Do not release VS-01 alone as MVP**. A vertical slice is an internal integration test milestone; feature work may be parallelized but one MVP Go/No-Go covers the complete agreed scope.
+Ship all: 11 canonical Skills, 16 Patterns, 50 benchmark cases, API and basic browser real paths, Codex and Claude Code verified core, Finding/Evidence/Oracle/Session contracts, recovery, export, regression recommendations and CI governance. **Do not release VS-01 alone as MVP**. A vertical slice is an internal integration test milestone; implementation is sequential, one feature PR at a time. Finish, verify, review, approve, and merge the active PR before starting the next feature. One MVP Go/No-Go covers the complete agreed scope.
 
 ## Workstream ownership / dependency graph
 

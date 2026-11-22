@@ -33,6 +33,9 @@
 - Do not generate/commit regression tests as part of Q9: output recommendations only.
 
 ## Pull requests
+- Work on one implementation PR at a time. Finish its implementation, verification, review, and required approvals, then merge it before starting the next feature or opening its PR.
+- Do not stack feature branches or PRs on unmerged PRs. Start the next feature from the latest merged base.
+- If the active PR is blocked on CI, review, or approval, pause subsequent feature work and resolve the active PR first; report any human-only blocker instead of accumulating downstream PRs.
 - Reference workstream W0–W11 and a Feature/Obligation ID.
 - Show RED → GREEN → REFACTOR → VERIFY with links, test and coverage reports, and approvals in Chinese.
 - For R2 require independent Quality Reviewer, for R3 independent Security Reviewer. Two distinct real people for final release RI + IRR; no self approval.

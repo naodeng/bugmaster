@@ -15,6 +15,7 @@
 | Action | Session Action Journal | 事前写意图；未知执行结果禁止重放 |
 | Oracle | `.bugmaster/oracles/` 不可变版本 | 来源、适用条件、有效性 |
 | Evidence | 元数据 + 内容哈希 Artifact | 哈希证明完整性，不单独证明真实性 |
+| Candidate Assessment | Candidate revision 中的 `candidateAssessment` | 只表示筛选结果；不能是 `confirmed`；拒绝必须关联反证 |
 | Finding | 不可变 Revision + `current.json` | 报告/索引由权威数据生成 |
 | Review | 真实审核记录 | 绑定 Finding、Oracle 和证据摘要 |
 | Session | 不可变版本 + `ActionJournalStore` + Checkpoint | Session 身份确定本地 Journal 路径；恢复门禁仍独立 |
@@ -36,6 +37,12 @@
 ## 缺陷确认准入
 
 Confirmed 需要有效且适用的 Oracle、真实且可追溯的执行证据、明确的预期违反、环境/因果排查、没有阻断级矛盾、至少 E3 的门禁评估，以及策略要求时的真实人工 Review。E4 独立复核不作为普遍强制条件。偶现无法再次复现不自动推翻可信原始证据。Evidence Level 与 Severity/Confidence 完全独立。
+
+## 候选筛选与反馈
+
+候选评估只允许 `candidate`、`needs_review`、`rejected` 和 `duplicate`，不能表示 `confirmed`。固定原因码说明 Oracle/证据缺失、Oracle/证据来源尚未验证、环境不稳定、误报检查不确定、观察相互矛盾、重复关联、策略要求人工复核或存在可信反证。拒绝必须有绑定同一已验证 Oracle 的 E3+ 工具执行证据，并表明实际行为符合预期；还必须由可信 Oracle 与 Evidence verifier 回调同时确认来源。自述的 `validated` 或来源验证标志不能作为依据；未提供两个可信 verifier 时必须保持 `needs_review`。模型意见不能单独拒绝。E3+ 违规证据与反证冲突时必须转 `needs_review`。
+
+跨表面去重只关联目标、业务对象、操作、Oracle 和违规签名均相同的候选。表面字段不参与该身份，因此 API 与 Browser 观测可以关联且不重复计数。人工反馈以事件列表追加，并绑定 Candidate revision 和证据引用。当前 helper 只返回更新后的内存值；本次改动没有实现不可变 Candidate/Finding 持久化或证据来源真实性校验。
 
 ## 审批与恢复
 
