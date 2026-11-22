@@ -282,6 +282,15 @@ class CandidateAssessmentTests(unittest.TestCase):
 
         self.assertNotIn("identity", assessment)
 
+    def test_candidate_identity_with_empty_value_is_omitted(self):
+        identity = {**candidate()["identity"], "operationRef": ""}
+
+        assessment = assess_candidate(
+            candidate(identity=identity), oracle(), [evidence()]
+        )
+
+        self.assertNotIn("identity", assessment)
+
     def test_unhashable_evidence_level_is_treated_as_invalid_evidence(self):
         assessment = assess_candidate(
             candidate(), oracle(), [evidence(level=["E3"])]
