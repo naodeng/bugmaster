@@ -40,7 +40,9 @@ Confirmed 需要有效且适用的 Oracle、真实且可追溯的执行证据、
 
 ## 候选筛选与反馈
 
-Candidate Assessment Schema 为未来可信 Host verifier 流程保留 `rejected`；当前 `assess_candidate()` helper 只输出 `candidate`、`needs_review` 或 `duplicate`，并且不接受调用方传入的 verifier 回调。可信 Host verifier 接入前，结构有效的反证仍保持 `needs_review`，并标记来源尚未验证。自述的 `validated` 或来源验证标志不能作为依据。模型意见不能单独拒绝。E3+ 违规证据与反证冲突时必须转 `needs_review`。`candidate-assessment-rejected.json` 仅用于验证 Schema 结构，不是运行时输出。
+Candidate Assessment Schema 为未来可信 Host verifier 流程保留 `rejected`；当前 `assess_candidate()` helper 只输出 `candidate`、`needs_review` 或 `duplicate`，并且不接受调用方传入的 verifier 回调。可信 Host verifier 接入前，结构有效的反证仍保持 `needs_review`，并标记来源尚未验证。自述的 `validated` 或来源验证标志不能作为自动拒绝的依据。模型意见不能单独拒绝。E3+ 违规证据与反证冲突时必须转 `needs_review`。`candidate-assessment-rejected.json` 仅用于验证 Schema 结构，不是运行时输出。
+
+`candidate` 和 `duplicate` 是基于调用方所给记录的本地暂定筛选结果。helper 不认证来源标志，也不通过规范存储核验 `duplicateOf`。Host 在把这些结果当作权威状态，或据此抑制/汇总记录前，必须核验来源真实性和被引用的 Candidate。Candidate Assessment 始终被 Confirmed Gate 阻断。
 
 跨表面去重只关联目标、业务对象、操作、Oracle 和违规签名均相同的候选。表面字段不参与该身份，因此 API 与 Browser 观测可以关联且不重复计数。人工反馈以事件列表追加，并绑定 Candidate revision 和证据引用。当前 helper 只返回更新后的内存值；本次改动没有实现不可变 Candidate/Finding 持久化或证据来源真实性校验。
 

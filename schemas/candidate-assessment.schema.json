@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://bugmaster.dev/schemas/candidate-assessment.schema.json",
   "title": "BugMaster Candidate Assessment",
-  "description": "A screening decision for a versioned candidate. It cannot represent a confirmed Finding.",
+  "description": "A provisional screening decision for a versioned candidate. It cannot represent a confirmed Finding; a host must verify provenance and duplicate references before treating results as authoritative.",
   "type": "object",
   "additionalProperties": false,
   "required": [

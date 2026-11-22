@@ -3,12 +3,13 @@
 **日期：** 2026-11-22
 **工作流：** W3 / W7 / W9；对应既有 Feature ID `F-FINDING`、`F-DEDUP`、`F-BENCHMARK`。本记录不新增 Feature Inventory 分母或正式 TDD ID。
 **验证基线 HEAD：** `336ce6277f0965c36fcbe61fbb90f50ea01ea2bf`
-**实现提交：** `6f122d1`（基于 PR #10 合并分支 `1f974bc` 重放）
+**实现提交：** `6f122d1`（基于 PR #10 合并提交 `1f974bc` 重放；该提交已是本轮 main 复核基线 `f97ca8f` 的祖先，不会由本 PR 重新引入 W6 变更）
 
 ## 变更范围
 
 - 增加 `Candidate Assessment` Schema 和纯本地筛选 helper；Schema 决策允许 `candidate`、`needs_review`、`rejected`、`duplicate`，不会生成 `confirmed`。2026-11-22 所有者复核后，当前运行时仅输出 `candidate`、`needs_review` 或 `duplicate`；Schema 的 `rejected` 仅为未来 Host verifier 集成保留。
-- 固定拒绝原因码；候选输入格式错误、误报检查不确定、证据冲突、环境不稳定或 Oracle/Evidence 来源未验证时 fail-closed。
+- 固定拒绝原因码；缺少/结构无效的 Oracle 或 Evidence、误报检查不确定、证据冲突及环境不稳定时转 `needs_review`。
+- `candidate` 与 `duplicate` 是根据调用方输入作出的本地暂定筛选结果。当前 helper 不认证 Oracle/Evidence 来源标志，也不从规范存储验证 `duplicate_of`；Host 在确认来源或据此抑制/汇总记录前必须完成这些校验。任何 Candidate Assessment 均不能通过 Confirmed Gate。
 - 初始实现曾用调用方传入的 `oracle_verifier` 与 `evidence_verifier` 回调控制 `rejected`；经安全复核发现调用方可自行提供恒真回调。所有者已决定在可信 Host verifier 集成前关闭自动 `rejected`；当前 API 不接受调用方 verifier 回调，结构有效的反证会保持 `needs_review`。
 - Review Event 追加到 Candidate revision 并绑定证据引用；本实现只更新内存副本，不认证 `reviewerId`，不提供持久化或签名身份。
 - 指标分别记录候选 Precision/Recall、错误拒绝、模糊 Oracle、重复关联和人工审核时长；没有真实 Ground Truth / 工时数据时不输出正式 Eval 结论。
@@ -29,6 +30,11 @@
 | 重复 Candidate 在需要人工复核时被提前排除，人工审核计数为 0 | 先统计人工审核工作量，再将重复项排除出缺陷 Precision/Recall 分母 |
 | Review Event 的布尔 revision、重复 Evidence 引用和指向其他 Candidate 的既有事件未被拒绝 | 严格校验 Revision 类型、Evidence 唯一性及追加前历史绑定；仅追加同一 Candidate revision 的反馈 |
 | Schema 时间戳负例最初因未启用 FormatChecker 未被识别 | 契约测试启用 JSON Schema `FormatChecker`，`reviewedAt` 非 RFC3339 时间值被拒绝 |
+
+## REFACTOR
+
+- Review Event 历史复用 `append_review_event()` 的绑定、时间戳和引用校验路径；没有为这一小段确定性 helper 增加额外抽象。
+- 合并 PR #10 后的目标单测与契约测试分别为 474/474 与 96/96 PASS；本轮安全修复的定向单元与 Schema 契约复跑为 40/40 与 11/11 PASS。
 
 ## VERIFY
 
@@ -86,12 +92,14 @@
 
 | 检查 | 结果 | 证据与边界 |
 |---|---|---|
-| CodeX 代码扫描：Standards / Spec | PASS | 两轴均未发现未解决的代码规范违规或需求实现缺陷。Standards 指出的 VERIFY 证据缺口已在本表补记。 |
-| CodeX 安全扫描 | PASS（源码审查） | 未发现当前可确认的漏洞；重点检查 Candidate 输入、Oracle/Evidence 来源、拒绝决策、Review Event 和 Confirmed Gate。此项为只读源码扫描，未执行目标代码。 |
+| CodeX 代码扫描（预修复 head `cfcec1b`） | FINDINGS_FIXED，待最终复扫 | Spec 发现 extra `identity` 可导致输出违反 Schema，以及非列表 `reviewEvents` 被静默丢弃；本轮已按 RED → GREEN 修复。其“PR #10 尚未进入 main”的历史范围疑问经 ancestry 检查排除：`1f974bc` 已是基线 `f97ca8f` 的祖先。最终 CodeX 扫描需绑定修复后的准确 PR head。 |
+| CodeX 安全扫描（预修复 head `cfcec1b`） | 无已确认安全漏洞 | 源码扫描确认 `candidate` / `duplicate` 只是暂定结果，不绕过 Confirmed Gate；未来 Host 需核验来源与规范重复引用。此项为只读扫描，未执行目标代码。 |
 | 本地全量单元、契约、安全测试与覆盖率 | NOT_RUN | 当前本机沙箱无法同时强制安全审查要求的累计磁盘配额等隔离限制，因此没有在本机执行目标测试代码。提交后的 GitHub Actions 必须对准确 PR head 执行这些工作流；其结果在 PR 记录。 |
-| 本地差异空白检查 | PASS | `git diff --cached --check`，当前工作树；未报告空白错误。 |
+| 本地差异空白检查 | PASS | `git diff --check`，修复工作树；未报告空白错误。 |
 | PR #12 首次 Actions（head `bc40b929`，Run `45012754683`） | FAIL（覆盖率） | 单元 477 项运行、4 项跳过且无失败；契约 96/96、security 1/1 通过。覆盖率为 2374/2375 行、877/878 分支；唯一缺行为 `scripts/validate_gates.py:7`。后续清单步骤因门禁失败而跳过。 |
 | 覆盖率修复（head `d65f5b4`，Run `45013082076`） | PASS | 增加 unit 行为断言覆盖 `candidateAssessment: null` 的字段存在分支。单元 478 项运行、4 项跳过且无失败；契约 96/96、安全 1/1、行覆盖率门禁及 Catalog/Benchmark/Branding 均通过。该工作流当时未将分支百分比打印到日志。 |
-| 分支覆盖率报告步骤 | PENDING | 工作流新增 `python -m coverage report -m`，使开启的分支覆盖率能在 Actions 日志单独核验和记录；等待此工作流改动所在准确 PR head 完成。仅在所需 Actions 全部成功后合并。 |
+| 分支覆盖率报告（head `cfcec1b`，Run `45013316053`） | PASS | 单元 478 项运行、4 项跳过；契约 96/96、安全 1/1；行覆盖 `2375/2375`、分支覆盖 `878/878`。Catalog、Benchmark Manifest、Branding 均 PASS。 |
+| Malformed input RED（head `d17c219`，Run `45014132903`） | RED（预期） | unit 480 项运行，新增两项均按预期失败：额外 identity 字段仍进入输出，非列表 `reviewEvents` 被静默忽略。其他测试流程因单测失败跳过。 |
+| Schema identity / review history 修复后的 PR Actions | PENDING | 已更新 `_identity()` 只复制 Schema 允许的字段；非列表 `reviewEvents` 现在抛出 `candidate-review-history-invalid`。等待该修复和中英文边界说明所在准确 head 的完整 Actions 与最终 CodeX 双轴/安全扫描。 |
 
 扫描命令的固定点与结论按本节记录；GitHub Actions 的提交 SHA、Run 链接和结果在 PR 中补充。Release Gate 仍按真实业务覆盖和执行证据单独判定，现有 Release 状态保持 No-Go。

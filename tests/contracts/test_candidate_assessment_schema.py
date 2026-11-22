@@ -63,6 +63,12 @@ class CandidateAssessmentSchemaTests(unittest.TestCase):
         assessment = assess_candidate(candidate, oracle, [evidence])
         self.assertEqual(list(self.validator.iter_errors(assessment)), [])
 
+        extra_identity = copy.deepcopy(candidate)
+        extra_identity["identity"]["unrecognized"] = "ignored"
+        assessment = assess_candidate(extra_identity, oracle, [evidence])
+        self.assertNotIn("identity", assessment)
+        self.assertEqual(list(self.validator.iter_errors(assessment)), [])
+
         malformed_checks = copy.deepcopy(candidate)
         malformed_checks["falsePositiveChecks"] = ["invalid-check"]
         assessment = assess_candidate(malformed_checks, oracle, [evidence])

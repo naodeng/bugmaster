@@ -113,7 +113,7 @@ def _matching_refs(
 
 def _identity(candidate):
     identity = candidate.get("identity")
-    if not isinstance(identity, dict):
+    if not isinstance(identity, dict) or set(identity) != set(_IDENTITY_FIELDS):
         return None
     values = tuple(identity.get(field) for field in _IDENTITY_FIELDS)
     if not all(_nonempty(value) for value in values):
@@ -215,10 +215,11 @@ def assess_candidate(
         evidences = []
 
     assessment = _assessment_base(candidate)
-    review_events = candidate.get("reviewEvents")
-    if isinstance(review_events, list):
-        for event in review_events:
-            assessment = append_review_event(assessment, event)
+    review_events = candidate.get("reviewEvents", [])
+    if not isinstance(review_events, list):
+        raise ValueError("candidate-review-history-invalid")
+    for event in review_events:
+        assessment = append_review_event(assessment, event)
     if duplicate_of is not None:
         if not isinstance(duplicate_of, dict):
             raise ValueError("duplicate-reference-invalid")
