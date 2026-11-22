@@ -46,8 +46,14 @@
 ### 最终代码审查追加发现的 RED/GREEN
 
 - **RED 固定点：** `fa1a7d5fc4e51f072fcb0598088f8ac798e602f3`；仅测试文件有未提交改动。
-- **RED 环境与命令：** Python 3.12.16；`/private/tmp/bugmaster-candidate-check/bin/python -m unittest discover -s tests/unit -p 'test_candidate_assessment.py' -k candidate_quality_rejects_unknown_values -v` — `TypeError: unhashable type: 'list'`。同环境执行 `... -k review_event_rejects_invalid_review_record_shape -v`，两种非法 review 对象均未抛出预期 `ValueError`。
+- **RED 环境与命令：** Python 3.12.16；`/private/tmp/bugmaster-candidate-check/bin/python -m unittest discover -s tests/unit -p 'test_candidate_assessment.py' -k candidate_quality_rejects_unknown_values -v` — `TypeError: unhashable type: 'list'`。执行 `/private/tmp/bugmaster-candidate-check/bin/python -m unittest discover -s tests/unit -p 'test_candidate_assessment.py' -k review_event_rejects_invalid_review_record_shape -v`，两种非法 review 对象均未抛出预期 `ValueError`。
 - **GREEN：** 先校验评分枚举输入为字符串，并要求 review 对象精确包含布尔 `required` 与 `events`；上述两个定向测试各 1/1 PASS，Candidate Assessment 单测 46/46 PASS，Schema 契约 11/11 PASS。
+
+### Spec 复扫追加发现的证据绑定 RED/GREEN
+
+- **RED 固定点：** `5546d7143a1a8b41bb661af80e0d8b883b0f53c8`；当时仅测试文件有未提交改动。
+- **RED 命令：** `/private/tmp/bugmaster-candidate-check/bin/python -m unittest discover -s tests/unit -p 'test_candidate_assessment.py' -k counterevidence_for_different_oracle -v`，断言 `EV-002` 不应出现在 OR-001 候选结果中，但实际被合并；执行 `/private/tmp/bugmaster-candidate-check/bin/python -m unittest discover -s tests/unit -p 'test_candidate_assessment.py' -k review_event_rejects_invalid_assessment_evidence_refs -v`，空值与重复引用两种用例均未抛出预期 `ValueError`。
+- **GREEN：** 仅合并与 Candidate Oracle 引用一致的 counter-evidence；追加 Review Event 前验证 assessment 引用全部非空且唯一。重复相同两条命令均 PASS；Candidate Assessment 单测 48/48 PASS。
 
 ## REFACTOR
 
@@ -57,7 +63,26 @@
 
 ## VERIFY
 
-运行环境：Python 3.12 临时验证环境 `/private/tmp/bugmaster-candidate-check`；`PY=/private/tmp/bugmaster-candidate-check/bin/python`；验证依赖未写入产品运行时依赖。
+运行环境：仓库工作树根目录；Python 3.12.16 临时验证环境 `/private/tmp/bugmaster-candidate-check`；`PY=/private/tmp/bugmaster-candidate-check/bin/python`；验证依赖未写入产品运行时依赖。
+
+`a694bdd03b1c2968baf5f59a20d0bed73fc0fc47` 的本地复验命令如下：
+
+```sh
+PY=/private/tmp/bugmaster-candidate-check/bin/python
+$PY --version
+$PY -m unittest discover -s tests/unit
+$PY -m unittest discover -s tests/contracts
+$PY -m unittest discover -s tests/security
+export COVERAGE_FILE=/private/tmp/bugmaster-final-clean.coverage
+$PY -m coverage run --branch --source=bugmaster_core,scripts -m unittest discover -s tests/unit
+$PY -m coverage json -o /private/tmp/bugmaster-final-clean-coverage.json
+$PY -m coverage report -m
+$PY -c 'import json; d=json.load(open("/private/tmp/bugmaster-final-clean-coverage.json")); t=d["totals"]; missing={path:report["missing_lines"] for path, report in d.get("files", {}).items() if report.get("missing_lines")}; assert t["num_statements"] > 0 and t["covered_lines"] == t["num_statements"], {**t, "uncovered_lines":missing}'
+$PY scripts/validate_catalog.py
+$PY scripts/validate_benchmark.py
+$PY scripts/check_branding.py
+git diff --check
+```
 
 | 检查 | 命令 / 结果 |
 |---|---|
@@ -113,7 +138,7 @@
 |---|---|---|
 | CodeX 代码扫描（预修复 head `cfcec1b`） | FINDINGS_FIXED，待最终复扫 | Spec 发现 extra `identity` 可导致输出违反 Schema，以及非列表 `reviewEvents` 被静默丢弃；后续按 RED → GREEN 修复。分支 ancestry 检查确认 `1f974bc` 不是基线 `f97ca8f` 的祖先；最终 PR 已从 `f97ca8f` 重建，避免带入原分支提交历史。 |
 | CodeX 安全扫描（预修复 head `cfcec1b`） | 无已确认安全漏洞 | 源码扫描确认 `candidate` / `duplicate` 只是暂定结果，不绕过 Confirmed Gate；未来 Host 需核验来源与规范重复引用。此项为只读扫描，未执行目标代码。 |
-| 本地全量单元、契约、安全测试与覆盖率（code fix commit `b6c029bec4c96b8e085887fc10a42d1e8f470abd`） | PASS | Python 3.12.16 临时环境 `/private/tmp/bugmaster-candidate-check`。命令：`$PY -m unittest discover -s tests/unit`、`$PY -m unittest discover -s tests/contracts`、`$PY -m unittest discover -s tests/security`，结果分别 484/484、96/96、1/1 PASS。覆盖：`COVERAGE_FILE=/private/tmp/bugmaster-final-clean.coverage $PY -m coverage run --branch --source=bugmaster_core,scripts -m unittest discover -s tests/unit`，之后运行 `coverage json -o /private/tmp/bugmaster-final-clean-coverage.json`、`coverage report -m` 和 100% 行断言，结果 2377/2377 行、878/878 分支。Catalog、Benchmark Manifest、Branding 与 `git diff --check` 均 PASS；Benchmark 明确为 NOT executed。 |
+| 本地全量单元、契约、安全测试与覆盖率（code fix commit `a694bdd03b1c2968baf5f59a20d0bed73fc0fc47`） | PASS | Python 3.12.16；单元 486/486、契约 96/96、安全 1/1。完整环境和逐条命令见上方代码块；覆盖率 2377/2377 行、878/878 分支。Catalog、Benchmark Manifest、Branding 与 `git diff --check` 均 PASS；Benchmark 明确为 NOT executed。 |
 | 本地差异空白检查 | PASS | `git diff --check`，修复工作树；未报告空白错误。 |
 | PR #12 首次 Actions（head `bc40b929`，Run `45012754683`） | FAIL（覆盖率） | 单元 477 项运行、4 项跳过且无失败；契约 96/96、security 1/1 通过。覆盖率为 2374/2375 行、877/878 分支；唯一缺行为 `scripts/validate_gates.py:7`。后续清单步骤因门禁失败而跳过。 |
 | 覆盖率修复（head `d65f5b4`，Run `45013082076`） | PASS | 增加 unit 行为断言覆盖 `candidateAssessment: null` 的字段存在分支。单元 478 项运行、4 项跳过且无失败；契约 96/96、安全 1/1、行覆盖率门禁及 Catalog/Benchmark/Branding 均通过。该工作流当时未将分支百分比打印到日志。 |
@@ -123,6 +148,7 @@
 | PR #12 审查评论 RED（临时干净分支基线 `f97ca8fb002f17e51986b91269a3df0556cd63a6`，仅测试文件有未提交测试改动） | RED（预期） | `python3.12 -m unittest discover -s tests/unit -p 'test_candidate_assessment.py' -k conflicting_observations_in_candidate_evidence -k review_event_can_reference_counterevidence -v` — 2 项失败：第一项得到 `candidate` 而非 `needs_review`；第二项抛出 `ValueError: review-event-evidence-invalid`。 |
 | PR #12 审查评论 GREEN（同一临时分支，生产修复后） | PASS | 同一 Python 3.12 命令 — 2/2 PASS；完整 Candidate Assessment 单测 45/45 PASS；Schema 契约 11/11 PASS；`git diff --check` PASS。 |
 | 首轮 CodeX Spec 扫描发现项（head `fa1a7d5`） | FIXED | unhashable `groundTruth` / `decision` 会抛出 `TypeError`；Review Event 追加会保留 Schema 无效的 `review` 对象。均在 `b6c029b` 修复，新增负例并通过 full unit/coverage。 |
+| 第二轮 CodeX Spec 扫描发现项（head `5546d71`） | FIXED | 与候选 Oracle 不匹配的 counter-evidence 引用不得加入结果；现有 assessment `evidenceRefs` 必须非空且唯一。均在 `a694bdd` 修复，两个新回归测试以及全量本地验证通过。 |
 | CodeX Security 扫描（head `fa1a7d5`） | PASS，无已确认漏洞 | 只读源码扫描；Candidate Assessment 结果保持暂定，counter-evidence 不自动拒绝，也不能通过 Confirmed Gate。Host 来源认证、规范重复引用验证及 reviewer 身份认证仍待集成；最终 head 复扫待完成。 |
 | 当前开发记录、最终 PR Actions 和 CodeX 双扫描 | PENDING | 历史 RED 原始证据未完整保留，已如实标注为历史摘要；当前 PR 评论及代码扫描发现均有可复核 RED/GREEN。最终 Actions 与双扫描需绑定最终 PR head 后再合并。 |
 
