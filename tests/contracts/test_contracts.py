@@ -33,7 +33,18 @@ class CoreContractTests(unittest.TestCase):
     def test_r3_never_dispatches(self):self.assertFalse(can_dispatch({'risk':'R3'}, {}, {'scopeValidated':True}))
     def test_unknown_outcome_never_replays(self):
         self.assertFalse(can_replay({'outcome':'unknown','newAuthorizationValid':True}))
-        self.assertTrue(can_replay({'outcome':'reconciled-not-executed','reconcilerVerified':True,'newAuthorizationValid':True}))
+        self.assertFalse(can_replay({'outcome':'reconciled-not-executed','reconcilerVerified':True,'newAuthorizationValid':True}))
+    def test_self_asserted_r0_and_r1_scope_never_dispatches(self):
+        for risk in ('R0','R1'):
+            self.assertFalse(can_dispatch({'risk':risk}, {}, {'scopeValidated':True}))
+    def test_self_asserted_evidence_and_oracle_never_confirms_finding(self):
+        result=eligible_confirmed(
+            {'evidenceLevel':'E3','oracleViolation':True,'causalCheck':'passed','environmentCheck':'passed','reviewRequired':False},
+            [{'source':'tool-execution','provenanceVerified':True,'integrityVerified':True}],
+            {'status':'validated','sourceRef':'req.md'},
+        )
+        self.assertFalse(result['eligible'])
+        self.assertIn('trusted-evidence-verifier-unavailable',result['reasons'])
     def test_standalone_contains_patterns(self):
         with tempfile.TemporaryDirectory() as d:
             p=build('discover-api-idempotency-defects',pathlib.Path(d)/'skill')
