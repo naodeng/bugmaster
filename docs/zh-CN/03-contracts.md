@@ -41,6 +41,8 @@ Confirmed 需要有效且适用的 Oracle、真实且可追溯的执行证据、
 
 批准必须绑定规范化动作、目标、参数摘要、环境、Scope Revision、风险等级、次数和有效期。模型自填 `approved` 不具备身份效力。R2 修改操作需要真实授权与可实施的工具层控制；R3 默认阻断。恢复前记录 Action Intent，对结果未知的副作用首先只读核查；可信只读核验器尚未接入，因此当前重放 helper 对所有请求 fail-closed；不能承诺外部系统 Exactly Once；预算与已消费审批不得在恢复时重置。
 
+`ActionJournal.actions_needing_reconciliation()` 返回本地日志状态仍未解决的 Action ID 元组，供恢复流程逐项检查。它只提供诊断视图，不验证外部副作用、不授权重放；Journal 缺失或校验失败时会拒绝读取。
+
 Scope JSON Schema 按目标记录 `in_scope`、`pending_authorization` 或 `out_of_scope`，并保存非秘密身份/环境引用、风险上限、有限动作预算，以及每个 `in_scope` 目标的审批引用。该引用本身不是授权证据；派发前授权网关必须验证真实审批记录及其与当前 Scope Revision 的绑定。v0.1 不允许将 Android、iOS 或未知表面标记为可执行。
 
 Approval 和 Action Schema 记录 Scope/Action 引用、Scope Revision、目标、环境、规范化操作与参数摘要、风险、次数、有效期及生命周期状态。在宿主核验来源事件和动作绑定前，引用字段仍是不可信数据；当前 helper 在真实网关实现前拒绝 R2，R3 不能进入已派发或已完成状态。
