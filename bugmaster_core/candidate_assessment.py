@@ -217,7 +217,12 @@ def assess_candidate(
     assessment = _assessment_base(candidate)
     candidate_refs = assessment["evidenceRefs"]
     counter_refs = []
-    if isinstance(counter_evidence, dict) and isinstance(counter_evidence.get("evidenceRefs"), list):
+    if (
+        isinstance(counter_evidence, dict)
+        and _nonempty(oracle_ref)
+        and counter_evidence.get("oracleRef") == oracle_ref
+        and isinstance(counter_evidence.get("evidenceRefs"), list)
+    ):
         counter_refs = [ref for ref in counter_evidence["evidenceRefs"] if _nonempty(ref)]
         assessment["evidenceRefs"] = list(dict.fromkeys(candidate_refs + counter_refs))
 
@@ -344,6 +349,8 @@ def append_review_event(assessment, event):
         or not all(_nonempty(ref) for ref in evidence_refs)
         or len(set(evidence_refs)) != len(evidence_refs)
         or not isinstance(assessment_refs, list)
+        or not all(_nonempty(ref) for ref in assessment_refs)
+        or len(set(assessment_refs)) != len(assessment_refs)
         or not set(evidence_refs).issubset(assessment_refs)
     ):
         raise ValueError("review-event-evidence-invalid")

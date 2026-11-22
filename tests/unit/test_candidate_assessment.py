@@ -118,6 +118,17 @@ class CandidateAssessmentTests(unittest.TestCase):
         self.assertNotIn("TRUSTED_COUNTEREVIDENCE", assessment["reasonCodes"])
         self.assertNotIn("counterEvidenceRefs", assessment)
 
+    def test_counterevidence_for_different_oracle_is_not_linked(self):
+        assessment = assess_candidate(
+            candidate(),
+            oracle(),
+            [evidence(), evidence("EV-002", "satisfied")],
+            {"oracleRef": "OR-OTHER", "evidenceRefs": ["EV-002"]},
+        )
+
+        self.assertEqual(assessment["decision"], "candidate")
+        self.assertNotIn("EV-002", assessment["evidenceRefs"])
+
     def test_caller_supplied_verifier_callbacks_are_not_accepted(self):
         args = (
             candidate(evidenceRefs=["EV-002"]),
@@ -410,6 +421,16 @@ class CandidateAssessmentTests(unittest.TestCase):
             append_review_event(
                 assessment, review_event(reviewedAt="2026-13-22T10:00:00Z")
             )
+
+    def test_review_event_rejects_invalid_assessment_evidence_refs(self):
+        assessment = assess_candidate(candidate(), oracle(), [evidence()])
+
+        for refs in (["EV-001", None], ["EV-001", "EV-001"]):
+            with self.subTest(refs=refs):
+                corrupt = copy.deepcopy(assessment)
+                corrupt["evidenceRefs"] = refs
+                with self.assertRaisesRegex(ValueError, "review-event-evidence-invalid"):
+                    append_review_event(corrupt, review_event())
 
     def test_review_event_id_cannot_overwrite_existing_feedback(self):
         assessment = assess_candidate(candidate(), oracle(), [evidence()])
