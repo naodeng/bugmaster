@@ -6,7 +6,7 @@
 **实现提交：** `8129838d0165115a78bf7435f1cdced7fa3de601`<br>
 **崩溃注入测试提交：** `72157f7e9d8df73f324d8432555d16e3ac1ef988`<br>
 **PR：** [#10](https://github.com/naodeng/bugmaster/pull/10)，基于 PR #9<br>
-**状态：** 初始实现曾在旧基线通过 Actions Run `44487187776`，但该 run 不验证当前 PR #9 head。PR #10 原 head `ffe52dc6c523e2eb4503d0d9a979dde515659fef` 仍以旧基线 `f69c61b8c52d471774ae8b212605e3dadd182eda` 为父系；已基于 PR #9 当前 head `c8f0f6e061ed55909e656b30a125d5f9cf2042d3` 完成本地整合并推送提交 `911f62def6331def4918a2ab8d5286794e3876a3`；文档 head `f44d8628cc48886d25baa896951b1e25626ad962` 的 Actions Run `44977659359` 全部成功，CodeX 通用审查结论为无重大问题；GitHub CodeX Security Review 状态未返回，独立人工 Q15 Security Review 仍待完成。只读待对账 Action 枚举及进程崩溃注入不提供可信外部核验、恢复授权或真实 API/Browser 执行。
+**状态：** PR #10 原先基于 PR #9 head `c8f0f6e`；2026-11-22 已将 PR #9 最新 head `84e7dee9838f4123b2aec181a93f4d4ebf85d9c3` 合入 PR #10 原 head `ae3ac3f74237a96c5f6db8944f2a46338bef9213`。整合提交 `b7e98a5c6ab6aec8ad860ee390d9e62a78d5d2d6` 的第一父提交为 PR #10 原 head，第二父提交为最新 PR #9 head，tree `f4c12afa7bc8e9127e9b5c80720df6062a26f45b`。本地 macOS / Python 3.12.16 验证 428/428 单元、82/82 契约、1/1 安全测试，生产行/分支覆盖 2,143/2,143 与 768/768（均 100%）；该 head 的 GitHub Actions 待推送后核对。PR #10 旧 head 的 CodeX review 不代表新 head；需重新复核。独立真人 Q15 Security Review 仍待完成。只读枚举和崩溃注入不提供可信外部核验、恢复授权或真实 API/Browser 执行。
 
 ## 需求与边界
 
@@ -118,3 +118,21 @@ PYTHONDONTWRITEBYTECODE=1 python3.12 -m unittest discover -s tests/unit -p 'test
 | Release Gate | `scripts/quality_gate.py --mode release --coverage /private/tmp/bugmaster-pr10-integrated.json`：按预期 NO-GO；功能义务清单未冻结、真实业务覆盖未超过 60%，核心 Happy/Negative/Edge 证据缺失 |
 
 完整本地整合验证对应 tree `badb6af5f651f646d9c5f6137cb826c46bd64efd`，已由远端提交 `911f62def6331def4918a2ab8d5286794e3876a3` 固定；该提交第一父提交为 PR #10 原 head `ffe52dc6c523e2eb4503d0d9a979dde515659fef`，第二父提交为 PR #9 当前 head `c8f0f6e061ed55909e656b30a125d5f9cf2042d3`。该 head 已推送。随后文档 head `f44d8628cc48886d25baa896951b1e25626ad962` 的 GitHub Actions [Run 81](https://github.com/naodeng/bugmaster/actions/runs/44977659359) 全部成功；Codex 通用审查对该 head 未发现重大问题。三种交叉审核角色对整合代码/测试快照无未解决发现。GitHub CodeX Security Review 请求未产生状态或结果，不能视为通过；所有 PR #3–#10 仍需独立人工 R3 Security Reviewer，AI 复核不构成 Q15 签署。
+
+## 2026-11-22：接入最新 PR #9 fail-closed 基线
+
+PR #9 在原 PR #10 基线提交 `c8f0f6e` 之后新增了对 R0/R1 自述 Scope claim 与自述 Evidence claim 的拒绝逻辑，并补充相应契约负例。PR #10 原 head `ae3ac3f` 因而不再基于最新 PR #9 head。为保留现有分支提交与审查轨迹，本次以普通 merge 将 PR #9 head `84e7dee9838f4123b2aec181a93f4d4ebf85d9c3` 合入 PR #10，生成整合提交 `b7e98a5c6ab6aec8ad860ee390d9e62a78d5d2d6`，tree `f4c12afa7bc8e9127e9b5c80720df6062a26f45b`。没有改动 PR #10 的 Action 枚举或进程崩溃恢复实现。
+
+环境：macOS POSIX，Python 3.12.16；JSON Schema 与 coverage 依赖从 `/private/tmp` 加载。验证结果：
+
+| 检查 | 命令 / 结果 |
+|---|---|
+| Journal / Session / Checkpoint 恢复定向测试 | `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/private/tmp/bugmaster-jsonschema python3.12 -m unittest tests.unit.test_action_journal_crash_recovery tests.unit.test_store_crash_recovery -v`：22/22 PASS |
+| 全单元与覆盖采集 | `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/private/tmp/bugmaster-jsonschema:/private/tmp/bugmaster-coverage python3.12 -m coverage run --branch --source=bugmaster_core,scripts --data-file=/private/tmp/bugmaster-pr10-latest.coverage -m unittest discover -s tests/unit`：428/428 PASS |
+| 全契约 | `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/private/tmp/bugmaster-jsonschema python3.12 -m unittest discover -s tests/contracts`：82/82 PASS |
+| R3 安全测试 | `PYTHONDONTWRITEBYTECODE=1 python3.12 -m unittest discover -s tests/security -v`：1/1 PASS |
+| 生产行 / 分支覆盖 | `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/private/tmp/bugmaster-coverage python3.12 -m coverage json --data-file=/private/tmp/bugmaster-pr10-latest.coverage -o /private/tmp/bugmaster-pr10-latest.json`；`PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/private/tmp/bugmaster-coverage python3.12 -m coverage report --data-file=/private/tmp/bugmaster-pr10-latest.coverage --include='bugmaster_core/*,scripts/*'`：2,143/2,143 语句、768/768 分支，分别统计且均 100%，无遗漏项。 |
+| Catalog / 品牌 / Benchmark manifest | `python3.12 scripts/validate_catalog.py`、`python3.12 scripts/check_branding.py`、`python3.12 scripts/validate_benchmark.py`：均 PASS；Benchmark 只校验结构，50 个场景未执行 |
+| Release Gate | `PYTHONDONTWRITEBYTECODE=1 python3.12 scripts/quality_gate.py --mode release --coverage /private/tmp/bugmaster-pr10-latest.json`：按预期 NO-GO，原因包括 Feature Inventory 未冻结、真实业务覆盖不超过 60%、核心 Happy/Negative/Edge 执行证据缺失 |
+
+PR #10 最新整合 head 的 GitHub Actions 与 CodeX 通用/安全辅助复审尚待远端核对。旧 head 上的 AI review 不能代表该整合提交；任何模型结论和 CI 均不替代独立真人 Q15 Security Reviewer 签署。
