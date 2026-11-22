@@ -45,6 +45,13 @@ class CoreContractTests(unittest.TestCase):
         )
         self.assertFalse(result['eligible'])
         self.assertIn('trusted-evidence-verifier-unavailable',result['reasons'])
+    def test_self_asserted_reconciliation_cannot_authorize_replay(self):
+        action = {
+            'outcome': 'reconciled-not-executed',
+            'reconcilerVerified': True,
+            'newAuthorizationValid': True,
+        }
+        self.assertFalse(can_replay(action))
     def test_standalone_contains_patterns(self):
         with tempfile.TemporaryDirectory() as d:
             p=build('discover-api-idempotency-defects',pathlib.Path(d)/'skill')

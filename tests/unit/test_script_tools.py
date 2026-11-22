@@ -244,6 +244,7 @@ class ScriptToolsTests(unittest.TestCase):
             {"status": "draft"},
         )
         self.assertFalse(rejected["eligible"])
+        self.assertIn("trusted-evidence-verifier-unavailable", rejected["reasons"])
         self.assertEqual(len(rejected["reasons"]), 9)
 
         self.assertFalse(can_replay({"outcome": "unknown"}))

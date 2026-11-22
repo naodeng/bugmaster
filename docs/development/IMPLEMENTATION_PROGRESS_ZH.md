@@ -1,7 +1,7 @@
 # BugMaster 工程实施进度矩阵
 
-**更新日期：** 2026-11-21
-**当前状态：** PR #1–#7 已合入 `main`，PR #7 merge commit 为 `c7fcfca24856eeb981389785d09bb4b84ca4bce4`。PR #8（W6-03）远端仍是基于旧 head 的开放 PR；本地隔离候选提交 `abe4b8e025402d5c0ec9b96ff68eabbdbb964b08` 基于当前 main 集成基线，并修复原三项安全评论及多轮独立复审问题。本轮再关闭两个 P2：恢复清理按 Session revision / Checkpoint ID 核对规范发布文件名及 inode；首次发布目录同步失败时保留临时硬链接，并在后续 Session 写入中同步后清理。最新本地验证为单元 399/399、契约 79/79、安全 1/1 通过；生产 Python（`bugmaster_core/` + `scripts/`）行覆盖 2,141/2,141、分支覆盖 770/770。覆盖 JSON：`/private/tmp/bugmaster-pr8-review-final.json`。候选尚未推送；同一最终 head 的独立复审和远端 CI 未运行。完整产品仍为 Release No-Go。
+**更新日期：** 2026-11-22
+**当前状态：** PR #1–#7 已合入 `main`。PR #8 head `21ed1b9281566bb28c72f1708d40ad84cd6dce3e` 修复 Session 与 Journal ID 绑定，Actions Runs `44983187716`、`44983456594` 均成功。PR #9 代码整合提交 `d2d2d6123b3c549fea93e3a393d55660516de9bc` 已包含 PR #8 C-1 修复；最新证据文档 head `d904e4d5e088df3d1e14452eb010ea5b7ced5bcb` 的 Actions Run `44985928795` 全部成功。本地 macOS / Python 3.12.16：408/408 单元、82/82 契约、1/1 安全测试，生产行/分支 2,145/2,145 与 768/768（均 100%）。CodeX 通用与安全辅助审查已在 d904e4d 请求，结果待返回。PR #8–#10 均属 R3，独立真人 Q15 尚未签署；V-2 至 V-6 仍是待验证证据/威胁模型项，完整产品仍为 Release No-Go。
 
 ## 仓库审计摘要
 
@@ -23,8 +23,8 @@
 | W2 | 11 个独立 Skills | 本地闭包验证通过 | 11 个包均含规范 Skill/Pattern 闭包且 manifest 摘要一致；Codex/Claude 干净安装和真实 Eval 未验证 |
 | W3 | 16 个 Bug Patterns | 候选规则 | 需适用/排除、Oracle、反例和真实对照 Eval |
 | W4 | 风险路由与有界自主探索 | 部分实现 | `scripts/discover_openapi.py` 可从本地 OpenAPI 3 JSON 输出稳定 ID 和 JSON Pointer 来源清单；URL/Browser 发现、风险路由与动态执行仍待实现 |
-| W5 | R0–R3 动作级授权 | 部分实现 | R0/R1 基础 helper 已 fail-closed；无可信网关时 R2 现在 fail-closed；真实网关、审批摘要和修订绑定仍待实现 |
-| W6 | Action Journal、Session/Checkpoint 持久化与安全恢复 | 部分实现 | PR #3–#7 已合入 `main`。当前 PR #8 候选新增确定性 `ActionJournalStore` 路径映射；使用 no-follow 目录描述符、固定根快照、检查可信祖先/私有模式与 macOS ACL、同步重试目录项，并在缺失历史或存在不安全既有文件时失败关闭。Journal 初始化和 Session revision 发布通过公开的 Session 锁上下文串行化；目录和既有锁的所有者/ACL/硬链接检查先于权限修改，只有新建锁才会 `fchmod`。Session 临时恢复只接受从记录身份推导出的规范目标文件名和同 inode；首次发布 `fsync` 失败会保留临时链接供下次写入恢复。最新候选单元 399/399、契约 79/79、安全 1/1、本地生产代码行/分支覆盖均 100%；Release 质量门禁仍因业务功能证据不足为 No-Go。远端 CI 与最终独立复审待推送后完成。事件来源真实性、可信 Safe Resume、权威 Scope、授权与预算对账仍未实现。 |
+| W5 | R0–R3 动作级授权 | 部分实现 | `scripts/validate_gates.py` 的 `can_dispatch()` 在可信 Scope/Approval verifier 接入前对所有风险等级恒拒绝；自述 `scopeValidated` 不再授权。真实 Scope 解析、授权网关、审批摘要和修订绑定仍待实现 |
+| W6 | Action Journal、Session/Checkpoint 持久化与安全恢复 | 部分实现 | PR #3–#7 已合入 `main`；PR #8–#10 均属 R3。PR #8 增加确定性 Journal 身份映射、可信祖先/目录描述符校验及 Session–Journal ID 绑定；PR #9 整合提交 `d2d2d6123b3c549fea93e3a393d55660516de9bc` 将 PR #8 head `21ed1b9` 的 C-1 修复与 fail-closed gate 合并，dispatch、Finding 与 replay 在可信 verifier 未接入前均拒绝。PR #9 head `d904e4d` 对应 Actions Run `44985928795` 全部成功；本地 408/408 单元、82/82 契约、1/1 安全、生产 2,145/2,145 语句和 768/768 分支均 PASS。Q15 真人签署未记录，外部 V-2 至 V-6 仍待验证。可信授权、事件来源真实性、预算对账及安全恢复授权仍未实现。
 | W7 | Finding、跨入口去重与报告 | 待实现 | 需 Oracle、来源、E3+ 证据和剩余风险追踪 |
 | W8 | 回归建议 | 待实现 | 只输出建议，不自动修改/提交测试代码 |
 | W9 | 50 场景 Benchmark | 计划中 | 需真实运行、隔离 Ground Truth 和 G0–G3 对照 |
@@ -38,18 +38,18 @@
 | 品牌与 Skill 命名扫描 | PASS | `python3 scripts/check_branding.py`；命名契约包含 4 项 Skill ID 检查 |
 | Catalog/Registry | PASS | `python3 scripts/validate_catalog.py` |
 | Benchmark Manifest | PASS（结构） | `validate_benchmark.py` 明确提示场景未执行 |
-| GitHub Actions | PR #4–#7 历史 head 检查通过；PR #8 最终 head NOT_RUN | PR #4 Run `44662457674`、PR #5 最终 head Run `44690535886`、PR #6 最终文档 head Run `44697609761`、PR #7 代码 head Run `44748455778` 均成功。PR #8 整合候选还未推送 |
-| 单元测试 | PR #8 本地集成候选 PASS，399/399 | Python 3.12；全部生产 Python 范围 `bugmaster_core/` + `scripts/` 行覆盖 2141/2141、分支覆盖 770/770，均为 100%；覆盖 JSON：`/private/tmp/bugmaster-pr8-review-final.json` |
-| R3 安全测试 | PR #8 本地集成候选 PASS，1/1 | `python3.12 -m unittest discover -s tests/security`；远端 CI 待推送后执行，不并入单元覆盖率分母 |
-| 契约测试 | PR #8 本地集成候选 PASS，79/79 | Python 3.12 + `jsonschema[format-nongpl]==4.26.0`；覆盖 Event v1.1、跨存储快照与确定性 Journal 路径 |
-| 当前生产 Python 行/分支覆盖率 | PR #8 本地集成候选 PASS，100% / 100% | `bugmaster_core` + `scripts` 共 2141/2141 行、770/770 分支；JSON：`/private/tmp/bugmaster-pr8-review-final.json`。行/分支口径分开报告，不等于业务功能覆盖 |
+| GitHub Actions | PR #8/#9 当前整合 heads PASS | PR #8 Runs `44983187716`、`44983456594`；PR #9 head `d904e4d` Run `44985928795` 全部成功 |
+| 单元测试 | PR #8/#9 当前本地树 PASS | PR #8 408/408；PR #9 最新整合树 408/408，SessionStore 定向 131/131。PR #9 覆盖 JSON：`/private/tmp/bugmaster-pr9-current.json` |
+| R3 安全测试 | PR #8/#9 最新本地与 Actions PASS，1/1 | `tests/security` 独立运行；PR #9 Actions Run `44985928795` 成功。Q15 独立人工 Security Reviewer 尚未签署；不并入单元覆盖率分母 |
+| 契约测试 | PR #8 79/79；PR #9 最新整合树 82/82，均 PASS | Python 3.12 + `jsonschema[format-nongpl]==4.26.0`；包括 Session–Journal ID 与 replay/dispatch/Finding fail-closed 合同 |
+| 当前生产 Python 行/分支覆盖率 | PR #8/#9 最新本地树 PASS，100% / 100% | PR #8 2,148/2,148 语句、772/772 分支；PR #9 整合树 2,145/2,145、768/768。行/分支分别报告，不代表业务功能覆盖 |
 | 业务功能覆盖率 >60% | 未达成 | 目前没有真实业务执行证据 |
 | 核心 Happy / Negative / Edge | 未达成 | 需每个核心功能有三类实际通过证据 |
 | Release | No-Go | 全量功能、真实 Benchmark、双宿主和独立审批均未完成 |
 
-本轮 PR #8 候选使用完整生产 Python 覆盖 JSON `/private/tmp/bugmaster-pr8-review-final.json` 运行 release quality gate，结果仍为 No-Go：代码行覆盖门禁通过，但功能清单未冻结、真实功能覆盖未超过 60%，核心功能 Happy/Negative/Edge 执行矩阵缺证据。W6 本地状态机单测不作为真实业务功能执行证据。Benchmark 脚本仅验证清单结构，未运行 50 个场景。
+本轮 PR #9 最新整合 tree `00f2b6ae995279fa6bf1d7e40dd5a1d8c209cc55` 使用覆盖 JSON `/private/tmp/bugmaster-pr9-current.json` 运行 `PYTHONDONTWRITEBYTECODE=1 python3.12 scripts/quality_gate.py --mode release --coverage /private/tmp/bugmaster-pr9-current.json`，结果为预期 No-Go：Feature Inventory 未冻结、真实业务覆盖未超过 60%，核心 Feature 的 Happy/Negative/Edge 执行证据缺失。Benchmark 只校验清单结构，50 个场景未执行。
 
-初始验证的命令与实际输出记录在 [基线验证记录](2026-11-18_INITIAL_BASELINE_VERIFICATION_ZH.md)。Scope 风险 helper、本地 OpenAPI 静态发现 CLI、Scope/Approval/Action Schema、Session Schema 和 R2 缺少可信审批网关时拒绝派发的 RED/GREEN/REFACTOR/VERIFY 证据分别见 [范围与风险门禁 TDD 记录](2026-11-18_SCOPE_GATE_TDD_ZH.md)、[OpenAPI 发现 TDD 记录](2026-11-18_OPENAPI_DISCOVERY_TDD_ZH.md)、[Scope Schema TDD 记录](2026-11-18_SCOPE_SCHEMA_TDD_ZH.md)、[Approval 与 Action Schema TDD 记录](2026-11-18_APPROVAL_ACTION_SCHEMA_TDD_ZH.md)、[Session Schema TDD 记录](2026-11-19_SESSION_SCHEMA_TDD_ZH.md)、[R2 门禁 TDD 记录](2026-11-18_R2_GATE_TDD_ZH.md)、[Session Revision 持久化 TDD 记录](2026-11-19_SESSION_REVISION_STORE_TDD_ZH.md)和[Checkpoint 跨存储引用 TDD 记录](2026-11-19_CHECKPOINT_REFERENCE_VALIDATION_TDD_ZH.md)。
+初始验证的命令与实际输出记录在 [基线验证记录](2026-11-18_INITIAL_BASELINE_VERIFICATION_ZH.md)。Scope 风险 helper、本地 OpenAPI 静态发现 CLI、Scope/Approval/Action Schema、Session Schema、R2 缺少可信审批网关时拒绝派发和 W6-04 重放门禁的 RED/GREEN/REFACTOR/VERIFY 证据分别见 [范围与风险门禁 TDD 记录](2026-11-18_SCOPE_GATE_TDD_ZH.md)、[OpenAPI 发现 TDD 记录](2026-11-18_OPENAPI_DISCOVERY_TDD_ZH.md)、[Scope Schema TDD 记录](2026-11-18_SCOPE_SCHEMA_TDD_ZH.md)、[Approval 与 Action Schema TDD 记录](2026-11-18_APPROVAL_ACTION_SCHEMA_TDD_ZH.md)、[Session Schema TDD 记录](2026-11-19_SESSION_SCHEMA_TDD_ZH.md)、[R2 门禁 TDD 记录](2026-11-18_R2_GATE_TDD_ZH.md)、[Session Revision 持久化 TDD 记录](2026-11-19_SESSION_REVISION_STORE_TDD_ZH.md)、[Checkpoint 跨存储引用 TDD 记录](2026-11-19_CHECKPOINT_REFERENCE_VALIDATION_TDD_ZH.md)和[回放门禁 fail-closed TDD 记录](2026-11-19_REPLAY_GATE_FAIL_CLOSED_TDD_ZH.md)。
 
 11 个独立包的离线构建/闭包/摘要核验见 [Standalone 打包验证记录](2026-11-18_STANDALONE_PACKAGING_VERIFY_ZH.md)。
 
