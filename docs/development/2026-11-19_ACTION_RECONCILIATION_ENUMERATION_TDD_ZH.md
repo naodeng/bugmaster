@@ -135,7 +135,7 @@ PR #9 在原 PR #10 基线提交 `c8f0f6e` 之后新增了对 R0/R1 自述 Scope
 | Catalog / 品牌 / Benchmark manifest | `python3.12 scripts/validate_catalog.py`、`python3.12 scripts/check_branding.py`、`python3.12 scripts/validate_benchmark.py`：均 PASS；Benchmark 只校验结构，50 个场景未执行 |
 | Release Gate | `PYTHONDONTWRITEBYTECODE=1 python3.12 scripts/quality_gate.py --mode release --coverage /private/tmp/bugmaster-pr10-latest.json`：按预期 NO-GO，原因包括 Feature Inventory 未冻结、真实业务覆盖不超过 60%、核心 Happy/Negative/Edge 执行证据缺失 |
 
-PR #10 最新整合 head 的 GitHub Actions 与 CodeX 通用/安全辅助复审尚待远端核对。旧 head 上的 AI review 不能代表该整合提交；任何模型结论和 CI 均不替代独立真人 Q15 Security Reviewer 签署。
+PR #10 代码/证据 head `8bbc2c3` 的 GitHub Actions Run `44986603312` 全部通过。CodeX 通用与安全辅助复审已在该 head 请求，结果待返回；旧 head 上的 AI review 不代表当前整合代码。任何模型结论和 CI 均不替代独立真人 Q15 Security Reviewer 签署。
 
 ## 2026-11-22：接入含 PR #8 C-1 的最新 PR #9 基线
 

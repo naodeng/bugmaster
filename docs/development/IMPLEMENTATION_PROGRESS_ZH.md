@@ -1,7 +1,7 @@
 # BugMaster 工程实施进度矩阵
 
 **更新日期：** 2026-11-22
-**当前状态：** PR #1–#7 已合入 `main`。PR #8 head `21ed1b9281566bb28c72f1708d40ad84cd6dce3e` 修复 Session 与 Journal ID 绑定，Actions Runs `44983187716`、`44983456594` 均成功。PR #9 最新 head `69b72003237e281f81a99f45c358f90478e63239` 的 Actions Run `44986287358` 成功；其代码树包含 PR #8 C-1 与 PR #9 fail-closed 改动，CodeX 通用复审在代码 head `d904e4d` 未发现重大问题，Security AI 复审仍待结果。PR #10 当前整合代码提交 `7eb6f1a40b165e43080f0ba167c3389fd0d5e6ae`（tree `af0e751902f230ef5e8035a51c845f5d14ab8ace`）包含最新 PR #9 基线；本地 macOS / Python 3.12.16：430/430 单元、82/82 契约、1/1 安全测试，生产行/分支覆盖 2,150/2,150 与 770/770（均 100%）。PR #10 最新整合 Actions 与 CodeX 复审待推送后核对。PR #8–#10 均为 R3，独立真人 Q15 尚未签署；V-2 至 V-6 仍是待验证证据/威胁模型项，完整产品仍为 Release No-Go。
+**当前状态：** PR #1–#7 已合入 `main`。PR #8 head `21ed1b9281566bb28c72f1708d40ad84cd6dce3e` 修复 Session 与 Journal ID 绑定，Actions Runs `44983187716`、`44983456594` 均成功。PR #9 最新 head `69b72003237e281f81a99f45c358f90478e63239` 的 Actions Run `44986287358` 成功；CodeX 通用复审在代码 head `d904e4d` 未发现重大问题，Security AI 复审仍待结果。PR #10 当前整合代码提交 `7eb6f1a40b165e43080f0ba167c3389fd0d5e6ae`（tree `af0e751902f230ef5e8035a51c845f5d14ab8ace`）包含最新 PR #9 基线；本地 macOS / Python 3.12.16：430/430 单元、82/82 契约、1/1 安全测试，生产行/分支覆盖 2,150/2,150 与 770/770（均 100%）。PR #10 代码/证据 head `8bbc2c3` 的 Actions Run `44986603312` 全部通过；CodeX 复审请求待返回。PR #8–#10 均为 R3，独立真人 Q15 尚未签署；V-2 至 V-6 仍是待验证证据/威胁模型项，完整产品仍为 Release No-Go。
 
 ## 仓库审计摘要
 
@@ -24,7 +24,7 @@
 | W3 | 16 个 Bug Patterns | 候选规则 | 需适用/排除、Oracle、反例和真实对照 Eval |
 | W4 | 风险路由与有界自主探索 | 部分实现 | `scripts/discover_openapi.py` 可从本地 OpenAPI 3 JSON 输出稳定 ID 和 JSON Pointer 来源清单；URL/Browser 发现、风险路由与动态执行仍待实现 |
 | W5 | R0–R3 动作级授权 | 部分实现 | `scripts/validate_gates.py` 的 `can_dispatch()` 在可信 Scope/Approval verifier 接入前对所有风险等级恒拒绝；自述 `scopeValidated` 不再授权。真实 Scope 解析、授权网关、审批摘要和修订绑定仍待实现 |
-| W6 | Action Journal、Session/Checkpoint 持久化与安全恢复 | 部分实现 | PR #3–#7 已合入 `main`；PR #8–#10 均属 R3。PR #8 修复 Session–Journal ID 不匹配问题；PR #9 当前 head `69b7200` 纳入该修复及 dispatch/Finding/replay fail-closed 改动，Actions Run `44986287358` 全部成功。PR #10 整合代码提交 `7eb6f1a40b165e43080f0ba167c3389fd0d5e6ae` 包含最新 PR #9 基线，保留待对账枚举与进程崩溃验证；本地 430/430 单元、82/82 契约、1/1 安全、生产 2,150/2,150 语句及 770/770 分支均 PASS，当前远端 Actions 待核对。独立 Q15 真人签署未记录，V-2 至 V-6 仍待验证。可信授权、事件来源真实性、预算对账和安全恢复授权未实现。详见 [Action 对账枚举 TDD 记录](2026-11-19_ACTION_RECONCILIATION_ENUMERATION_TDD_ZH.md) 与 [回放门禁 TDD 记录](2026-11-19_REPLAY_GATE_FAIL_CLOSED_TDD_ZH.md)。
+| W6 | Action Journal、Session/Checkpoint 持久化与安全恢复 | 部分实现 | PR #3–#7 已合入 `main`；PR #8–#10 均属 R3。PR #8 修复 Session–Journal ID 不匹配问题；PR #9 当前 head `69b7200` 纳入该修复及 dispatch/Finding/replay fail-closed 改动，Actions Run `44986287358` 全部成功。PR #10 整合代码提交 `7eb6f1a40b165e43080f0ba167c3389fd0d5e6ae` 包含最新 PR #9 基线，保留待对账枚举与进程崩溃验证；本地 430/430 单元、82/82 契约、1/1 安全、生产 2,150/2,150 语句及 770/770 分支均 PASS；代码/证据 head `8bbc2c3` 的 Actions Run `44986603312` 全部成功。独立 Q15 真人签署未记录，V-2 至 V-6 仍待验证。可信授权、事件来源真实性、预算对账和安全恢复授权未实现。
 | W7 | Finding、跨入口去重与报告 | 待实现 | 需 Oracle、来源、E3+ 证据和剩余风险追踪 |
 | W8 | 回归建议 | 待实现 | 只输出建议，不自动修改/提交测试代码 |
 | W9 | 50 场景 Benchmark | 计划中 | 需真实运行、隔离 Ground Truth 和 G0–G3 对照 |
@@ -38,9 +38,9 @@
 | 品牌与 Skill 命名扫描 | PASS | `python3 scripts/check_branding.py`；命名契约包含 4 项 Skill ID 检查 |
 | Catalog/Registry | PASS | `python3 scripts/validate_catalog.py` |
 | Benchmark Manifest | PASS（结构） | `validate_benchmark.py` 明确提示场景未执行 |
-| GitHub Actions | PR #8/#9 当前 heads PASS；PR #10 最新整合 head 待远端核对 | PR #8 Runs `44983187716`、`44983456594`；PR #9 head `69b7200` Run `44986287358` 均成功；PR #10 最新 head Actions 尚未完成 |
+| GitHub Actions | PR #8/#9/#10 当前已验证 heads PASS | PR #8 Runs `44983187716`、`44983456594`；PR #9 Run `44986287358`；PR #10 code/evidence head `8bbc2c3` Run `44986603312` 均成功 |
 | 单元测试 | PR #8/#9/#10 当前本地树 PASS | PR #8 408/408；PR #9 最新整合树 408/408；PR #10 最新整合树 430/430。PR #10 Journal/Session/Checkpoint 恢复定向测试 22/22；覆盖 JSON：`/private/tmp/bugmaster-pr10-final.json` |
-| R3 安全测试 | PR #8/#9 Actions 与 PR #10 本地 PASS，1/1 | PR #9 Run `44986287358` 成功；PR #10 最新整合树本地 `tests/security` 1/1，远端 Actions 待核对。Q15 独立人工 Security Reviewer 尚未签署 |
+| R3 安全测试 | PR #8/#9 Actions 与 PR #10 本地及 Actions PASS，1/1 | PR #9 Run `44986287358`、PR #10 Run `44986603312` 均成功；Q15 独立人工 Security Reviewer 尚未签署 |
 | 契约测试 | PR #8 79/79；PR #9/#10 当前整合树 82/82，均 PASS | Python 3.12 + `jsonschema[format-nongpl]==4.26.0`；PR #10 远端 Actions 待核对 |
 | 当前生产 Python 行/分支覆盖率 | PR #8/#9/#10 最新本地树 PASS，100% / 100% | PR #8 2,148/2,148 语句、772/772 分支；PR #9 2,145/2,145、768/768；PR #10 2,150/2,150、770/770。分别统计行/分支，不代表业务功能覆盖 |
 | 业务功能覆盖率 >60% | 未达成 | 目前没有真实业务执行证据 |
