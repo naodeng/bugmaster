@@ -273,6 +273,14 @@ class CandidateAssessmentTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     assess_candidate(candidate(**updates), oracle(), [evidence()])
 
+    def test_candidate_identity_rejects_unknown_fields(self):
+        identity = {**candidate()["identity"], "unrecognized": "value"}
+
+        with self.assertRaisesRegex(ValueError, "candidate-identity-invalid"):
+            assess_candidate(
+                candidate(identity=identity), oracle(), [evidence()]
+            )
+
     def test_unhashable_evidence_level_is_treated_as_invalid_evidence(self):
         assessment = assess_candidate(
             candidate(), oracle(), [evidence(level=["E3"])]
@@ -294,9 +302,15 @@ class CandidateAssessmentTests(unittest.TestCase):
                 [evidence()],
             )
 
+    def test_candidate_review_history_must_be_a_list(self):
+        with self.assertRaisesRegex(ValueError, "candidate-review-history-invalid"):
+            assess_candidate(
+                candidate(reviewEvents="malformed"), oracle(), [evidence()]
+            )
+
     def test_malformed_candidate_lists_are_normalized_to_empty(self):
         assessment = assess_candidate(
-            candidate(evidenceRefs="EV-001", falsePositiveChecks="unknown", reviewEvents="bad"),
+            candidate(evidenceRefs="EV-001", falsePositiveChecks="unknown"),
             oracle(),
             [evidence()],
         )
