@@ -103,3 +103,21 @@ PYTHONDONTWRITEBYTECODE=1 python3.12 -m unittest discover -s tests/contracts -p 
 | Q15 / 合并 | PR #9 属 R3；独立真人 Security Reviewer 的正式 Q15 签署仍未记录。fail-closed helper、AI 审查与自动化门禁均不能替代签署 |
 
 覆盖 JSON：`/private/tmp/bugmaster-pr9-v1.json`。本地结果不代表真实 API/Browser 执行、可信授权或恢复已实现；Release 仍为 **No-Go**。
+
+## 2026-11-22：接入 PR #8 最新 Journal 身份绑定修复
+
+PR #8 的最新 head `21ed1b9281566bb28c72f1708d40ad84cd6dce3e` 修复了 `ActionJournalStore.initialize()` 未将 Store Journal ID 与已持久化 Session `journalId` 绑定的问题。PR #9 原先停留在旧 PR #8 基线 `58a601a`；本次将最新 PR #8 head 合入 PR #9，生成提交 `d2d2d6123b3c549fea93e3a393d55660516de9bc`（tree `00f2b6ae995279fa6bf1d7e40dd5a1d8c209cc55`），保留 V-1 fail-closed 代码和负例测试。
+
+环境：macOS / Darwin，Python 3.12.16。最新整合树验证：
+
+| 检查 | 命令 / 结果 |
+|---|---|
+| Journal ID 绑定与 SessionStore 定向 | `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/private/tmp/bugmaster-jsonschema python3.12 -m unittest tests.unit.test_action_journal_store.ActionJournalStoreTests.test_initialize_rejects_journal_id_mismatch_for_an_existing_session tests.unit.test_session_store -v`：131/131 PASS |
+| 全单元与覆盖采集 | `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/private/tmp/bugmaster-jsonschema:/private/tmp/bugmaster-coverage python3.12 -m coverage run --branch --source=bugmaster_core,scripts --data-file=/private/tmp/bugmaster-pr9-current.coverage -m unittest discover -s tests/unit`：408/408 PASS |
+| 全契约 | `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/private/tmp/bugmaster-jsonschema python3.12 -m unittest discover -s tests/contracts`：82/82 PASS |
+| R3 安全测试 | `PYTHONDONTWRITEBYTECODE=1 python3.12 -m unittest discover -s tests/security -v`：1/1 PASS |
+| 生产行 / 分支覆盖 | `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/private/tmp/bugmaster-coverage python3.12 -m coverage json --data-file=/private/tmp/bugmaster-pr9-current.coverage -o /private/tmp/bugmaster-pr9-current.json`；`PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/private/tmp/bugmaster-coverage python3.12 -m coverage report --data-file=/private/tmp/bugmaster-pr9-current.coverage --include='bugmaster_core/*,scripts/*'`：2,145/2,145 语句、768/768 分支，分别统计且均 100% |
+| Catalog / 品牌 / Benchmark | `python3.12 scripts/validate_catalog.py`、`python3.12 scripts/check_branding.py`、`python3.12 scripts/validate_benchmark.py`：PASS；50 个 Benchmark 场景未执行 |
+| Release Gate | `PYTHONDONTWRITEBYTECODE=1 python3.12 scripts/quality_gate.py --mode release --coverage /private/tmp/bugmaster-pr9-current.json`：按预期 NO-GO，Feature Inventory 未冻结、真实业务覆盖不足、核心 Happy/Negative/Edge 证据缺失 |
+
+PR #9 新整合 head 的 GitHub Actions 与 CodeX 辅助复审待推送后核对；旧 head 上的审查结果不代表此整合提交。独立真人 Q15 Security Reviewer 仍未签署，V-2 至 V-6 继续标记为待验证证据或威胁模型问题。

@@ -1023,6 +1023,39 @@ class ActionJournalStoreTests(unittest.TestCase):
 
             self.assertFalse(store.path.exists())
 
+    def test_initialize_rejects_journal_id_mismatch_for_an_existing_session(self):
+        ActionJournalStore, _ = _store_types(self)
+        from bugmaster_core.action_journal import JournalCorruptionError
+        from bugmaster_core.session_store import SessionStore
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            orphan_store = ActionJournalStore(root, "session-1", "journal-b")
+            orphan_store.initialize().close()
+            SessionStore(root, "session-1", lambda _document: None).create(
+                {
+                    "schemaVersion": "1.0",
+                    "sessionId": "session-1",
+                    "revision": 1,
+                    "status": "created",
+                    "projectRef": "project-1",
+                    "hostRef": "codex",
+                    "environmentRef": "local",
+                    "createdAt": "2026-11-21T00:00:00Z",
+                    "scopeHistory": [{"scopeId": "scope-1", "revision": 1}],
+                    "approvalRefs": [],
+                    "checkpointRefs": [],
+                    "actionBudget": {},
+                    "journalId": "journal-a",
+                }
+            )
+
+            with self.assertRaisesRegex(
+                JournalCorruptionError,
+                "Journal ID does not match the stored Session",
+            ):
+                orphan_store.initialize()
+
     def test_initialize_fails_closed_when_journal_storage_is_missing_for_existing_session(self):
         ActionJournalStore, _ = _store_types(self)
         from bugmaster_core.action_journal import JournalCorruptionError

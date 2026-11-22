@@ -305,3 +305,41 @@ PR #8 首次推送后 Actions Run [44486235780](https://github.com/naodeng/bugma
 PR #8 Actions [Run 44904474057](https://github.com/naodeng/bugmaster/actions/runs/44904474057) 在 Ubuntu 26.04 上针对 head `a20335a64224c208174cd06e908b2f77a4d0e06d` 全部通过：单元 406/406、契约 79/79、安全 1/1；全量单元覆盖采集和 100% 行覆盖断言通过；Catalog、Benchmark manifest 结构与品牌检查通过。分支覆盖 770/770（100%）由本机覆盖 JSON 单独测得；CI workflow 当前只断言行覆盖。
 
 Release 质量门禁仍为 **NO-GO**：功能义务清单、真实业务覆盖和核心 Feature 的 Happy/Negative/Edge 实测证据缺失，50 个 Benchmark 场景未执行。R3 人工安全审查签署也仍未获得。
+
+## 2026-11-22 Q15 复核发现的 Session–Journal 身份绑定修复
+
+### RED
+
+- 复核报告指出 `ActionJournalStore.initialize()` 在 Session 已存在时只检查 revision 数量；如果先为 `journal-b` 创建空 Journal，再持久化 `journal-a` 的 Session，之后初始化 `journal-b` 仍会成功返回并可继续写入。
+- 新增 `test_initialize_rejects_journal_id_mismatch_for_an_existing_session`，用真实临时目录、JournalStore 和 SessionStore 重现上述顺序。实现前运行：
+  `PYTHONDONTWRITEBYTECODE=1 /private/tmp/bugmaster-review-venv/bin/python3.12 -m unittest discover -s tests/unit -p 'test_action_journal_store.py' -k initialize_rejects_journal_id_mismatch_for_an_existing_session -v`
+  结果 **RED**：`JournalCorruptionError not raised`。
+- 为保持现有调用契约，新增 `test_lock_revisions_keeps_yielding_the_committed_count`。当时的临时实现将 `lock_revisions()` 从整数改为 `(count, latest)`，该测试按预期 RED：`(0, None) != 0`。
+
+### GREEN / REFACTOR
+
+- `SessionStore.lock_revision_snapshot()` 在同一排他锁内读取并提供已提交数量和最新 revision。`lock_revisions()` 保留原先仅返回数量的行为，并委托给快照上下文。
+- `ActionJournalStore.initialize()` 在同一 Session 锁与固定 root fd 下比较最新 Session 的 `journalId` 和 Store ID；不匹配时抛出 `JournalCorruptionError`，且不会打开或返回并行 Journal。
+- 英文与中文 Schema README 同步记录快照接口及身份绑定行为。
+
+### VERIFY
+
+**代码/测试提交：** `77d3a9cf79391c61450df71f0dee32a17468ef87`。环境：macOS / Darwin、Python 3.12.16。
+
+| 检查 | 命令 / 结果 |
+|---|---|
+| 身份不匹配回归 | `PYTHONDONTWRITEBYTECODE=1 /private/tmp/bugmaster-review-venv/bin/python3.12 -m unittest discover -s tests/unit -p 'test_action_journal_store.py' -k initialize_rejects_journal_id_mismatch_for_an_existing_session -v`：1/1 PASS；修复前 RED，修复后 GREEN |
+| API 兼容回归 | `PYTHONDONTWRITEBYTECODE=1 /private/tmp/bugmaster-review-venv/bin/python3.12 -m unittest discover -s tests/unit -p 'test_session_store.py' -k lock_revisions_keeps_yielding_the_committed_count -v`：1/1 PASS；修复前因 `(0, None) != 0` RED |
+| ActionJournalStore / SessionStore 单测 | `PYTHONDONTWRITEBYTECODE=1 /private/tmp/bugmaster-review-venv/bin/python3.12 -m unittest discover -s tests/unit -p 'test_action_journal_store.py' -v`：84/84 PASS；`PYTHONDONTWRITEBYTECODE=1 /private/tmp/bugmaster-review-venv/bin/python3.12 -m unittest discover -s tests/unit -p 'test_session_store.py' -v`：129/129 PASS |
+| 全量单元与覆盖采集 | `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/private/tmp/bugmaster-coverage:/private/tmp/bugmaster-jsonschema /private/tmp/bugmaster-review-venv/bin/python3.12 -m coverage run --branch --source=bugmaster_core,scripts --data-file=/private/tmp/bugmaster-pr8-c1.coverage -m unittest discover -s tests/unit`：408/408 PASS |
+| 行覆盖 / 分支覆盖 | `coverage report --data-file=/private/tmp/bugmaster-pr8-c1.coverage --include='bugmaster_core/*,scripts/*'`：2,148/2,148 语句、772/772 分支，分别统计，均为 100%；无未覆盖生产行或分支 |
+| 全契约 | `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/private/tmp/bugmaster-coverage:/private/tmp/bugmaster-jsonschema /private/tmp/bugmaster-review-venv/bin/python3.12 -m unittest discover -s tests/contracts`：79/79 PASS |
+| 独立安全套件 | `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/private/tmp/bugmaster-coverage:/private/tmp/bugmaster-jsonschema /private/tmp/bugmaster-review-venv/bin/python3.12 -m unittest discover -s tests/security`：1/1 PASS |
+| Catalog | `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/private/tmp/bugmaster-coverage:/private/tmp/bugmaster-jsonschema /private/tmp/bugmaster-review-venv/bin/python3.12 scripts/validate_catalog.py`：PASS |
+| Benchmark manifest / 品牌 / Diff | `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/private/tmp/bugmaster-coverage:/private/tmp/bugmaster-jsonschema /private/tmp/bugmaster-review-venv/bin/python3.12 scripts/validate_benchmark.py` 与 `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/private/tmp/bugmaster-coverage:/private/tmp/bugmaster-jsonschema /private/tmp/bugmaster-review-venv/bin/python3.12 scripts/check_branding.py` 均 PASS；`git diff --check` PASS。Benchmark 场景未执行 |
+| Release 质量门禁 | **NO-GO（预期）**：义务清单未冻结、真实业务功能覆盖未超过 60%，且核心 Feature 缺少 Happy/Negative/Edge 执行证据 |
+| 远端 CI | [Actions Run 44983187716](https://github.com/naodeng/bugmaster/actions/runs/44983187716) 在 PR #8 代码/测试 head `77d3a9cf79391c61450df71f0dee32a17468ef87` 上全部成功：单元、契约、安全、覆盖采集与 100% 行覆盖断言、Catalog、Benchmark manifest 结构、品牌检查均 PASS |
+| 远端状态 | 代码提交已快进推送至 PR #8 分支，head 为 `77d3a9cf79391c61450df71f0dee32a17468ef87`；本段 TDD 证据是之后新增的文档更新，推送后还需核对其 CI |
+| Q15 / 合并 | 独立真人 Security Reviewer 的正式 Q15 签署仍未记录；本修复和 AI/自动化结果不能替代签署，PR 不因本地验证而视为可合并 |
+
+覆盖 JSON：`/private/tmp/bugmaster-pr8-c1.json`。本地测试与覆盖结果不代表生产 API/Browser 执行，也不改变 Release No-Go。

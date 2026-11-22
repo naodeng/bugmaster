@@ -69,6 +69,13 @@ class SessionStoreTests(unittest.TestCase):
         SessionStore, _, _ = _session_store_types(self)
         return SessionStore(root, session_id, _accept_session)
 
+    def test_lock_revisions_keeps_yielding_the_committed_count(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = self.make_store(directory)
+
+            with store.lock_revisions() as revision_count:
+                self.assertEqual(revision_count, 0)
+
     def _append_rejecting_interrupted_checkpoint(
         self,
         payload,
