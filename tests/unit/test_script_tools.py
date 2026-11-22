@@ -219,6 +219,16 @@ class ScriptToolsTests(unittest.TestCase):
     def test_dispatch_gate_rejects_r0_without_a_validated_scope(self):
         self.assertFalse(can_dispatch({"risk": "R0"}, {}, {"scopeValidated": False}))
 
+    def test_dispatch_gate_rejects_self_asserted_scope_for_r0_and_r1(self):
+        for risk in ("R0", "R1"):
+            self.assertFalse(
+                can_dispatch(
+                    {"risk": risk},
+                    {"status": "approved", "provenanceVerified": True},
+                    {"enforcement": "enforced", "scopeValidated": True},
+                )
+            )
+
     def test_finding_and_replay_gates_require_every_safety_condition(self):
         rejected = eligible_confirmed(
             {
@@ -234,9 +244,42 @@ class ScriptToolsTests(unittest.TestCase):
             {"status": "draft"},
         )
         self.assertFalse(rejected["eligible"])
-        self.assertEqual(len(rejected["reasons"]), 8)
+        self.assertEqual(len(rejected["reasons"]), 9)
 
         self.assertFalse(can_replay({"outcome": "unknown"}))
+
+    def test_finding_gate_rejects_self_asserted_execution_and_oracle_claims(self):
+        result = eligible_confirmed(
+            {
+                "evidenceLevel": "E3",
+                "oracleViolation": True,
+                "causalCheck": "passed",
+                "environmentCheck": "passed",
+                "reviewRequired": False,
+            },
+            [
+                {
+                    "source": "tool-execution",
+                    "provenanceVerified": True,
+                    "integrityVerified": True,
+                }
+            ],
+            {"status": "validated", "sourceRef": "oracle.json"},
+        )
+
+        self.assertFalse(result["eligible"])
+        self.assertIn("trusted-evidence-verifier-unavailable", result["reasons"])
+
+    def test_replay_gate_rejects_self_asserted_reconciliation_and_authorization(self):
+        self.assertFalse(
+            can_replay(
+                {
+                    "outcome": "reconciled-not-executed",
+                    "reconcilerVerified": True,
+                    "newAuthorizationValid": True,
+                }
+            )
+        )
 
     def test_dispatch_gate_rejects_high_risk_and_unscoped_actions(self):
         self.assertFalse(can_dispatch({"risk": "R3"}, {}, {"scopeValidated": True}))

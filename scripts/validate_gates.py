@@ -2,7 +2,7 @@
 """Conservative gate: model assertions do not count as execution evidence."""
 VALID_LEVELS={'E0','E1','E2','E3','E4'}
 def eligible_confirmed(finding, evidences, oracle):
-    reasons=[]
+    reasons=['trusted-evidence-verifier-unavailable']
     if finding.get('evidenceLevel') not in {'E3','E4'}: reasons.append('evidence-level-below-E3')
     if oracle.get('status')!='validated' or not oracle.get('sourceRef'): reasons.append('oracle-not-validated')
     valid_tool_evidence=[e for e in evidences if e.get('source')=='tool-execution' and e.get('provenanceVerified') is True and e.get('integrityVerified') is True]
@@ -15,12 +15,9 @@ def eligible_confirmed(finding, evidences, oracle):
     return {'eligible':not reasons,'reasons':reasons}
 
 def can_dispatch(action, approval, policy):
-    if action.get('risk')=='R3':return False
-    if action.get('risk')=='R2':
-        # This repository has no trusted approval gateway yet. These dictionaries
-        # may contain model- or user-asserted claims, so R2 stays fail-closed.
-        return False
-    return action.get('risk') in ('R0','R1') and policy.get('scopeValidated') is True
+    # Caller-supplied dictionaries cannot establish authorization for any risk.
+    return False
 
 def can_replay(action):
-    return action.get('outcome')=='reconciled-not-executed' and action.get('reconcilerVerified') is True and action.get('newAuthorizationValid') is True
+    # Caller-supplied booleans cannot authorize replay of an unknown effect.
+    return False
