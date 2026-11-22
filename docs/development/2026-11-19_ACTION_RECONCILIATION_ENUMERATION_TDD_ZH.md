@@ -6,7 +6,7 @@
 **实现提交：** `8129838d0165115a78bf7435f1cdced7fa3de601`<br>
 **崩溃注入测试提交：** `72157f7e9d8df73f324d8432555d16e3ac1ef988`<br>
 **PR：** [#10](https://github.com/naodeng/bugmaster/pull/10)，基于 PR #9<br>
-**状态：** PR #10 原先基于 PR #9 head `c8f0f6e`；2026-11-22 已将 PR #9 最新 head `84e7dee9838f4123b2aec181a93f4d4ebf85d9c3` 合入 PR #10 原 head `ae3ac3f74237a96c5f6db8944f2a46338bef9213`。整合提交 `b7e98a5c6ab6aec8ad860ee390d9e62a78d5d2d6` 的第一父提交为 PR #10 原 head，第二父提交为最新 PR #9 head，tree `f4c12afa7bc8e9127e9b5c80720df6062a26f45b`。本地 macOS / Python 3.12.16 验证 428/428 单元、82/82 契约、1/1 安全测试，生产行/分支覆盖 2,143/2,143 与 768/768（均 100%）；该 head 的 GitHub Actions 待推送后核对。PR #10 旧 head 的 CodeX review 不代表新 head；需重新复核。独立真人 Q15 Security Review 仍待完成。只读枚举和崩溃注入不提供可信外部核验、恢复授权或真实 API/Browser 执行。
+**状态：** PR #10 原 head `ae3ac3f74237a96c5f6db8944f2a46338bef9213` 已先后合入 PR #9 当前代码基线。PR #9 的 C-1 修复随 head `21ed1b9` 进入其整合提交 `d2d2d6123b3c549fea93e3a393d55660516de9bc`；PR #10 最终代码整合提交 `7eb6f1a40b165e43080f0ba167c3389fd0d5e6ae` 包含该修复与 fail-closed gate，tree `af0e751902f230ef5e8035a51c845f5d14ab8ace`。文档同步 merge 提交 `a0e339481406f716ba0433247167448ecabd54be` 纳入 PR #9 最新文档 head `69b72003237e281f81a99f45c358f90478e63239`。本地 macOS / Python 3.12.16 验证 430/430 单元、82/82 契约、1/1 安全测试，生产行/分支覆盖 2,150/2,150 与 770/770（均 100%）；PR #10 最新 head Actions 与 CodeX 复审待推送后核对。独立真人 Q15 Security Review 仍未签署。只读枚举和崩溃注入不提供可信外部核验、恢复授权或真实 API/Browser 执行。
 
 ## 需求与边界
 
@@ -136,3 +136,21 @@ PR #9 在原 PR #10 基线提交 `c8f0f6e` 之后新增了对 R0/R1 自述 Scope
 | Release Gate | `PYTHONDONTWRITEBYTECODE=1 python3.12 scripts/quality_gate.py --mode release --coverage /private/tmp/bugmaster-pr10-latest.json`：按预期 NO-GO，原因包括 Feature Inventory 未冻结、真实业务覆盖不超过 60%、核心 Happy/Negative/Edge 执行证据缺失 |
 
 PR #10 最新整合 head 的 GitHub Actions 与 CodeX 通用/安全辅助复审尚待远端核对。旧 head 上的 AI review 不能代表该整合提交；任何模型结论和 CI 均不替代独立真人 Q15 Security Reviewer 签署。
+
+## 2026-11-22：接入含 PR #8 C-1 的最新 PR #9 基线
+
+PR #9 最新代码树已包含 PR #8 Session–Journal ID 绑定修复及自身的 fail-closed Scope/Evidence gate。PR #10 原始分支曾基于更早的 PR #9 head；本次整合代码提交 `7eb6f1a40b165e43080f0ba167c3389fd0d5e6ae` 纳入该最新代码树，tree `af0e751902f230ef5e8035a51c845f5d14ab8ace`。后续文档同步 merge `a0e339481406f716ba0433247167448ecabd54be` 纳入 PR #9 最新证据 head `69b72003237e281f81a99f45c358f90478e63239`。PR #10 的 Action 枚举、缺失日志 guard 和进程崩溃验证实现未修改。
+
+环境：macOS POSIX，Python 3.12.16；JSON Schema 与 coverage 依赖从 `/private/tmp` 加载。代码树 `af0e751` 的本地验证：
+
+| 检查 | 命令 / 结果 |
+|---|---|
+| Journal / Session / Checkpoint 恢复定向 | `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/private/tmp/bugmaster-jsonschema python3.12 -m unittest tests.unit.test_action_journal_crash_recovery tests.unit.test_store_crash_recovery -v`：22/22 PASS；另行运行 Session–Journal mismatch 回归 1/1 PASS |
+| 全单元与覆盖采集 | `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/private/tmp/bugmaster-jsonschema:/private/tmp/bugmaster-coverage python3.12 -m coverage run --branch --source=bugmaster_core,scripts --data-file=/private/tmp/bugmaster-pr10-final.coverage -m unittest discover -s tests/unit`：430/430 PASS |
+| 全契约 | `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/private/tmp/bugmaster-jsonschema python3.12 -m unittest discover -s tests/contracts`：82/82 PASS |
+| R3 安全测试 | `PYTHONDONTWRITEBYTECODE=1 python3.12 -m unittest discover -s tests/security -v`：1/1 PASS |
+| 生产行 / 分支覆盖 | `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/private/tmp/bugmaster-coverage python3.12 -m coverage json --data-file=/private/tmp/bugmaster-pr10-final.coverage -o /private/tmp/bugmaster-pr10-final.json`；`PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/private/tmp/bugmaster-coverage python3.12 -m coverage report --data-file=/private/tmp/bugmaster-pr10-final.coverage --include='bugmaster_core/*,scripts/*'`：2,150/2,150 语句、770/770 分支，分别统计且均 100%，无遗漏项 |
+| Catalog / 品牌 / Benchmark manifest | `python3.12 scripts/validate_catalog.py`、`python3.12 scripts/check_branding.py`、`python3.12 scripts/validate_benchmark.py`：PASS；50 个 Benchmark 场景未执行 |
+| Release Gate | `PYTHONDONTWRITEBYTECODE=1 python3.12 scripts/quality_gate.py --mode release --coverage /private/tmp/bugmaster-pr10-final.json`：按预期 NO-GO，Feature Inventory 未冻结、业务覆盖未超过 60%、核心 Happy/Negative/Edge 证据缺失 |
+
+PR #9 head `69b7200` 对应 Actions Run `44986287358` 全部通过；PR #10 当前整合 head 的 Actions 与 CodeX 通用/安全复审待远端核对。独立真人 Q15 Security Reviewer 仍未签署，模型结论和 CI 均不能替代签署。
