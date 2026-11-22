@@ -151,7 +151,7 @@ def _normalize_false_positive_checks(checks):
         ):
             continue
         evidence_refs = item.get("evidenceRefs")
-        if evidence_refs is not None and (
+        if "evidenceRefs" in item and (
             not isinstance(evidence_refs, list)
             or not all(_nonempty(ref) for ref in evidence_refs)
         ):
@@ -237,6 +237,7 @@ def assess_candidate(
         if (
             not _nonempty(duplicate_of.get("candidateId"))
             or duplicate_of.get("candidateId") == candidate_id
+            or not isinstance(duplicate_of.get("decision"), str)
             or duplicate_of.get("decision") not in {"candidate", "needs_review"}
             or not isinstance(duplicate_of.get("revision"), int)
             or isinstance(duplicate_of.get("revision"), bool)
@@ -324,6 +325,21 @@ def append_review_event(assessment, event):
     if not isinstance(assessment, dict) or not isinstance(event, dict):
         raise TypeError("assessment-and-event-must-be-objects")
     revision = assessment.get("revision")
+    decision = assessment.get("decision")
+    pattern_id = assessment.get("patternId")
+    if (
+        assessment.get("schemaVersion") != "1.0"
+        or not _nonempty(assessment.get("candidateId"))
+        or not isinstance(revision, int)
+        or isinstance(revision, bool)
+        or revision < 1
+        or not _nonempty(assessment.get("observedSurface"))
+        or not isinstance(pattern_id, str)
+        or _PATTERN_ID.fullmatch(pattern_id) is None
+        or not isinstance(decision, str)
+        or decision not in _CANDIDATE_DECISIONS
+    ):
+        raise ValueError("review-assessment-invalid")
     event_revision = event.get("candidateRevision")
     if (
         event.get("candidateId") != assessment.get("candidateId")

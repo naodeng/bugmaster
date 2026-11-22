@@ -222,16 +222,24 @@ class CandidateAssessmentTests(unittest.TestCase):
         self.assertIn("FALSE_POSITIVE_CHECK_INCONCLUSIVE", assessment["reasonCodes"])
 
     def test_malformed_false_positive_check_evidence_refs_are_omitted(self):
-        assessment = assess_candidate(
-            candidate(falsePositiveChecks=[
-                {"check": "business_exception", "result": "clear", "evidenceRefs": "EV-001"}
-            ]),
-            oracle(),
-            [evidence()],
-        )
-        self.assertEqual(assessment["falsePositiveChecks"], [])
-        self.assertEqual(assessment["decision"], "needs_review")
-        self.assertIn("FALSE_POSITIVE_CHECK_INCONCLUSIVE", assessment["reasonCodes"])
+        for evidence_refs in ("EV-001", None):
+            with self.subTest(evidence_refs=evidence_refs):
+                assessment = assess_candidate(
+                    candidate(falsePositiveChecks=[
+                        {
+                            "check": "business_exception",
+                            "result": "clear",
+                            "evidenceRefs": evidence_refs,
+                        }
+                    ]),
+                    oracle(),
+                    [evidence()],
+                )
+                self.assertEqual(assessment["falsePositiveChecks"], [])
+                self.assertEqual(assessment["decision"], "needs_review")
+                self.assertIn(
+                    "FALSE_POSITIVE_CHECK_INCONCLUSIVE", assessment["reasonCodes"]
+                )
 
     def test_detected_false_positive_signal_without_rebuttal_requires_review(self):
         checks = [{"check": "business_exception", "result": "detected"}]
@@ -280,6 +288,22 @@ class CandidateAssessmentTests(unittest.TestCase):
                 [evidence("EV-002")],
                 duplicate_of=assess_candidate(candidate(), oracle(), [evidence()]),
             )
+
+        existing = assess_candidate(candidate(), oracle(), [evidence()])
+        for decision in ([], {}):
+            with self.subTest(duplicate_decision=decision):
+                duplicate_of = {
+                    **existing,
+                    "candidateId": "CF-OLD",
+                    "decision": decision,
+                }
+                with self.assertRaisesRegex(ValueError, "duplicate-identity-mismatch"):
+                    assess_candidate(
+                        candidate(candidateId="CF-002"),
+                        oracle(),
+                        [evidence("EV-002")],
+                        duplicate_of=duplicate_of,
+                    )
 
     def test_required_candidate_assessment_fields_are_validated(self):
         for updates in (
@@ -351,6 +375,28 @@ class CandidateAssessmentTests(unittest.TestCase):
 
         self.assertEqual(assessment["review"]["events"], [event])
         self.assertIn("EV-002", assessment["evidenceRefs"])
+
+    def test_review_event_rejects_invalid_assessment_header(self):
+        assessment = assess_candidate(candidate(), oracle(), [evidence()])
+        invalid_headers = (
+            {"candidateId": ""},
+            {"revision": 0},
+            {"schemaVersion": "2.0"},
+            {"decision": "confirmed"},
+            {"observedSurface": ""},
+            {"patternId": "BP-API-2"},
+        )
+
+        for header in invalid_headers:
+            with self.subTest(header=header):
+                corrupt = copy.deepcopy(assessment)
+                corrupt.update(header)
+                event = review_event(
+                    candidateId=corrupt["candidateId"],
+                    candidateRevision=corrupt["revision"],
+                )
+                with self.assertRaisesRegex(ValueError, "review-assessment-invalid"):
+                    append_review_event(corrupt, event)
 
     def test_malformed_candidate_lists_are_normalized_to_empty(self):
         assessment = assess_candidate(
