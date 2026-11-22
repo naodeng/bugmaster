@@ -243,15 +243,30 @@ class ActionJournalStore:
         return self._journal_id
 
     def open(self):
-        """Open an existing Journal through a pinned private directory."""
-        return self._open_from_root_fd(None)
+        """Open an existing Journal only when its Session identity agrees."""
+        try:
+            root_fd = self._open_root_directory(create=False)
+        except FileNotFoundError as error:
+            raise JournalCorruptionError(
+                "canonical Journal storage path is missing"
+            ) from error
+        try:
+            session_store = SessionStore(
+                self._root, self._session_id, lambda _document: None
+            )
+            with session_store.lock_revision_snapshot(
+                root_fd=root_fd, create_directories=False
+            ) as (revision_count, latest_session):
+                self._validate_session_journal_binding(
+                    revision_count, latest_session
+                )
+                return self._open_from_root_fd(root_fd)
+        finally:
+            os.close(root_fd)
 
     def _open_from_root_fd(self, root_fd):
         try:
-            if root_fd is None:
-                directory_fd = self._open_store_directory(create=False)
-            else:
-                directory_fd = self._open_store_directory_at(root_fd, create=False)
+            directory_fd = self._open_store_directory_at(root_fd, create=False)
         except FileNotFoundError as error:
             raise JournalCorruptionError(
                 "canonical Journal storage path is missing"
@@ -275,13 +290,9 @@ class ActionJournalStore:
                 root_fd=root_fd
             ) as (revision_count, latest_session):
                 session_exists = revision_count > 0
-                if (
-                    session_exists
-                    and latest_session["journalId"] != self._journal_id
-                ):
-                    raise JournalCorruptionError(
-                        "canonical Journal ID does not match the stored Session"
-                    )
+                self._validate_session_journal_binding(
+                    revision_count, latest_session
+                )
                 try:
                     directory_fd = self._open_store_directory_at(
                         root_fd, create=not session_exists
@@ -309,6 +320,15 @@ class ActionJournalStore:
                 )
         finally:
             os.close(root_fd)
+
+    def _validate_session_journal_binding(self, revision_count, latest_session):
+        if (
+            revision_count
+            and latest_session["journalId"] != self._journal_id
+        ):
+            raise JournalCorruptionError(
+                "canonical Journal ID does not match the stored Session"
+            )
 
     def _open_root_directory(self, *, create):
         """Open the configured root after validating its full ancestor chain."""
