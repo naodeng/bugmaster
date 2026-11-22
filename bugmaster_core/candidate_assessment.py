@@ -234,6 +234,9 @@ def assess_candidate(
     if duplicate_of is not None:
         if not isinstance(duplicate_of, dict):
             raise ValueError("duplicate-reference-invalid")
+        candidate_identity = _identity(candidate)
+        duplicate_identity = _identity(duplicate_of)
+        identity = candidate.get("identity")
         if (
             not _nonempty(duplicate_of.get("candidateId"))
             or duplicate_of.get("candidateId") == candidate_id
@@ -242,8 +245,10 @@ def assess_candidate(
             or not isinstance(duplicate_of.get("revision"), int)
             or isinstance(duplicate_of.get("revision"), bool)
             or duplicate_of.get("revision") < 1
-            or _identity(candidate) is None
-            or _identity(candidate) != _identity(duplicate_of)
+            or candidate_identity is None
+            or candidate_identity != duplicate_identity
+            or candidate.get("oracleRef") != duplicate_of.get("oracleRef")
+            or candidate.get("oracleRef") != identity.get("oracleRef")
         ):
             raise ValueError("duplicate-identity-mismatch")
         assessment["decision"] = "duplicate"

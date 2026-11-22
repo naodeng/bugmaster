@@ -261,6 +261,27 @@ class CandidateAssessmentTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             assess_candidate(incoming, oracle(), [evidence("EV-002")], duplicate_of=existing)
 
+    def test_duplicate_link_requires_matching_top_level_and_identity_oracle(self):
+        existing = assess_candidate(candidate(), oracle(), [evidence()])
+        mismatched_candidate = candidate(candidateId="CF-002", oracleRef="OR-002")
+        mismatched_existing = {**existing, "oracleRef": "OR-002"}
+
+        for incoming, duplicate in (
+            (mismatched_candidate, existing),
+            (candidate(candidateId="CF-003"), mismatched_existing),
+        ):
+            with self.subTest(
+                candidateOracle=incoming["oracleRef"],
+                duplicateOracle=duplicate["oracleRef"],
+            ):
+                with self.assertRaisesRegex(ValueError, "duplicate-identity-mismatch"):
+                    assess_candidate(
+                        incoming,
+                        oracle(),
+                        [evidence("EV-002")],
+                        duplicate_of=duplicate,
+                    )
+
     def test_duplicate_cannot_point_to_noncanonical_assessment(self):
         existing = assess_candidate(candidate(), oracle(), [evidence()])
         existing["decision"] = "rejected"
