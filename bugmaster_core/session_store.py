@@ -402,10 +402,17 @@ class SessionStore:
         return normalized
 
     @contextmanager
+    def lock_revision_snapshot(self, *, root_fd=None):
+        """Hold the exclusive Session lock while yielding count and latest revision."""
+        with self._locked(root_fd=root_fd) as storage:
+            history = self._read_revisions_locked(storage)
+            yield history["count"], history["latest"]
+
+    @contextmanager
     def lock_revisions(self, *, root_fd=None):
         """Hold the exclusive Session lock while yielding its committed count."""
-        with self._locked(root_fd=root_fd) as storage:
-            yield self._read_revisions_locked(storage)["count"]
+        with self.lock_revision_snapshot(root_fd=root_fd) as (revision_count, _):
+            yield revision_count
 
     def append_revision(self, document, expected_revision):
         """Append the next revision if the expected revision is still current."""
