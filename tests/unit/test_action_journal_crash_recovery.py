@@ -1,10 +1,13 @@
 """Process-crash checks for conservative Action Journal recovery."""
 
+import json
 import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+
+from jsonschema import Draft202012Validator, FormatChecker
 
 
 _WORKER = r"""
@@ -126,9 +129,18 @@ class ActionJournalCrashRecoveryTests(unittest.TestCase):
             from bugmaster_core.action_journal_store import ActionJournalStore
             from bugmaster_core.session_store import SessionStore
 
+            schema_path = (
+                Path(__file__).resolve().parents[2]
+                / "schemas"
+                / "session.schema.json"
+            )
+            session_schema = json.loads(schema_path.read_text(encoding="utf-8"))
+            session_validator = Draft202012Validator(
+                session_schema, format_checker=FormatChecker()
+            ).validate
             store = ActionJournalStore(root, "session-1", "journal-1")
             store.initialize().close()
-            SessionStore(root, "session-1", lambda _document: None).create(
+            SessionStore(root, "session-1", session_validator).create(
                 {
                     "schemaVersion": "1.0",
                     "sessionId": "session-1",
@@ -138,10 +150,11 @@ class ActionJournalCrashRecoveryTests(unittest.TestCase):
                     "hostRef": "codex",
                     "environmentRef": "local",
                     "createdAt": "2026-11-21T00:00:00Z",
+                    "updatedAt": "2026-11-21T00:00:00Z",
                     "scopeHistory": [{"scopeId": "scope-1", "revision": 1}],
                     "approvalRefs": [],
                     "checkpointRefs": [],
-                    "actionBudget": {},
+                    "actionBudget": {"maxActions": 0, "consumedActions": 0},
                     "journalId": "journal-1",
                 }
             )
