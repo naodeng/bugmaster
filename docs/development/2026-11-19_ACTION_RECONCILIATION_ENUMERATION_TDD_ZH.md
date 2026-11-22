@@ -154,3 +154,28 @@ PR #9 最新代码树已包含 PR #8 Session–Journal ID 绑定修复及自身�
 | Release Gate | `PYTHONDONTWRITEBYTECODE=1 python3.12 scripts/quality_gate.py --mode release --coverage /private/tmp/bugmaster-pr10-final.json`：按预期 NO-GO，Feature Inventory 未冻结、业务覆盖未超过 60%、核心 Happy/Negative/Edge 证据缺失 |
 
 PR #9 head `69b7200` 对应 Actions Run `44986287358` 全部通过；PR #10 当前整合 head 的 Actions 与 CodeX 通用/安全复审待远端核对。独立真人 Q15 Security Reviewer 仍未签署，模型结论和 CI 均不能替代签署。
+
+## 2026-11-22：补齐人工复核指出的 PR #10 枚举与 store-backed 崩溃覆盖
+
+PR #10 合入 PR #9 新 head `be7884511d034d85358f6c3d4599796b37b8a092`，整合提交为 `0ab902673f1e4734b1509db2bfafa1a5960d0777`；本次测试提交为 `4aaafd4eb32cfeb09de73133a10f5aeba811e667`。本轮只增加测试，没有改变生产行为。审查报告指出这些路径此前缺少测试，故不伪造生产行为 RED；新增真实文件系统和子进程场景后验证其结果。
+
+### 新增覆盖
+
+- **store-backed 崩溃恢复：** 子进程通过 `ActionJournalStore.open()` 打开与持久 Session `journalId` 相符的 Journal，在 `dispatched` 事件 fsync 后以 `os._exit(71)` 退出。父进程重新通过 Store 打开，枚举到未决 action，并确认不能再次 dispatch。
+- **空 Journal 枚举：** 对零字节 Journal 明确断言当前结果为 `()`。这只固定空历史的现有语义；同 UID 截断/篡改仍属于已声明威胁模型，测试不声称检测该操作。若产品要求抵抗同 UID 篡改，需要单独设计并审查 genesis/head 记录。
+- **失败态风险枚举：** 对失败的 R0 Action 断言终态且不枚举；对失败的 R1 Action 断言需要对账且进入枚举。
+
+### VERIFY
+
+环境：macOS / Darwin，Python 3.12.16。
+
+| 检查 | 结果 |
+|---|---|
+| Journal 崩溃恢复定向测试 | `test_action_journal_crash_recovery.py`：15/15 PASS；包含 store-backed 子进程崩溃、零字节、失败 R0/R1 枚举 |
+| 全量单元 / 契约 / 安全 | 单元 437/437、契约 82/82、安全 1/1 PASS |
+| 行 / 分支覆盖 | `bugmaster_core/` 与 `scripts/` 共 2,159/2,159 语句、768/768 分支，分别统计，均 100%；覆盖 JSON：`/private/tmp/bugmaster-pr10-human-review.json` |
+| macOS ACL / 清单检查 | 完整单元与验证器套件在 Darwin 执行，原生 `chmod +a` ACL 测试通过；Catalog、Benchmark manifest 结构、品牌扫描与 `git diff --check` PASS。50 个 Benchmark 场景未执行 |
+| Release Gate | **NO-GO（预期）**：Feature Inventory 未冻结、业务覆盖未超过 60%、核心 Happy/Negative/Edge 执行证据缺失 |
+| 远端 CI / Q15 | 新整合 head 推送后仍须核验远端 Actions；用户提供的报告是 REQUEST CHANGES 结论，不是 GitHub Q15 APPROVE，不能记录为已签署 |
+
+V-2/V-3/V-5 仍为未证实的平台 ACL、DoS/root 祖先及 legacy 可达性事项；本轮没有把它们扩大成确认漏洞。V-4 的同 UID 篡改威胁也未改变。最终是否通过 R3 Q15 仍需独立真人在修复后的 head 上复核并正式批准。
