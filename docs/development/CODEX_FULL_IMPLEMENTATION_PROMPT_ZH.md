@@ -19,7 +19,7 @@
    - `python -m unittest discover -s tests/unit -v`
    - `python -m unittest discover -s tests/contracts -v`
    - 执行现有质量门禁并准确说明当前 No-Go 原因。
-4. 如果 GitHub 仓库不存在、连接器无创建权限、缺少真实宿主或独立审核者，记录为阻断，不虚构仓库、Issue、PR、Review、Eval 和发布证据。其他可实施任务继续进行。
+4. 如果 GitHub 仓库不存在、连接器无创建权限或缺少真实宿主，记录为阻断，不虚构仓库、Issue、PR、Review、Eval 和发布证据。Q15 不要求独立真人 PR 审核；缺少适用的 Codex 扫描、真实宿主或 Q16 发布授权时，按对应门禁记录阻断。其他可实施任务继续进行。
 
 ## 品牌与 Skill 名称必须统一
 
@@ -75,7 +75,7 @@
 
 - 所有实际改动关联 Feature/Obligation、测试 ID、W0–W11、RED/GREEN 证据，使用独立 PR/Commit；不要在未获权限的 GitHub 组织伪造已创建仓库或 Issues。
 - 强制 CI：单元行覆盖率 100%、业务功能覆盖率 >60%、核心三类用例、品牌与 Skill 名称扫描、Schema、打包闭包、静态安全、完整 Benchmark、两宿主验证。
-- Q15 独立 Review：R2 需非作者质量审核人，R3 需独立安全审核人；Q16 正式发布需发起人 + 不同的真实发布审核人。签署固定 Commit/Manifest/Artifact 摘要，保护 GitHub Environment/Tag，校验供应链来源；无双人授权或任一阻断门禁失败，Release **No-Go**。
+- Q15=D：每个 PR 由 Codex 对准确 head 做代码扫描；R2/R3 变更还做安全扫描。项目所有者查看结果后手动合并，不要求独立真人 PR 签署。Q16 正式发布仍需发起人和不同的真人发布审核人批准同一固定 Commit/Manifest/Artifact 摘要。保护 GitHub Environment/Tag 并校验供应链来源；无双人发布授权或任一阻断门禁失败，Release **No-Go**。
 - GitHub Actions 第三方 Action 固定经审查的完整 SHA，令牌最小权限；无真实能力或证据则标记待实现，禁止宣称已运行正式发布工作流。
 
 ## 开始执行，不要停留在答复

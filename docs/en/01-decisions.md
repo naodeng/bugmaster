@@ -20,6 +20,7 @@ Status: approved in conversation; not implemented or committed to GitHub.
 | Q12 | B | Portable core; Codex first, Claude Code verified |
 | Q13 | B | Versioned session, journal and safe resume |
 | Q14 | A | Complete MVP in one release; vertical slice is an internal integration checkpoint, not scope reduction |
+| Q15 | D | Codex code scan on every PR; security scan for R2/R3; project owner manually merges, with no independent human PR signature |
 
 ADR-014: single-scope complete MVP. Do not reinterpret the vertical slice as a phased MVP release. Missing independent host enforcement prevents bounded autonomy, rather than lowering safety requirements.
 

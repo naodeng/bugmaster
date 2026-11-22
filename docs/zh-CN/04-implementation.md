@@ -6,6 +6,8 @@
 
 一次性完整 MVP 交付：11 Skills、16 Patterns、50 Benchmark 场景、API 与 Browser Basic、Codex 和 Claude Code 核心验证、Oracle/Evidence/Finding、Safe Resume、Evidence Bundle、回归建议、CI 门禁。Vertical Slice VS-01 只是**内部最早端到端集成验证点**，不能偷换成缩小范围的首个 MVP 版本。
 
+开发按串行 PR 推进：一次只实施一个功能 PR。完成当前 PR 的开发、验证及 Q15 扫描后，由项目所有者查看结果并手动合并，再开始下一项功能。每个 PR 做 Codex 代码扫描；R2/R3 变更还做安全扫描。不得并行堆叠功能分支或 PR；若 CI、扫描或待决风险阻塞当前 PR，先记录证据并交项目所有者处理。Q15 不要求独立真人签署。
+
 ## 工作流与依赖
 
 | 工作流 | TDD 任务 | 依赖 | 完成条件 |

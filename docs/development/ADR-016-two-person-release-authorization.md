@@ -1,16 +1,16 @@
 # Q16 正式发布授权与供应链保障规范（ADR-016）
 
-> 状态：Accepted as architecture decision / 尚未实施。日期：2026-11-18。Q16=B。范围：Q14=A 的一次性交付完整 MVP。来源：`RELEASE_POLICY.md`、`docs/zh-CN/07-release.md`、`docs/zh-CN/08-implementation-governance.md`、ADR-015。
+> 状态：Accepted as architecture decision / 尚未实施。原日期：2026-11-18。Q15 于 2026-11-22 修订为 D；Q16=B。范围：Q14=A 的一次性交付完整 MVP。来源：`RELEASE_POLICY.md`、`docs/zh-CN/07-release.md`、`docs/zh-CN/08-implementation-governance.md`、ADR-015。
 
 ## 1. 决策冻结
 
-Q1–Q16：**A,A,B,B,B,B,B,B,A,B,B,B,B,A,B,B**。Q15 的 R2/R3 **代码变更审核** 与 Q16 的 **特定 Release Candidate 双人发布授权** 是两种不同动作。任何自动化结果、AI 评审或拥有权限的单一维护者都不得冒充第二名自然人审核者。没有第二名授权审核者时，允许继续开发并生成候选制品，但正式公开发布必须 No-Go；不得将 Q16 降级为自动发布。
+Q1–Q16：**A,A,B,B,B,B,B,B,A,B,B,B,B,A,D,B**。Q15 要求 Codex 对每个 PR 做代码扫描，对 R2/R3 变更做安全扫描；项目所有者查看结果后手动合并，不要求独立真人 PR 审核或签署。Q16 的特定 Release Candidate 双人发布授权与 Q15 是不同动作。没有第二名授权审核者时，允许继续开发并生成候选制品，但正式公开发布必须 No-Go；不得将 Q16 降级为自动发布。
 
 ## 2. 责任与分离
 
 - **Release Initiator (RI)**：选择已审核的固定源码 SHA、触发候选构建、汇总 RC Manifest 和测试证据、提出 Go/No-Go；可以是 Q15 的 IM/RA。
-- **Independent Release Reviewer (IRR)**：与 RI 不同的真实自然人，核查冻结 SHA、Manifest、产物摘要、Attestation、全量基准、BLK-01..07、R2/R3 审核、兼容性、安装、回滚演练后显式批准或拒绝。
-- **Security Reviewer (SR)**：对 R3 变更独立审核。若 SR 与 IRR 为同一人，须分别留下变更审查和发布审核两条独立证据；与代码作者独立的要求仍适用。
+- **Independent Release Reviewer (IRR)**：与 RI 不同的真实自然人，核查冻结 SHA、Manifest、产物摘要、Attestation、全量基准、BLK-01..07、Q15 扫描证据、兼容性、安装和回滚演练后显式批准或拒绝。
+- **Codex 扫描**：对每个 PR 做代码扫描，对 R2/R3 变更做安全扫描。项目所有者查看发现并手动合并；Codex 扫描不替代 Q16 的 IRR 发布批准。
 - **Evaluation Custodian (EC)**：证明 Ground Truth 对被测 Agent 不可见、基准可复核，提供签署所需的 Eval Run 引用。
 - **Publisher**：仅受环境保护门禁批准后的受限 CI 发布 Job；人不直接使用常设管理令牌向 Release 上传制品。
 
@@ -56,7 +56,7 @@ flowchart TD
 
 ## 6. 最小 Release Manifest 契约
 
-字段：`schemaVersion`, `releaseId`, `version`, `sourceCommit`, `sourceTreeDigest`, `workflowRunId`, `datasetDigest`, `requiredScope` (11 Skills,16 Patterns,50 cases,2 hosts), `qualityEvidenceRefs`, `riskReviewRefs`, `securityReviewRefs`, `blockingSpikeRefs`, `artifactDigests`, `attestationRefs`, `riIdentity`, `irrIdentity`, `approvalManifestDigest`, `approvalDecision`, `publishedTag`, `postPublishVerification`。所有审批必须绑定不可变 Manifest Digest，未绑定则无效。`approvalDecision` 必须由 GitHub 环境审核/经过身份验证的批准动作生成，不能由模型手填。
+字段：`schemaVersion`, `releaseId`, `version`, `sourceCommit`, `sourceTreeDigest`, `workflowRunId`, `datasetDigest`, `requiredScope` (11 Skills,16 Patterns,50 cases,2 hosts), `qualityEvidenceRefs`, `codeScanRefs`, `securityScanRefs`, `blockingSpikeRefs`, `artifactDigests`, `attestationRefs`, `riIdentity`, `irrIdentity`, `approvalManifestDigest`, `approvalDecision`, `publishedTag`, `postPublishVerification`。所有审批必须绑定不可变 Manifest Digest，未绑定则无效。`approvalDecision` 必须由 GitHub 环境审核/经过身份验证的批准动作生成，不能由模型手填。
 
 ## 7. 发布权限矩阵
 
@@ -70,7 +70,7 @@ flowchart TD
 
 ## 8. Go/No-Go 决策
 
-全部为 Go 条件：Q14 全量范围（11/16/50/2 + API/Browser）完成；Q15 W0–W11 DoD；BLK-01..07 已关闭；契约、安全、Evidence、Safe Resume、独立安装与双宿主真实 Run 通过；G0–G3 Eval 有实际分子/分母、用量成本和失败案例；英文/中文文档、许可证、SBOM、签署/Attestation、回滚演练完成；RI != IRR 且 IRR 在冻结 Manifest 上签署批准；发布 Job 二次核验 SHA 和摘要。任何关键安全、证据、审核或权限保护不足则 No-Go，不以风险接受绕过。
+全部为 Go 条件：Q14 全量范围（11/16/50/2 + API/Browser）完成；Q15 W0–W11 DoD 与适用的代码/安全扫描证据齐全；BLK-01..07 已关闭；契约、安全、Evidence、Safe Resume、独立安装与双宿主真实 Run 通过；G0–G3 Eval 有实际分子/分母、用量成本和失败案例；英文/中文文档、许可证、SBOM、签署/Attestation、回滚演练完成；RI != IRR 且 IRR 在冻结 Manifest 上签署批准；发布 Job 二次核验 SHA 和摘要。任何关键安全、证据或权限保护不足则 No-Go，不以风险接受绕过。
 
 ## 9. 失败与回滚
 
@@ -93,7 +93,7 @@ flowchart TD
 | RELAUTH-006 | 缺少或无法验证 Attestation | 阻断正式发布 |
 | RELAUTH-007 | Fork PR 尝试读取发布凭据 | 凭据不可达 |
 | RELAUTH-008 | 未经批准的 Tag/Release 创建 | Ruleset/权限阻断 |
-| RELAUTH-009 | R3 改动缺独立 SR 复核 | No-Go |
+| RELAUTH-009 | R2/R3 改动缺适用的 Q15 代码/安全扫描证据 | No-Go |
 | RELAUTH-010 | 发布 job 未通过 protected environment | 无法发布 |
 | RELAUTH-011 | Immutable Release 后尝试替换资产 | 拒绝并改走新版本修复 |
 | RELAUTH-012 | 发布后下载并核验证据 | Digest/来源/Tag 均一致 |
@@ -106,7 +106,7 @@ CI 静态/合约测试每 PR 执行；发布流程在隔离测试仓库进行至
 
 ## 11. 对 W0–W11 的增量任务
 
-- **W0**：冻结 ADR-016，明确发布人选与 Q15 职责隔离。
+- **W0**：冻结 ADR-016，明确 Q15 PR 扫描与 Q16 双人发布授权的边界。
 - **W1**：实现 Release Manifest / Sign-off / Attestation / Rollback Event Schema。
 - **W9**：导出冻结 Benchmark / Eval Run Digest 和评分口径。
 - **W10**：发布包来自经验证的两宿主适配器与固定源码。

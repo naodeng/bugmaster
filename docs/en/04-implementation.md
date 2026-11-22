@@ -4,7 +4,7 @@
 
 ## Scope contract
 
-Ship all: 11 canonical Skills, 16 Patterns, 50 benchmark cases, API and basic browser real paths, Codex and Claude Code verified core, Finding/Evidence/Oracle/Session contracts, recovery, export, regression recommendations and CI governance. **Do not release VS-01 alone as MVP**. A vertical slice is an internal integration test milestone; feature work may be parallelized but one MVP Go/No-Go covers the complete agreed scope.
+Ship all: 11 canonical Skills, 16 Patterns, 50 benchmark cases, API and basic browser real paths, Codex and Claude Code verified core, Finding/Evidence/Oracle/Session contracts, recovery, export, regression recommendations and CI governance. **Do not release VS-01 alone as MVP**. A vertical slice is an internal integration test milestone; implementation is sequential, one feature PR at a time. Run a Codex code scan on every PR and a security scan for R2/R3 changes. The project owner reviews scan results and merges manually before the next feature starts; Q15 requires no independent human PR signature. One MVP Go/No-Go covers the complete agreed scope.
 
 ## Workstream ownership / dependency graph
 
@@ -21,7 +21,7 @@ Ship all: 11 canonical Skills, 16 Patterns, 50 benchmark cases, API and basic br
 | W8 Regression | recommendation schema and Markdown (no code writes) | W7 | advice traceable, no source edits |
 | W9 Benchmark | local Order Demo, correct/buggy variants, private truth, 50 cases | W1, W5 | reference tests detect faults |
 | W10 Host verification | real Codex and Claude Code installation/API/browser flows | W2–W9 | target compatibility matrix verified |
-| W11 Release | R0-R3 review, PR CI, Eval G0–G3, immutable manifests, rollback dry run | W1–W10 | one complete MVP Go/No-Go |
+| W11 Release | Q15 code/security scan evidence, PR CI, Eval G0–G3, immutable manifests, Q16 authorization, rollback dry run | W1–W10 | one complete MVP Go/No-Go |
 
 ## Vertical Slice VS-01 (internal integration milestone)
 

@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "1.0",
+  "candidateId": "CF-002",
+  "revision": 1,
+  "observedSurface": "api",
+  "patternId": "BP-API-002",
+  "decision": "rejected",
+  "reasonCodes": ["TRUSTED_COUNTEREVIDENCE"],
+  "oracleRef": "OR-001",
+  "evidenceRefs": ["EV-002"],
+  "counterEvidenceRefs": ["EV-002"],
+  "falsePositiveChecks": [{"check": "business_exception", "result": "detected", "evidenceRefs": ["EV-002"]}],
+  "review": {"required": false, "events": []}
+}

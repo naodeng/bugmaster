@@ -33,9 +33,14 @@
 - Do not generate/commit regression tests as part of Q9: output recommendations only.
 
 ## Pull requests
+- Work on one implementation PR at a time. Finish its implementation, verification, Q15 scans, and project-owner decision before starting the next feature or opening its PR.
+- Do not stack feature branches or PRs on unmerged PRs. Start the next feature from the latest merged base.
+- If the active PR is blocked on CI, a required scan, or a project-owner decision, pause subsequent feature work and resolve the active PR first.
 - Reference workstream W0–W11 and a Feature/Obligation ID.
-- Show RED → GREEN → REFACTOR → VERIFY with links, test and coverage reports, and approvals in Chinese.
-- For R2 require independent Quality Reviewer, for R3 independent Security Reviewer. Two distinct real people for final release RI + IRR; no self approval.
+- Show RED → GREEN → REFACTOR → VERIFY with links, test and coverage reports, Q15 scan evidence, and applicable Q16 authorization in Chinese.
+- Run a Codex code scan for every PR; R2 and R3 changes also require a Codex security scan. The project owner reviews the results and merges manually. Q15 does not require independent human review or signature; do not auto-merge.
+- Q16 public release approval still requires two distinct real people as RI and IRR.
+- If later evidence suggests this Q15 decision creates a material problem, explain the evidence and impact, then discuss it with the project owner or ask the owner to choose. Do not restore independent human Q15 sign-off unilaterally.
 - Do not merge solely based on generated markdown or passing placeholder fixtures.
 
 ## Codex execution entry

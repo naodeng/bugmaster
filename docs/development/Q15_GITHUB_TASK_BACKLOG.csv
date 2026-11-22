@@ -1,28 +1,28 @@
-﻿Issue Key,Workstream,Title,Risk,Accountable Role,Required Reviewer Role,Dependencies (issue keys),TDD/Eval IDs,Acceptance Evidence,State
-W0-01,W0,Architecture decision ledger and identifier freeze,R2,IM,QR,,TDD-CON-001,"Decision ledger, canonical IDs, accepted ADR-015",planned
-W0-02,W0,Cross-contract state-machine and directory review,R3,IM,SR,W0-01,TDD-CON-002,No contradictory enums or authoritative paths,planned
-W0-03,W0,Blocking-spike risk register and tracking,R2,IM,QR,W0-01,GOV-001,BLK-01..07 owners and outcomes,planned
-W1-01,W1,Core JSON Schemas and negative fixtures,R2,IM,QR,W0-02,TDD-CON-001..020,Schema negative and positive runs,planned
-W1-02,W1,Approval and execution contract validators,R3,IM,SR,W1-01,TDD-SEC-001..012,"Parameters, scope and risk binding",planned
-W1-03,W1,Reference integrity and compatibility contract,R2,IM,QR,W1-01,TDD-CON-012..020,No broken cross-refs,planned
-W2-01,W2,Eleven canonical Skills and bilingual references,R2,IM,QR,W1-01,TDD-SKL-001..011,Complete Skills and examples,planned
-W2-02,W2,Standalone dependency-closure builder,R2,IM,QR,"W2-01,W3-01",TDD-SKL-011,Independent clean install,planned
-W3-01,W3,Sixteen canonical Bug Patterns and taxonomy,R2,IM,QR,W1-01,TDD-PAT-001..016,"16 unique IDs, source and oracle",planned
-W3-02,W3,"Pattern provenance, aliases and status gates",R2,IM,QR,W3-01,TDD-PAT-001..016,Canonical BP-API-002; alias tests,planned
-W4-01,W4,Three-valued deterministic resolver,R2,IM,QR,"W1-01,W3-01",TDD-ROUTE-001,Stable candidates and exclusions,planned
-W4-02,W4,"Semantic rerank, budget and novel hypothesis",R2,IM,QR,W4-01,TDD-ROUTE-002,"Valid decisions, fallbacks",planned
-W5-01,W5,Scope and action gateway with enforced approval,R3,IM,SR,W1-02,TDD-SEC-001..012,BLK-02 negative scenarios,planned
-W5-02,W5,API/Browser tooling and target allowlists,R3,IM,SR,W5-01,TDD-SEC-008,BLK-06 redirects and tools,planned
-W6-01,W6,"Journal, immutable session and checkpoint",R3,IM,SR,W5-01,TDD-ACT-001..012,Write-ahead intent and single writer,planned
-W6-02,W6,Safe resume and crash fault injection,R3,IM,SR,W6-01,TDD-FS-001..008,BLK-03 no unsafe replay,planned
-W7-01,W7,Oracle/Evidence Gate and provenance,R3,IM,SR,W6-01,TDD-FND-001..012,BLK-04 fake evidence rejected,planned
-W7-02,W7,"Finding revisions, reports and evidence bundle",R3,IM,SR,W7-01,TDD-FND-001..012,"Immutable findings, redacted export",planned
-W8-01,W8,Regression recommendation contracts and renderer,R2,IM,QR,W7-02,TDD-REG-001,Recommendation only; no code writes,planned
-W9-01,W9,Reference order API/UI and faulty variants,R2,EC,QR,"W1-01,W5-01",TDD-EVAL-001..025,Reference tests distinguish variants,planned
-W9-02,W9,"Fifty benchmark tasks, separated answers and scorer",R3,EC,SR,W9-01,TDD-EVAL-001..050,BLK-05 answers inaccessible,planned
-W9-03,W9,G0–G3 comparative runs and metric report,R2,EC,QR,W9-02,TDD-EVAL-026..050,Reproducible records and denominators,planned
-W10-01,W10,Codex/Claude Code packaging and clean installs,R2,IM,QR,"W2-02,W3-02",TDD-HOST-001..015,BLK-01 logs and hashes,planned
-W10-02,W10,Dual-host API/Browser/permission evaluation,R3,IM,SR,"W5-02,W7-02,W9-02",TDD-HOST-016..030,BLK-06 real run IDs,planned
-W11-01,W11,CI rules and governed PR workflows,R3,RA,SR,W0-03,GOV-001..010,Fork isolation; protected release,planned
-W11-02,W11,VS-01 and full release-candidate dry run,R3,RA,SR,"W2-02,W3-02,W4-02,W5-02,W6-02,W7-02,W8-01,W9-03,W10-02",REL-001..010,BLK-07 complete scope and evidence,planned
-W11-03,W11,"Release manifest, licensing, bilingual docs, rollback",R3,RA,SR,W11-02,REL-001..010,No-Go unless every gate passed,planned
+﻿Issue Key,Workstream,Title,Risk,Accountable Role,Required Q15 Scan,Dependencies (issue keys),TDD/Eval IDs,Acceptance Evidence,State
+W0-01,W0,Architecture decision ledger and identifier freeze,R2,IM,Codex code and security scan,,TDD-CON-001,"Decision ledger, canonical IDs, accepted ADR-015",planned
+W0-02,W0,Cross-contract state-machine and directory review,R3,IM,Codex code and security scan,W0-01,TDD-CON-002,No contradictory enums or authoritative paths,planned
+W0-03,W0,Blocking-spike risk register and tracking,R2,IM,Codex code and security scan,W0-01,GOV-001,BLK-01..07 owners and outcomes,planned
+W1-01,W1,Core JSON Schemas and negative fixtures,R2,IM,Codex code and security scan,W0-02,TDD-CON-001..020,Schema negative and positive runs,planned
+W1-02,W1,Approval and execution contract validators,R3,IM,Codex code and security scan,W1-01,TDD-SEC-001..012,"Parameters, scope and risk binding",planned
+W1-03,W1,Reference integrity and compatibility contract,R2,IM,Codex code and security scan,W1-01,TDD-CON-012..020,No broken cross-refs,planned
+W2-01,W2,Eleven canonical Skills and bilingual references,R2,IM,Codex code and security scan,W1-01,TDD-SKL-001..011,Complete Skills and examples,planned
+W2-02,W2,Standalone dependency-closure builder,R2,IM,Codex code and security scan,"W2-01,W3-01",TDD-SKL-011,Independent clean install,planned
+W3-01,W3,Sixteen canonical Bug Patterns and taxonomy,R2,IM,Codex code and security scan,W1-01,TDD-PAT-001..016,"16 unique IDs, source and oracle",planned
+W3-02,W3,"Pattern provenance, aliases and status gates",R2,IM,Codex code and security scan,W3-01,TDD-PAT-001..016,Canonical BP-API-002; alias tests,planned
+W4-01,W4,Three-valued deterministic resolver,R2,IM,Codex code and security scan,"W1-01,W3-01",TDD-ROUTE-001,Stable candidates and exclusions,planned
+W4-02,W4,"Semantic rerank, budget and novel hypothesis",R2,IM,Codex code and security scan,W4-01,TDD-ROUTE-002,"Valid decisions, fallbacks",planned
+W5-01,W5,Scope and action gateway with enforced approval,R3,IM,Codex code and security scan,W1-02,TDD-SEC-001..012,BLK-02 negative scenarios,planned
+W5-02,W5,API/Browser tooling and target allowlists,R3,IM,Codex code and security scan,W5-01,TDD-SEC-008,BLK-06 redirects and tools,planned
+W6-01,W6,"Journal, immutable session and checkpoint",R3,IM,Codex code and security scan,W5-01,TDD-ACT-001..012,Write-ahead intent and single writer,planned
+W6-02,W6,Safe resume and crash fault injection,R3,IM,Codex code and security scan,W6-01,TDD-FS-001..008,BLK-03 no unsafe replay,planned
+W7-01,W7,Oracle/Evidence Gate and provenance,R3,IM,Codex code and security scan,W6-01,TDD-FND-001..012,BLK-04 fake evidence rejected,planned
+W7-02,W7,"Finding revisions, reports and evidence bundle",R3,IM,Codex code and security scan,W7-01,TDD-FND-001..012,"Immutable findings, redacted export",planned
+W8-01,W8,Regression recommendation contracts and renderer,R2,IM,Codex code and security scan,W7-02,TDD-REG-001,Recommendation only; no code writes,planned
+W9-01,W9,Reference order API/UI and faulty variants,R2,EC,Codex code and security scan,"W1-01,W5-01",TDD-EVAL-001..025,Reference tests distinguish variants,planned
+W9-02,W9,"Fifty benchmark tasks, separated answers and scorer",R3,EC,Codex code and security scan,W9-01,TDD-EVAL-001..050,BLK-05 answers inaccessible,planned
+W9-03,W9,G0–G3 comparative runs and metric report,R2,EC,Codex code and security scan,W9-02,TDD-EVAL-026..050,Reproducible records and denominators,planned
+W10-01,W10,Codex/Claude Code packaging and clean installs,R2,IM,Codex code and security scan,"W2-02,W3-02",TDD-HOST-001..015,BLK-01 logs and hashes,planned
+W10-02,W10,Browser tool research and dual-host API/Browser/permission evaluation,R3,IM,Codex code and security scan,"W5-02,W7-02,W9-02",TDD-HOST-016..030,"First compare Codex Computer Use, ego-browser, agent-browser, Playwright CLI/MCP and alternatives; document local-first, evidence, isolation and permission trade-offs; then run dual-host Browser/permission cases with real run IDs. No new BugMaster Skill or Agent Runtime",planned
+W11-01,W11,CI rules and governed PR workflows,R3,RA,Codex code and security scan,W0-03,GOV-001..010,Fork isolation; protected release,planned
+W11-02,W11,VS-01 and full release-candidate dry run,R3,RA,Codex code and security scan,"W2-02,W3-02,W4-02,W5-02,W6-02,W7-02,W8-01,W9-03,W10-02",REL-001..010,BLK-07 complete scope and evidence,planned
+W11-03,W11,"Release manifest, licensing, bilingual docs, rollback",R3,RA,Codex code and security scan,W11-02,REL-001..010,No-Go unless every gate passed,planned

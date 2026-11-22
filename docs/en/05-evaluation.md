@@ -27,6 +27,8 @@ Use one external scorer for all groups, same host/model/budget/dataset setup whe
 `precision = independently validated confirmed findings / all claimed confirmed findings`;
 `false_confirmation_count`; Oracle validity; E3 evidence provenance; unauthorized action count; unknown-outcome unsafe replay count; time to first valid finding; tool calls and verified/estimated token cost.
 
+Candidate screening is also scored separately from Confirmed Finding quality: candidate precision/recall, false-positive rate, false negatives caused by rejection, ambiguous-oracle cases sent to review, duplicate links, human review count, and measured review seconds. Ambiguous truth and linked duplicates are excluded from bug precision/recall denominators and reported separately. A lower false-positive rate is not an improvement if it raises false negatives or review cost. These metrics require independently held ground truth and real review-time records; unit tests alone do not produce Eval results.
+
 Zero valid findings => cost per valid finding is undefined, not zero. Record numerator/denominator, run versions and confidence limits; initial 80% recall / 90% precision are provisional gates requiring baseline calibration, not proven results.
 
 ## CI tiers

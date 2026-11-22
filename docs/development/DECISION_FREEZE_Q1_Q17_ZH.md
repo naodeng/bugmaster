@@ -16,7 +16,7 @@
 | Q12 | B | Portable Core + Codex-first / Claude Code 验证 |
 | Q13 | B | Session/Action Journal/Checkpoint/Safe Resume |
 | Q14 | A | 全量 11 Skills、16 Patterns、50 场景、双宿主，一次性 MVP |
-| Q15 | B | R2/Q Reviewer 与 R3/Security 独立审核 |
+| Q15 | D | Codex 对每个 PR 做代码扫描；R2/R3 还做安全扫描；项目所有者查看结果后手动合并，不要求真人签署 |
 | Q16 | B | 发起人与独立复审者两人发布授权 |
 | Q17 | A | GitHub-first 实际工程实施 |
 

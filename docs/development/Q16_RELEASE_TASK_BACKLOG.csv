@@ -1,6 +1,6 @@
-Issue ID,Title,Workstream,Risk,Owner Role,Reviewer Role,Acceptance Tests
-Q16-01,Freeze Release Authorization Contract,W0,R3,IM,SR,"ADR-016, distinct human signoffs"
-Q16-02,Implement release manifest and signoff validation,W1,R3,IM,SR,"RELAUTH-003..006,016"
-Q16-03,Configure protected production environment and tag rulesets,W11,R3,RA,SR,"RELAUTH-001,002,008,010,014"
-Q16-04,Attest and verify release artifacts with least privilege,W11,R3,RA,SR,"RELAUTH-005..007,012,015"
-Q16-05,Rehearse failed release and immutable rollback,W11,R3,RA,SR,RELAUTH-011..013
+Issue ID,Title,Workstream,Risk,Owner Role,Required Q15 Scan,Acceptance Tests
+Q16-01,Freeze Release Authorization Contract,W0,R3,IM,Codex code and security scan,"ADR-016, distinct human signoffs"
+Q16-02,Implement release manifest and signoff validation,W1,R3,IM,Codex code and security scan,"RELAUTH-003..006,016"
+Q16-03,Configure protected production environment and tag rulesets,W11,R3,RA,Codex code and security scan,"RELAUTH-001,002,008,010,014"
+Q16-04,Attest and verify release artifacts with least privilege,W11,R3,RA,Codex code and security scan,"RELAUTH-005..007,012,015"
+Q16-05,Rehearse failed release and immutable rollback,W11,R3,RA,Codex code and security scan,RELAUTH-011..013

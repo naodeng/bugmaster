@@ -6,6 +6,7 @@
     {
       "id": "BENCH-API-BUSINESS-01",
       "category": "api-business",
+      "assessmentFocus": "candidate-positive",
       "status": "planned",
       "fixtureRef": null,
       "groundTruthRef": null,
@@ -14,6 +15,7 @@
     {
       "id": "BENCH-API-BUSINESS-02",
       "category": "api-business",
+      "assessmentFocus": "counterevidence-normal-behavior",
       "status": "planned",
       "fixtureRef": null,
       "groundTruthRef": null,
@@ -22,6 +24,7 @@
     {
       "id": "BENCH-API-BUSINESS-03",
       "category": "api-business",
+      "assessmentFocus": "ambiguous-oracle-needs-review",
       "status": "planned",
       "fixtureRef": null,
       "groundTruthRef": null,
@@ -30,6 +33,7 @@
     {
       "id": "BENCH-API-BUSINESS-04",
       "category": "api-business",
+      "assessmentFocus": "model-disagrees-with-execution",
       "status": "planned",
       "fixtureRef": null,
       "groundTruthRef": null,
@@ -38,6 +42,7 @@
     {
       "id": "BENCH-API-BUSINESS-05",
       "category": "api-business",
+      "assessmentFocus": "false-negative-rejection-risk",
       "status": "planned",
       "fixtureRef": null,
       "groundTruthRef": null,
@@ -46,6 +51,7 @@
     {
       "id": "BENCH-API-BUSINESS-06",
       "category": "api-business",
+      "assessmentFocus": "human-review-feedback",
       "status": "planned",
       "fixtureRef": null,
       "groundTruthRef": null,
@@ -150,6 +156,7 @@
     {
       "id": "BENCH-BROWSER-UI-API-01",
       "category": "browser-ui-api",
+      "assessmentFocus": "cross-surface-deduplication",
       "status": "planned",
       "fixtureRef": null,
       "groundTruthRef": null,

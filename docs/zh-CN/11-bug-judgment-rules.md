@@ -16,6 +16,10 @@
 
 API 入口发现的问题不一定是 API 层根因；Web 上观察到异常也未必是前端问题。分别保存 testSurface、observedLayer、failureType、suspectedComponent、rootCauseStatus。
 
+候选筛选与 Finding 确认分开。helper 输出的 `candidate` 与 `duplicate` 是基于调用方所给记录的本地暂定筛选结果；它不认证来源标志，也不通过规范存储核验重复引用。Host 在把结果当作权威状态，或据此抑制/汇总记录前，必须核验来源真实性与被引用的 Candidate。Candidate Assessment 始终被 Confirmed Gate 阻断。
+
+Schema 为未来可信 Host verifier 流程保留 `rejected`；当前 helper 不会输出该状态，也不接受调用方传入 verifier 回调。可信 Host verifier 接入前，反证保持 `needs_review`；自述来源标志不能授权自动拒绝。证据缺失或结构无效、规则模糊、证据弱、环境不稳或观察矛盾时也继续 Review。人工反馈须绑定候选 revision 和证据；没有可信宿主审核记录时，反馈不能作为已认证批准。
+
 ## 规则在哪看
 - `patterns/taxonomy.json` 分类；`patterns/<domain>/<pattern-id>/pattern.json` 单条规则；`registry/capabilities.json` Skill 路由。
 - 正式规则应补齐适用条件、反例排除、业务 Oracle 来源、具体实验、证据、误报防护，并对正常/缺陷实现执行 Eval；当前 16 条仍是 Candidate。

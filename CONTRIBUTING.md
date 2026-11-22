@@ -8,4 +8,4 @@ All development-process records and pull request evidence must be in Chinese. Pu
 
 Coverage: 100% unit line coverage, >60% validated business-feature coverage and Happy/Negative/Edge scenario evidence for every critical feature. Do not reduce test assertions or hide exclusions to make a gate pass.
 
-Use `.github/pull_request_template.md` and [Chinese development playbook](docs/development/DEVELOPMENT_PLAYBOOK_ZH.md). Follow Q15 independent risk review and Q16 two-person release approval.
+Use `.github/pull_request_template.md` and [Chinese development playbook](docs/development/DEVELOPMENT_PLAYBOOK_ZH.md). Q15 requires a Codex code scan for every PR and a Codex security scan for R2/R3 changes; the project owner reviews results and merges manually. Q16 separately requires two distinct people to authorize a public release.

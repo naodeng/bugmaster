@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "1.0",
+  "candidateId": "CF-001",
+  "revision": 1,
+  "observedSurface": "api",
+  "patternId": "BP-API-002",
+  "decision": "needs_review",
+  "reasonCodes": ["ORACLE_UNCONFIRMED", "FALSE_POSITIVE_CHECK_INCONCLUSIVE"],
+  "oracleRef": null,
+  "evidenceRefs": ["EV-001"],
+  "falsePositiveChecks": [{"check": "business_exception", "result": "unknown"}],
+  "review": {"required": true, "events": []}
+}

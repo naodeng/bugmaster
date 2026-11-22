@@ -15,6 +15,7 @@
 | Action | session journal | session ID + action ID + sequence | write-ahead intent; unknown outcomes never replayed |
 | Oracle | `.bugmaster/oracles/<id>/revisions/` | ID + revision + digest | approved/validated where required |
 | Evidence | metadata and content-addressed artifacts | EV ID + artifact SHA-256 | hash proves integrity, not authenticity |
+| Candidate Assessment | candidate revision's `candidateAssessment` | candidate ID + revision | screening only; never `confirmed`; rejection requires linked counter-evidence |
 | Finding | immutable revisions + current pointer | Finding ID + revision | report and indexes are generated |
 | Review | signed-off/host-attested review record | review ID + bound revision/digest | model cannot approve itself |
 | Session | immutable revisions + `ActionJournalStore` + checkpoints | session ID + revision | deterministic local Journal identity mapping; safe resume gate remains separate |
@@ -36,6 +37,14 @@
 ## Confirmation invariant
 
 `confirmed` requires valid applicable Oracle, authentic independently attributable execution artifact(s), observable violation, sufficiently checked environment and causality, no blocking contradiction, >=E3 gate assessment, and bound human review when policy requires. E4 independent review is optional. Non-reproduction does not automatically invalidate original credible evidence. Confidence and severity are independent of maturity.
+
+## Candidate screening and feedback
+
+The Candidate Assessment schema reserves `rejected` for a future trusted-host verification flow; the current `assess_candidate()` helper emits only `candidate`, `needs_review`, or `duplicate`, and does not accept caller-supplied verifier callbacks. Until a trusted host verifier is integrated, structurally valid counter-evidence stays `needs_review` with unverified-provenance reasons. Self-asserted `validated` or provenance flags do not qualify for automatic rejection. A model opinion alone cannot reject. Conflicting E3+ violation and counter-evidence stays `needs_review`. The `candidate-assessment-rejected.json` file is a schema-only fixture, not a runtime assessment.
+
+`candidate` and `duplicate` are provisional local screening results based on supplied records. The helper does not authenticate provenance flags or verify `duplicateOf` against canonical storage. A Host must verify source provenance and the referenced candidate before treating these results as authoritative or suppressing/aggregating records. Candidate Assessment remains blocked from the Confirmed Gate.
+
+Cross-surface deduplication links only candidates with the same target, business object, operation, Oracle, and violation signature. The observed surface is omitted from that identity so an API and browser observation can link without counting twice. Review feedback is an append-only event list bound to a candidate revision and evidence references. The current helper returns an updated in-memory value; durable immutable Candidate/Finding storage and evidence provenance verification are not implemented by this change.
 
 ## Approval invariant
 

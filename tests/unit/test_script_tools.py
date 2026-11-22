@@ -271,6 +271,31 @@ class ScriptToolsTests(unittest.TestCase):
         self.assertFalse(result["eligible"])
         self.assertIn("trusted-evidence-verifier-unavailable", result["reasons"])
 
+    def test_finding_gate_rejects_any_candidate_assessment_field(self):
+        result = eligible_confirmed(
+            {
+                "evidenceLevel": "E3",
+                "oracleViolation": True,
+                "causalCheck": "passed",
+                "environmentCheck": "passed",
+                "reviewRequired": False,
+                "candidateAssessment": None,
+            },
+            [
+                {
+                    "source": "tool-execution",
+                    "provenanceVerified": True,
+                    "integrityVerified": True,
+                }
+            ],
+            {"status": "validated", "sourceRef": "oracle.json"},
+        )
+
+        self.assertFalse(result["eligible"])
+        self.assertIn(
+            "candidate-assessment-not-confirmed-finding", result["reasons"]
+        )
+
     def test_replay_gate_rejects_self_asserted_reconciliation_and_authorization(self):
         self.assertFalse(
             can_replay(

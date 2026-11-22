@@ -32,7 +32,7 @@
 - 核心价值：用户不指定具体测试点时，也能发现可测试功能并解释测试选择，在授权范围内动态探索，以 Oracle/证据验证缺陷，生成适合 QA、开发及项目负责人复核的报告。
 
 ## 2. 最终决策与范围
-正式决策序列：`Q1=A Q2=A Q3=B Q4=B Q5=B Q6=B Q7=B Q8=B Q9=A Q10=B Q11=B Q12=B Q13=B Q14=A Q15=B Q16=B Q17=A`。逐项说明见 [决策冻结](DECISION_FREEZE_Q1_Q17_ZH.md)。
+正式决策序列：`Q1=A Q2=A Q3=B Q4=B Q5=B Q6=B Q7=B Q8=B Q9=A Q10=B Q11=B Q12=B Q13=B Q14=A Q15=D Q16=B Q17=A`。Q15 于 2026-11-22 由项目所有者修订；详见 [决策冻结](DECISION_FREEZE_Q1_Q17_ZH.md) 与 [ADR-015](ADR-015-risk-based-dual-review.md)。
 
 **一次性交付的完整 v0.1**：11 Skills、16 Pattern 规则、50 个真实可执行 Benchmark、Codex 与 Claude Code 两宿主真实验证、REST/JSON/OpenAPI 优先及 Browser Basic、证据门禁、Session/Journal 安全恢复、独立安装、Go/No-Go 发布门禁。
 
@@ -195,7 +195,7 @@ bugmaster/
 在既定 50 个案例内覆盖仅 URL 和仅 OpenAPI 的盲范围发现、范围越权拒绝、动态探索、无 Bug 正确实现和错误业务 Oracle；若新增场景需重排原 50 分配而不静默扩大 Q14 范围。
 
 ## 15. 发布授权与供应链
-W11 发布时由发布发起人 RI 和不同人类独立审核者 IRR 批准**同一固定 Commit + Manifest + Artifact Digests**；Q15 风险独立 Review 不可用 AI 审核替代。Environment 必须验证 prevent self-review 实际生效，标签/产物保护、Actions 最小权限、签署或 Artifact Attestation、可复现构建、SBOM、回退演练均需独立可核查证据。环境 Required reviewers 配置多人不自动等于多签。
+W11 发布时由发布发起人 RI 和不同人类独立审核者 IRR 批准**同一固定 Commit + Manifest + Artifact Digests**。Q15 对每个 PR 做 Codex 代码扫描，R2/R3 变更还做安全扫描；项目所有者查看结果后手动合并，不要求真人 Q15 签署。Environment 必须验证 prevent self-review 实际生效，标签/产物保护、Actions 最小权限、签署或 Artifact Attestation、可复现构建、SBOM、回退演练均需独立可核查证据。环境 Required reviewers 配置多人不自动等于多签。
 
 Release No-Go：审批人未到位；任务或功能缺必需实测证据；任一安全/恢复关键 Spike 失败；50 Eval 或双宿主未通过；制品/Manifest 与审批 SHA 不一致。不可覆盖已发布不可变制品，不破坏 `.bugmaster/` 数据。
 
