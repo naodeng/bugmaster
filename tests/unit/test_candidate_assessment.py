@@ -105,18 +105,34 @@ class CandidateAssessmentTests(unittest.TestCase):
         self.assertEqual(assessment["decision"], "needs_review")
         self.assertIn("ENVIRONMENT_UNSTABLE", assessment["reasonCodes"])
 
-    def test_normal_behavior_is_rejected_only_with_valid_counterevidence(self):
+    def test_caller_supplied_verifiers_cannot_auto_reject_counterevidence(self):
         assessment = assess_candidate(
             candidate(evidenceRefs=["EV-002"]),
             oracle(),
             [evidence("EV-002", "satisfied")],
             {"oracleRef": "OR-001", "evidenceRefs": ["EV-002"]},
-            evidence_verifier=lambda item: item["evidenceId"] == "EV-002",
-            oracle_verifier=lambda item: item["oracleId"] == "OR-001",
         )
-        self.assertEqual(assessment["decision"], "rejected")
-        self.assertIn("TRUSTED_COUNTEREVIDENCE", assessment["reasonCodes"])
-        self.assertEqual(assessment["counterEvidenceRefs"], ["EV-002"])
+        self.assertEqual(assessment["decision"], "needs_review")
+        self.assertIn("ORACLE_PROVENANCE_UNVERIFIED", assessment["reasonCodes"])
+        self.assertIn("EVIDENCE_PROVENANCE_UNVERIFIED", assessment["reasonCodes"])
+        self.assertNotIn("TRUSTED_COUNTEREVIDENCE", assessment["reasonCodes"])
+        self.assertNotIn("counterEvidenceRefs", assessment)
+
+    def test_caller_supplied_verifier_callbacks_are_not_accepted(self):
+        args = (
+            candidate(evidenceRefs=["EV-002"]),
+            oracle(),
+            [evidence("EV-002", "satisfied")],
+            {"oracleRef": "OR-001", "evidenceRefs": ["EV-002"]},
+        )
+        verifier_options = (
+            {"evidence_verifier": lambda item: True},
+            {"oracle_verifier": lambda item: True},
+        )
+        for options in verifier_options:
+            with self.subTest(options=tuple(options)):
+                with self.assertRaises(TypeError):
+                    assess_candidate(*args, **options)
 
     def test_self_asserted_provenance_cannot_auto_reject_without_trusted_verifier(self):
         assessment = assess_candidate(
@@ -128,28 +144,15 @@ class CandidateAssessmentTests(unittest.TestCase):
         self.assertEqual(assessment["decision"], "needs_review")
         self.assertIn("EVIDENCE_PROVENANCE_UNVERIFIED", assessment["reasonCodes"])
 
-    def test_self_asserted_validated_oracle_cannot_auto_reject(self):
+    def test_counterevidence_with_invalid_provenance_stays_in_review(self):
         assessment = assess_candidate(
             candidate(evidenceRefs=["EV-002"]),
             oracle(),
-            [evidence("EV-002", "satisfied")],
+            [evidence("EV-002", "satisfied", provenanceVerified=False)],
             {"oracleRef": "OR-001", "evidenceRefs": ["EV-002"]},
-            evidence_verifier=lambda item: True,
         )
         self.assertEqual(assessment["decision"], "needs_review")
-        self.assertIn("ORACLE_PROVENANCE_UNVERIFIED", assessment["reasonCodes"])
-
-    def test_rejected_counterevidence_fails_closed_when_verifier_denies(self):
-        assessment = assess_candidate(
-            candidate(evidenceRefs=["EV-002"]),
-            oracle(),
-            [evidence("EV-002", "satisfied")],
-            {"oracleRef": "OR-001", "evidenceRefs": ["EV-002"]},
-            evidence_verifier=lambda item: False,
-            oracle_verifier=lambda item: True,
-        )
-        self.assertEqual(assessment["decision"], "needs_review")
-        self.assertIn("EVIDENCE_PROVENANCE_UNVERIFIED", assessment["reasonCodes"])
+        self.assertIn("EVIDENCE_INSUFFICIENT", assessment["reasonCodes"])
 
     def test_model_opinion_cannot_reject_without_counterevidence(self):
         assessment = assess_candidate(
@@ -172,8 +175,6 @@ class CandidateAssessmentTests(unittest.TestCase):
             oracle(),
             [evidence(), evidence("EV-002", "satisfied")],
             {"oracleRef": "OR-001", "evidenceRefs": ["EV-002"]},
-            evidence_verifier=lambda item: True,
-            oracle_verifier=lambda item: True,
         )
         self.assertEqual(assessment["decision"], "needs_review")
         self.assertIn("CONTRADICTORY_EVIDENCE", assessment["reasonCodes"])
@@ -259,6 +260,40 @@ class CandidateAssessmentTests(unittest.TestCase):
                 duplicate_of=assess_candidate(candidate(), oracle(), [evidence()]),
             )
 
+    def test_required_candidate_assessment_fields_are_validated(self):
+        for updates in (
+            {"observedSurface": None},
+            {"observedSurface": ""},
+            {"patternId": None},
+            {"patternId": "BP-API-2"},
+            {"oracleRef": ""},
+            {"oracleRef": {"id": "OR-001"}},
+        ):
+            with self.subTest(updates=updates):
+                with self.assertRaises(ValueError):
+                    assess_candidate(candidate(**updates), oracle(), [evidence()])
+
+    def test_unhashable_evidence_level_is_treated_as_invalid_evidence(self):
+        assessment = assess_candidate(
+            candidate(), oracle(), [evidence(level=["E3"])]
+        )
+
+        self.assertEqual(assessment["decision"], "needs_review")
+        self.assertIn("EVIDENCE_INSUFFICIENT", assessment["reasonCodes"])
+
+    def test_candidate_review_history_must_be_valid_before_it_is_copied(self):
+        assessment = assess_candidate(
+            candidate(reviewEvents=[review_event()]), oracle(), [evidence()]
+        )
+        self.assertEqual(assessment["review"]["events"], [review_event()])
+
+        with self.assertRaises(ValueError):
+            assess_candidate(
+                candidate(reviewEvents=[{"eventId": "REV-BROKEN"}]),
+                oracle(),
+                [evidence()],
+            )
+
     def test_malformed_candidate_lists_are_normalized_to_empty(self):
         assessment = assess_candidate(
             candidate(evidenceRefs="EV-001", falsePositiveChecks="unknown", reviewEvents="bad"),
@@ -322,6 +357,12 @@ class CandidateAssessmentTests(unittest.TestCase):
             append_review_event(assessment, review_event(evidenceRefs=["EV-001", "EV-001"]))
         with self.assertRaises(ValueError):
             append_review_event(assessment, review_event(reviewerId=" "))
+        with self.assertRaises(ValueError):
+            append_review_event(assessment, review_event(reviewedAt="not-a-time"))
+        with self.assertRaises(ValueError):
+            append_review_event(
+                assessment, review_event(reviewedAt="2026-13-22T10:00:00Z")
+            )
 
     def test_review_event_id_cannot_overwrite_existing_feedback(self):
         assessment = assess_candidate(candidate(), oracle(), [evidence()])

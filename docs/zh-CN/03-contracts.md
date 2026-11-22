@@ -40,7 +40,7 @@ Confirmed 需要有效且适用的 Oracle、真实且可追溯的执行证据、
 
 ## 候选筛选与反馈
 
-候选评估只允许 `candidate`、`needs_review`、`rejected` 和 `duplicate`，不能表示 `confirmed`。固定原因码说明 Oracle/证据缺失、Oracle/证据来源尚未验证、环境不稳定、误报检查不确定、观察相互矛盾、重复关联、策略要求人工复核或存在可信反证。拒绝必须有绑定同一已验证 Oracle 的 E3+ 工具执行证据，并表明实际行为符合预期；还必须由可信 Oracle 与 Evidence verifier 回调同时确认来源。自述的 `validated` 或来源验证标志不能作为依据；未提供两个可信 verifier 时必须保持 `needs_review`。模型意见不能单独拒绝。E3+ 违规证据与反证冲突时必须转 `needs_review`。
+Candidate Assessment Schema 为未来可信 Host verifier 流程保留 `rejected`；当前 `assess_candidate()` helper 只输出 `candidate`、`needs_review` 或 `duplicate`，并且不接受调用方传入的 verifier 回调。可信 Host verifier 接入前，结构有效的反证仍保持 `needs_review`，并标记来源尚未验证。自述的 `validated` 或来源验证标志不能作为依据。模型意见不能单独拒绝。E3+ 违规证据与反证冲突时必须转 `needs_review`。`candidate-assessment-rejected.json` 仅用于验证 Schema 结构，不是运行时输出。
 
 跨表面去重只关联目标、业务对象、操作、Oracle 和违规签名均相同的候选。表面字段不参与该身份，因此 API 与 Browser 观测可以关联且不重复计数。人工反馈以事件列表追加，并绑定 Candidate revision 和证据引用。当前 helper 只返回更新后的内存值；本次改动没有实现不可变 Candidate/Finding 持久化或证据来源真实性校验。
 

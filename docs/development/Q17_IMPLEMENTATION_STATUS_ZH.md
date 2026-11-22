@@ -6,7 +6,7 @@ Q17=A GitHub-first 已确认；当前 GitHub 目标 `AI-Native-QA-Lab/BugMaster`
 
 ## 事实与验收状态
 
-- Q1–Q17 决策：A,A,B,B,B,B,B,B,A,B,B,B,B,A,B,B,A。
+- Q1–Q17 决策：A,A,B,B,B,B,B,B,A,B,B,B,B,A,D,B,A（Q15 于 2026-11-22 修订）。
 - 计划完整 MVP：11 Skills、16 Patterns、50 Eval、2 宿主。均保持在发布验收范围。
 - 已准备：11 份基础 SKILL.md 及中文摘要，16 个 Candidate Pattern 元数据，Registry，确定性保守 Gate、Standalone 打包器、10 个单元/契约测试、50 项 **planned** Benchmark Manifest、CI 预检、W0–W11 Issue 导入清单。
 - 未实现：真正的 HTTP/Browser 受控 Action Gateway、Session Journal 强持久化、完整 E0–E4 Gate、Finding 版本化、真实订单 Demo 与注入缺陷、50 个可执行 Benchmark、Codex/Claude Code 实际安装验证、双人发布保护。
@@ -27,7 +27,7 @@ Q17=A GitHub-first 已确认；当前 GitHub 目标 `AI-Native-QA-Lab/BugMaster`
 ## GitHub 首次导入
 
 1. 在组织 `AI-Native-QA-Lab` 中创建 `BugMaster`（需仓库创建权限）。
-2. 将本目录作为初始化候选提交到**新分支**；由 Q15 Reviewer 审核后合并，而非绕过审核写 main。
+2. 将本目录作为初始化候选提交到**新分支**；完成 Q15 代码扫描（R2/R3 还要安全扫描）后，由项目所有者查看结果并手动合并。
 3. 使用 `docs/development/Q17_GITHUB_IMPORT_BACKLOG.csv` 导入 Issues，先创建 W0–W11 Epics 再建立依赖。
 4. 启用受保护分支、最小权限 CI；发布工作流保持 No-Go，直到 Q16 真实双人签署机制验证。
 5. 执行真实 Codex/Claude Code 安装与安全测试；不得将计划测试误标为已完成。

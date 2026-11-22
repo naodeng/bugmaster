@@ -1,6 +1,8 @@
 """Deterministic screening and review history for unconfirmed candidates."""
 
+import re
 from copy import deepcopy
+from datetime import datetime
 
 
 _LEVELS = {"E0": 0, "E1": 1, "E2": 2, "E3": 3, "E4": 4}
@@ -14,6 +16,20 @@ _IDENTITY_FIELDS = (
 _REVIEW_DECISIONS = {"accept", "reject", "needs_evidence"}
 _CANDIDATE_DECISIONS = {"candidate", "needs_review", "rejected", "duplicate"}
 _GROUND_TRUTH = {"bug", "normal", "ambiguous"}
+_PATTERN_ID = re.compile(r"BP-[A-Z]+-[0-9]{3}")
+_RFC3339_TIMESTAMP = re.compile(
+    r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]+)?(?:Z|[+-][0-9]{2}:[0-9]{2})"
+)
+_REVIEW_EVENT_FIELDS = {
+    "eventId",
+    "candidateId",
+    "candidateRevision",
+    "reviewerId",
+    "decision",
+    "reason",
+    "evidenceRefs",
+    "reviewedAt",
+}
 _FALSE_POSITIVE_CHECK_RESULTS = {"clear", "detected", "unknown"}
 REASON_CODES = frozenset({
     "ORACLE_UNCONFIRMED",
@@ -50,8 +66,6 @@ def _evidence_for(
     oracle_ref,
     result=None,
     minimum_level=0,
-    require_trusted=False,
-    evidence_verifier=None,
 ):
     matches = [
         item
@@ -61,17 +75,15 @@ def _evidence_for(
     if len(matches) != 1:
         return None
     evidence = matches[0]
+    evidence_level = evidence.get("evidenceLevel")
     if (
         evidence.get("source") != "tool-execution"
         or evidence.get("provenanceVerified") is not True
         or evidence.get("integrityVerified") is not True
         or evidence.get("oracleRef") != oracle_ref
-        or _LEVELS.get(evidence.get("evidenceLevel"), -1) < minimum_level
+        or not isinstance(evidence_level, str)
+        or _LEVELS.get(evidence_level, -1) < minimum_level
         or (result is not None and evidence.get("oracleResult") != result)
-    ):
-        return None
-    if require_trusted and (
-        not callable(evidence_verifier) or evidence_verifier(evidence) is not True
     ):
         return None
     return evidence
@@ -83,8 +95,6 @@ def _matching_refs(
     oracle_ref,
     result=None,
     minimum_level=0,
-    require_trusted=False,
-    evidence_verifier=None,
 ):
     return [
         ref
@@ -96,8 +106,6 @@ def _matching_refs(
             oracle_ref,
             result,
             minimum_level,
-            require_trusted,
-            evidence_verifier,
         )
         is not None
     ]
@@ -116,6 +124,16 @@ def _identity(candidate):
 def _review_required(candidate):
     value = candidate.get("reviewRequired", False)
     return value if isinstance(value, bool) else True
+
+
+def _valid_review_timestamp(value):
+    if not isinstance(value, str) or _RFC3339_TIMESTAMP.fullmatch(value) is None:
+        return False
+    try:
+        datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    return True
 
 
 def _normalize_false_positive_checks(checks):
@@ -146,9 +164,6 @@ def _assessment_base(candidate):
     evidence_refs = candidate.get("evidenceRefs")
     if not isinstance(evidence_refs, list):
         evidence_refs = []
-    review_events = candidate.get("reviewEvents")
-    if not isinstance(review_events, list):
-        review_events = []
     assessment = {
         "schemaVersion": "1.0",
         "candidateId": candidate.get("candidateId"),
@@ -162,7 +177,7 @@ def _assessment_base(candidate):
         "falsePositiveChecks": _normalize_false_positive_checks(candidate.get("falsePositiveChecks", [])),
         "review": {
             "required": _review_required(candidate),
-            "events": deepcopy(review_events),
+            "events": [],
         },
     }
     identity = candidate.get("identity")
@@ -177,20 +192,33 @@ def assess_candidate(
     evidences,
     counter_evidence=None,
     duplicate_of=None,
-    evidence_verifier=None,
-    oracle_verifier=None,
 ):
-    """Screen a candidate; rejection needs trusted Oracle and evidence verifiers."""
+    """Screen a candidate; counter-evidence stays in review until host verification exists."""
     if not isinstance(candidate, dict):
         raise TypeError("candidate-must-be-an-object")
     candidate_id = candidate.get("candidateId")
     revision = candidate.get("revision")
-    if not _nonempty(candidate_id) or not isinstance(revision, int) or isinstance(revision, bool) or revision < 1:
-        raise ValueError("candidate-identity-invalid")
+    pattern_id = candidate.get("patternId")
+    oracle_ref = candidate.get("oracleRef")
+    if (
+        not _nonempty(candidate_id)
+        or not isinstance(revision, int)
+        or isinstance(revision, bool)
+        or revision < 1
+        or not _nonempty(candidate.get("observedSurface"))
+        or not isinstance(pattern_id, str)
+        or _PATTERN_ID.fullmatch(pattern_id) is None
+        or (oracle_ref is not None and not _nonempty(oracle_ref))
+    ):
+        raise ValueError("candidate-assessment-input-invalid")
     if not isinstance(evidences, list):
         evidences = []
 
     assessment = _assessment_base(candidate)
+    review_events = candidate.get("reviewEvents")
+    if isinstance(review_events, list):
+        for event in review_events:
+            assessment = append_review_event(assessment, event)
     if duplicate_of is not None:
         if not isinstance(duplicate_of, dict):
             raise ValueError("duplicate-reference-invalid")
@@ -228,26 +256,12 @@ def assess_candidate(
     valid_observation_refs = _matching_refs(candidate_refs, evidences, oracle_ref, minimum_level=3)
     violation_refs = _matching_refs(candidate_refs, evidences, oracle_ref, "violated", 3)
     raw_counter_refs = []
-    valid_counter_refs = []
-    trusted_oracle = False
     if (
         isinstance(counter_evidence, dict)
         and counter_evidence.get("oracleRef") == oracle_ref
         and oracle_valid
     ):
         raw_counter_refs = _matching_refs(counter_refs, evidences, oracle_ref, "satisfied", 3)
-        if raw_counter_refs and callable(oracle_verifier):
-            trusted_oracle = oracle_verifier(oracle) is True
-        if trusted_oracle:
-            valid_counter_refs = _matching_refs(
-                counter_refs,
-                evidences,
-                oracle_ref,
-                "satisfied",
-                3,
-                require_trusted=True,
-                evidence_verifier=evidence_verifier,
-            )
 
     if not valid_observation_refs:
         reasons.append("EVIDENCE_INSUFFICIENT")
@@ -264,19 +278,18 @@ def assess_candidate(
         reasons.append("FALSE_POSITIVE_CHECK_INCONCLUSIVE")
     if invalid_check_result:
         reasons.append("FALSE_POSITIVE_CHECK_INCONCLUSIVE")
-    if "detected" in check_results and not valid_counter_refs:
+    if "detected" in check_results and not raw_counter_refs:
         reasons.append("COUNTEREVIDENCE_MISSING")
-    if raw_counter_refs and not trusted_oracle:
+    if raw_counter_refs:
         reasons.append("ORACLE_PROVENANCE_UNVERIFIED")
-    if raw_counter_refs and not valid_counter_refs:
         reasons.append("EVIDENCE_PROVENANCE_UNVERIFIED")
     review_required = assessment["review"]["required"]
     if review_required:
         reasons.append("HUMAN_REVIEW_REQUIRED")
 
-    if violation_refs and valid_counter_refs:
+    if violation_refs and raw_counter_refs:
         reasons.append("CONTRADICTORY_EVIDENCE")
-    if not violation_refs and not valid_counter_refs:
+    if not violation_refs and not raw_counter_refs:
         reasons.append("EVIDENCE_INSUFFICIENT")
 
     blocking_reasons = {
@@ -290,14 +303,11 @@ def assess_candidate(
         "CONTRADICTORY_EVIDENCE",
         "HUMAN_REVIEW_REQUIRED",
     }
-    if any(reason in blocking_reasons for reason in reasons):
-        assessment["decision"] = "needs_review"
-    elif valid_counter_refs:
-        assessment["decision"] = "rejected"
-        reasons.append("TRUSTED_COUNTEREVIDENCE")
-        assessment["counterEvidenceRefs"] = valid_counter_refs
-    else:
-        assessment["decision"] = "candidate"
+    assessment["decision"] = (
+        "needs_review"
+        if any(reason in blocking_reasons for reason in reasons)
+        else "candidate"
+    )
     assessment["reasonCodes"] = list(dict.fromkeys(reasons))
     return assessment
 
@@ -317,8 +327,11 @@ def append_review_event(assessment, event):
         or event_revision != revision
         or not _nonempty(event.get("eventId"))
         or not _nonempty(event.get("reviewerId"))
+        or not isinstance(event.get("decision"), str)
         or event.get("decision") not in _REVIEW_DECISIONS
         or not _nonempty(event.get("reason"))
+        or not _valid_review_timestamp(event.get("reviewedAt"))
+        or set(event) - _REVIEW_EVENT_FIELDS
     ):
         raise ValueError("review-event-binding-invalid")
     evidence_refs = event.get("evidenceRefs")
@@ -348,11 +361,17 @@ def append_review_event(assessment, event):
         previous_id = previous.get("eventId")
         previous_refs = previous.get("evidenceRefs")
         if (
-            previous.get("candidateId") != copied.get("candidateId")
+            set(previous) - _REVIEW_EVENT_FIELDS
+            or previous.get("candidateId") != copied.get("candidateId")
             or not isinstance(previous_revision, int)
             or isinstance(previous_revision, bool)
             or previous_revision != revision
             or not _nonempty(previous_id)
+            or not _nonempty(previous.get("reviewerId"))
+            or not isinstance(previous.get("decision"), str)
+            or previous.get("decision") not in _REVIEW_DECISIONS
+            or not _nonempty(previous.get("reason"))
+            or not _valid_review_timestamp(previous.get("reviewedAt"))
             or not isinstance(previous_refs, list)
             or not previous_refs
             or not all(_nonempty(ref) for ref in previous_refs)

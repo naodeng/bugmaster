@@ -76,13 +76,13 @@ class CandidateAssessmentSchemaTests(unittest.TestCase):
             oracle,
             [normal_evidence],
             {"oracleRef": "OR-001", "evidenceRefs": ["EV-010"]},
-            evidence_verifier=lambda item: item["evidenceId"] == "EV-010",
-            oracle_verifier=lambda item: item["oracleId"] == "OR-001",
         )
-        self.assertEqual(assessment["decision"], "rejected")
+        self.assertEqual(assessment["decision"], "needs_review")
+        self.assertIn("ORACLE_PROVENANCE_UNVERIFIED", assessment["reasonCodes"])
+        self.assertIn("EVIDENCE_PROVENANCE_UNVERIFIED", assessment["reasonCodes"])
         self.assertEqual(list(self.validator.iter_errors(assessment)), [])
 
-    def test_rejected_assessment_requires_and_records_counterevidence(self):
+    def test_schema_rejection_fixture_requires_counterevidence(self):
         self.assertEqual(list(self.validator.iter_errors(self.rejected)), [])
 
     def test_candidate_decision_cannot_be_confirmed(self):
