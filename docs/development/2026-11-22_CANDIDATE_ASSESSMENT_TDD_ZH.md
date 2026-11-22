@@ -152,4 +152,23 @@ git diff --check
 | CodeX Security 扫描（head `fa1a7d5`） | PASS，无已确认漏洞 | 只读源码扫描；Candidate Assessment 结果保持暂定，counter-evidence 不自动拒绝，也不能通过 Confirmed Gate。Host 来源认证、规范重复引用验证及 reviewer 身份认证仍待集成；最终 head 复扫待完成。 |
 | 当前开发记录、最终 PR Actions 和 CodeX 双扫描 | PENDING | 历史 RED 原始证据未完整保留，已如实标注为历史摘要；当前 PR 评论及代码扫描发现均有可复核 RED/GREEN。最终 Actions 与双扫描需绑定最终 PR head 后再合并。 |
 
-扫描命令的固定点与结论按本节记录；本 PR 由 `main@f97ca8f` 重建，不包含 `1f974bc` 作为祖先提交。PR 最终 head 的 GitHub Actions 与 Q15 扫描结果须在本记录补充。Release Gate 仍按真实业务覆盖和执行证据单独判定，现有 Release 状态保持 No-Go。
+扫描命令的固定点与结论按本节记录；本 PR 由 `main@f97ca8f` 重建，不包含 `1f974bc` 作为祖先提交。Release Gate 仍按真实业务覆盖和执行证据单独判定，现有 Release 状态保持 No-Go。
+
+### 最终复扫发现与候选提交 `03b30529`
+
+CodeX 最终复扫在前一候选 head `5f7e9d67e6c6b240c7102bbfc81876874b03c8fa` 发现三处输入边界问题。RED 阶段先增加测试、生产代码未改；定向测试按预期失败：
+
+- `/private/tmp/bugmaster-candidate-check/bin/python -m unittest discover -s tests/unit -p 'test_candidate_assessment.py' -k malformed_false_positive_check_evidence_refs -v`：显式 `evidenceRefs: null` 被保留，没有走无效误报检查路径。
+- `/private/tmp/bugmaster-candidate-check/bin/python -m unittest discover -s tests/unit -p 'test_candidate_assessment.py' -k invalid_candidate_and_duplicate_inputs_are_rejected -v`：`duplicate_of.decision` 为 list 或 object 时分别抛出 `TypeError`，而不是稳定的输入校验错误。
+- `/private/tmp/bugmaster-candidate-check/bin/python -m unittest discover -s tests/unit -p 'test_candidate_assessment.py' -k review_event_rejects_invalid_assessment_header -v`：6 种 schema 无效的 assessment header 未被 `append_review_event()` 拒绝。
+
+GREEN 提交 `03b30529c8b86a6cf5ba19737046083618f279ee`：显式 null 被视为无效 Evidence 引用并移除相应误报检查；duplicate decision 在集合成员判断前校验字符串类型；Review Event 追加前验证 assessment 的 schemaVersion、candidateId、revision、observedSurface、patternId 和 decision。以上三条定向命令均通过。完整复验：Python 3.12.16，单元 487/487、契约 96/96、安全 1/1；受维护范围行覆盖 2381/2381、分支覆盖 880/880；Catalog、Benchmark Manifest、Branding 与 `git diff --check` 均 PASS。Benchmark 结构通过但正式场景仍为 NOT executed。最终 PR Actions 和 CodeX 代码扫描在此提交推送后复核。
+
+### 最终 Spec 复扫：重复项必须绑定同一顶层 Oracle
+
+- **RED 固定点：** `03b30529c8b86a6cf5ba19737046083618f279ee`；先新增 `test_duplicate_link_requires_matching_top_level_and_identity_oracle`，生产代码未改。
+- **RED 命令：** `/private/tmp/bugmaster-candidate-check/bin/python -m unittest discover -s tests/unit -p 'test_candidate_assessment.py' -k duplicate_link_requires_matching_top_level_and_identity_oracle -v`。
+- **RED 结果：** 2 个子用例均失败：候选顶层 Oracle 与现有候选不同、以及现有 assessment 顶层 Oracle 与 identity 不一致时，均未抛出 `duplicate-identity-mismatch`。
+- **GREEN 提交：** `0dd3f940a49dc23ba24113206eb71f9d04874749`；重复关联现在要求两条记录的顶层 Oracle 相同，且候选顶层 Oracle 与嵌套 identity Oracle 一致。定向测试 1/1、Candidate Assessment 单测 50/50 通过。
+- **完整验证：** Python 3.12.16，单元 488/488、契约 96/96、安全 1/1；受维护范围行覆盖 2384/2384、分支覆盖 880/880；Catalog、Benchmark Manifest、Branding 与 `git diff --check` PASS。Benchmark 仍为 NOT executed。
+- **最终候选状态：** `0dd3f948` 之后还有本开发记录提交；推送 PR 后须以最新 PR head 完成 Actions、CodeX 代码扫描及安全扫描，并把准确 SHA 与结果记录在 PR 描述中。此文件记录 RED/GREEN 与本地 VERIFY；PR 描述记录最终远端验证和扫描结果。
