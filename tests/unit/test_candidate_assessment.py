@@ -273,13 +273,14 @@ class CandidateAssessmentTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     assess_candidate(candidate(**updates), oracle(), [evidence()])
 
-    def test_candidate_identity_rejects_unknown_fields(self):
+    def test_candidate_identity_drops_fields_not_allowed_by_the_output_schema(self):
         identity = {**candidate()["identity"], "unrecognized": "value"}
 
-        with self.assertRaisesRegex(ValueError, "candidate-identity-invalid"):
-            assess_candidate(
-                candidate(identity=identity), oracle(), [evidence()]
-            )
+        assessment = assess_candidate(
+            candidate(identity=identity), oracle(), [evidence()]
+        )
+
+        self.assertNotIn("identity", assessment)
 
     def test_unhashable_evidence_level_is_treated_as_invalid_evidence(self):
         assessment = assess_candidate(
