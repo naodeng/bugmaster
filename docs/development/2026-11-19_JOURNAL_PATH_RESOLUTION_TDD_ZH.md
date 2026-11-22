@@ -343,3 +343,34 @@ Release 质量门禁仍为 **NO-GO**：功能义务清单、真实业务覆盖�
 | Q15 / 合并 | 独立真人 Security Reviewer 的正式 Q15 签署仍未记录；本修复和 AI/自动化结果不能替代签署，PR 不因本地验证而视为可合并 |
 
 覆盖 JSON：`/private/tmp/bugmaster-pr8-c1.json`。本地测试与覆盖结果不代表生产 API/Browser 执行，也不改变 Release No-Go。
+
+## 2026-11-22：修复公开 open() 身份绑定与 PR #8 fail-closed gate
+
+**依据：** 独立真人复核报告 F-1、F-2。实现提交：`ea526e6272d7823fad25d3255aeb5691e55760da`。
+
+### RED
+
+- 新增 `test_open_rejects_journal_id_mismatch_for_an_existing_session`：先建立 `journal-b`，再将 Session 固定为 `journal-a`，通过公开 `ActionJournalStore.open()` 尝试打开并行 Journal。旧实现 **RED**：`JournalCorruptionError not raised`（Store 定向套件 85 项中该断言失败）。
+- 为 R0/R1 dispatch、全自述 execution/Oracle/Finding、全自述 reconciliation/authorization 新增拒绝负例。旧实现的单元 gate 测试 **3 项失败**，契约测试 **3 项失败**；直接调用普通字典即可让 gate 返回允许/eligible。
+
+### GREEN / REFACTOR
+
+- `open()` 现在固定可信 root fd，在 Session 只读锁快照内比较持久化 `journalId`，然后从该 root fd 打开 Journal；不匹配时抛 `JournalCorruptionError`。它与 `initialize()` 共用身份比较，并通过 `create_directories=False` 避免只读打开创建 Session 路径。
+- `SessionStore.lock_revision_snapshot()` 保留原来的默认写入初始化行为，同时支持不创建目录的只读快照；没有 Session 存储时返回 `(0, None)`。
+- PR #8 自身的 `can_dispatch()`、`can_replay()` 现在恒拒绝；`eligible_confirmed()` 在可信 Evidence verifier 缺失时恒带阻断原因。PR #9 原有负例仍保留。
+- 移除已无调用者的 `_open_from_root_fd(None)` 路径，避免维护未使用的按路径打开分支。
+
+### VERIFY
+
+环境：macOS Darwin，Python 3.12.16；依赖由本机隔离虚拟环境及 `/private/tmp` 提供。
+
+| 检查 | 结果 |
+|---|---|
+| RED 单元 / 契约 | Store 85 项中 mismatch 断言失败；gate 单元 3/14 失败、契约 3/13 失败，均为旧实现接受自述输入的预期失败 |
+| 定向 GREEN | `test_action_journal_store.py` 85/85、`test_script_tools.py` 14/14、`test_contracts.py` 13/13、`test_session_store.py` 130/130、`test_checkpoint_reference_validator.py` 26/26 PASS |
+| 全量单元 / 契约 / 安全 | 单元 412/412、契约 81/81、安全 1/1 PASS |
+| 行 / 分支覆盖 | `bugmaster_core/` 与 `scripts/` 共 2,154/2,154 语句、766/766 分支，分别统计，均 100%；无排除项。覆盖 JSON：`/private/tmp/bugmaster-pr8-final.json` |
+| macOS ACL / 静态清单 | Darwin 上 `chmod +a` 原生 ACL 用例在完整单元与验证器套件中运行并通过；Catalog、Benchmark manifest 结构、品牌扫描及 `git diff --check` PASS。Benchmark 场景未执行 |
+| Release Gate | **NO-GO（预期）**：Feature Inventory 未冻结、真实业务覆盖不超过 60%，核心 Happy/Negative/Edge 执行证据缺失；本次修复不改变 Release 状态 |
+
+V-2（非 macOS POSIX/NFSv4 ACL）、V-3（独立 Session/Checkpoint root 祖先）、V-5（无生产调用者的 legacy path API）仍是证据/威胁模型事项，未发现可证明的跨用户读取或写入；不以推测性代码修改代替证据。V-6 的 macOS 原生 ACL 路径已在本次 Darwin 测试树上执行，仍需对后续最终堆叠 head 核对。报告未给出 Q15 APPROVE；本记录不将其写成正式安全签署。
