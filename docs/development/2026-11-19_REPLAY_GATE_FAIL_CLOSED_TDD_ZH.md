@@ -64,3 +64,42 @@ PYTHONDONTWRITEBYTECODE=1 python3.12 -m unittest discover -s tests/contracts -p 
 ## 后续缺口
 
 可信只读 reconciliation verifier、当前授权真实性/修订绑定、预算与 Journal 消费对账、未知结果的权威状态来源以及安全恢复流程仍未实现。不能因为此 helper 当前全部拒绝重放，就把 W6 或 BLK-03 标记完成。Release 维持 **No-Go**。
+
+## 2026-11-22 复核 V-1：调用方自述字段不得打开派发与 Finding 门禁
+
+### 审查范围
+
+复核报告指出，`can_replay()` 已经恒拒绝，但 `can_dispatch()` 仍会因普通字典中的 `scopeValidated=True` 放行 R0/R1；`eligible_confirmed()` 也会因输入字典同时自称 E3、Oracle 已验证、执行来源/完整性已验证和因果检查通过而返回 eligible。仓库没有这三个 helper 的生产调用方，也没有可信 Scope、Approval 或 Evidence verifier。本修复不伪造 verifier，只让这些尚未接入可信验证器的辅助门禁保持 fail-closed。
+
+### RED
+
+- 新增 `test_self_asserted_scope_claim_cannot_dispatch_r0_or_r1`，分别用 R0、R1 和 `scopeValidated=True` 重现放行；新增 `test_self_asserted_evidence_cannot_confirm_without_a_trusted_verifier`，让 Finding、Tool Evidence 与 Oracle 的所有字段都由输入字典自述为有效。
+- 在生产代码仍处于 PR #9 原 head `c8f0f6e061ed55909e656b30a125d5f9cf2042d3` 时，运行：
+  `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/private/tmp/bugmaster-coverage:/private/tmp/bugmaster-jsonschema /private/tmp/bugmaster-review-venv/bin/python3.12 -m unittest discover -s tests/contracts -p 'test_contracts.py' -v`
+  结果 **RED**：14 项测试中 3 个断言失败；R0、R1 的 `can_dispatch()` 都错误返回 True，`eligible_confirmed()` 也错误返回 True。
+
+### GREEN / REFACTOR
+
+- `can_dispatch()` 在可信 Scope/Approval verifier 接入前对所有风险等级恒返回 False。调用方传入的普通 `action`、`approval`、`policy` 字典不能证明授权或强制执行。
+- `eligible_confirmed()` 在可信 Evidence/Oracle verifier 接入前始终带有 `trusted-evidence-verifier-unavailable` 阻断原因；其他质量原因仍按原逻辑收集。所有自述字段都为真时也不会确认 Finding。
+- 保留现有函数签名与返回结构；`can_replay()` 继续恒返回 False。本轮没有增加生产调用方，也没有实现真实 verifier、派发或恢复。
+
+### VERIFY
+
+**代码/测试提交：** `e9e336b77e8e3ffb5aa42109857b8d7d436af27b`。环境：macOS / Darwin、Python 3.12.16。
+
+| 检查 | 命令 / 结果 |
+|---|---|
+| Script 工具定向单测 | `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/private/tmp/bugmaster-coverage:/private/tmp/bugmaster-jsonschema /private/tmp/bugmaster-review-venv/bin/python3.12 -m unittest discover -s tests/unit -p 'test_script_tools.py' -v`：11/11 PASS |
+| Finding/派发/重放合同 | `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/private/tmp/bugmaster-coverage:/private/tmp/bugmaster-jsonschema /private/tmp/bugmaster-review-venv/bin/python3.12 -m unittest discover -s tests/contracts -p 'test_contracts.py' -v`：14/14 PASS |
+| 全量单元与覆盖采集 | `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/private/tmp/bugmaster-coverage:/private/tmp/bugmaster-jsonschema /private/tmp/bugmaster-review-venv/bin/python3.12 -m coverage run --branch --source=bugmaster_core,scripts --data-file=/private/tmp/bugmaster-pr9-v1.coverage -m unittest discover -s tests/unit`：406/406 PASS |
+| 全契约 | `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/private/tmp/bugmaster-coverage:/private/tmp/bugmaster-jsonschema /private/tmp/bugmaster-review-venv/bin/python3.12 -m unittest discover -s tests/contracts`：82/82 PASS |
+| 独立安全套件 | `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/private/tmp/bugmaster-coverage:/private/tmp/bugmaster-jsonschema /private/tmp/bugmaster-review-venv/bin/python3.12 -m unittest discover -s tests/security`：1/1 PASS |
+| 行覆盖 / 分支覆盖 | `coverage report --data-file=/private/tmp/bugmaster-pr9-v1.coverage --include='bugmaster_core/*,scripts/*'`：2,138/2,138 语句、766/766 分支，分别统计，均为 100%；无未覆盖生产行或分支 |
+| Catalog | `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/private/tmp/bugmaster-coverage:/private/tmp/bugmaster-jsonschema /private/tmp/bugmaster-review-venv/bin/python3.12 scripts/validate_catalog.py`：PASS |
+| Benchmark manifest / 品牌 / Diff | `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/private/tmp/bugmaster-coverage:/private/tmp/bugmaster-jsonschema /private/tmp/bugmaster-review-venv/bin/python3.12 scripts/validate_benchmark.py` 与 `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/private/tmp/bugmaster-coverage:/private/tmp/bugmaster-jsonschema /private/tmp/bugmaster-review-venv/bin/python3.12 scripts/check_branding.py` 均 PASS；`git diff --check` PASS。Benchmark 只验证清单结构，50 场景未执行 |
+| Release 质量门禁 | `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/private/tmp/bugmaster-coverage:/private/tmp/bugmaster-jsonschema /private/tmp/bugmaster-review-venv/bin/python3.12 scripts/quality_gate.py --mode release --coverage /private/tmp/bugmaster-pr9-v1.json`：exit 1 / **NO-GO（预期）**；功能义务清单未冻结、实测业务覆盖未超过 60%，且核心 Feature 缺少 Happy/Negative/Edge 实测证据 |
+| GitHub Actions | [Run 44983997546](https://github.com/naodeng/bugmaster/actions/runs/44983997546) 在 PR #9 代码 head `e9e336b77e8e3ffb5aa42109857b8d7d436af27b` 上全部成功：单元、契约、安全、覆盖采集与 100% 行覆盖断言、Catalog、Benchmark manifest 结构、品牌检查均 PASS |
+| Q15 / 合并 | PR #9 属 R3；独立真人 Security Reviewer 的正式 Q15 签署仍未记录。fail-closed helper、AI 审查与自动化门禁均不能替代签署 |
+
+覆盖 JSON：`/private/tmp/bugmaster-pr9-v1.json`。本地结果不代表真实 API/Browser 执行、可信授权或恢复已实现；Release 仍为 **No-Go**。

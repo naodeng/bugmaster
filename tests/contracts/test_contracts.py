@@ -30,6 +30,30 @@ class CoreContractTests(unittest.TestCase):
         }
         policy={'enforcement':'enforced','scopeValidated':True}
         self.assertFalse(can_dispatch(action,approval,policy))
+    def test_self_asserted_scope_claim_cannot_dispatch_r0_or_r1(self):
+        policy = {'scopeValidated': True}
+        for risk in ('R0', 'R1'):
+            with self.subTest(risk=risk):
+                self.assertFalse(can_dispatch({'risk': risk}, {}, policy))
+    def test_self_asserted_evidence_cannot_confirm_without_a_trusted_verifier(self):
+        finding = {
+            'evidenceLevel': 'E3',
+            'oracleViolation': True,
+            'causalCheck': 'passed',
+            'environmentCheck': 'passed',
+            'reviewRequired': False,
+        }
+        evidences = [{
+            'source': 'tool-execution',
+            'provenanceVerified': True,
+            'integrityVerified': True,
+        }]
+        oracle = {'status': 'validated', 'sourceRef': 'requirements.md'}
+
+        result = eligible_confirmed(finding, evidences, oracle)
+
+        self.assertFalse(result['eligible'])
+        self.assertIn('trusted-evidence-verifier-unavailable', result['reasons'])
     def test_r3_never_dispatches(self):self.assertFalse(can_dispatch({'risk':'R3'}, {}, {'scopeValidated':True}))
     def test_unknown_outcome_never_replays(self):
         self.assertFalse(can_replay({'outcome':'unknown','newAuthorizationValid':True}))

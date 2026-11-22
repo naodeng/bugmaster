@@ -234,7 +234,8 @@ class ScriptToolsTests(unittest.TestCase):
             {"status": "draft"},
         )
         self.assertFalse(rejected["eligible"])
-        self.assertEqual(len(rejected["reasons"]), 8)
+        self.assertIn("trusted-evidence-verifier-unavailable", rejected["reasons"])
+        self.assertEqual(len(rejected["reasons"]), 9)
 
         self.assertFalse(can_replay({"outcome": "unknown"}))
 
@@ -242,6 +243,7 @@ class ScriptToolsTests(unittest.TestCase):
         self.assertFalse(can_dispatch({"risk": "R3"}, {}, {"scopeValidated": True}))
         self.assertFalse(can_dispatch({"risk": "R2"}, {}, {"scopeValidated": True}))
         self.assertFalse(can_dispatch({"risk": "R1"}, {}, {"scopeValidated": False}))
+        self.assertFalse(can_dispatch({"risk": "R1"}, {}, {"scopeValidated": True}))
 
     def test_script_cli_entrypoints_execute_with_local_inputs(self):
         output = io.StringIO()
