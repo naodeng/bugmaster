@@ -470,6 +470,32 @@ class CandidateAssessmentTests(unittest.TestCase):
         twice_reviewed = append_review_event(reviewed, second_event)
         self.assertEqual(twice_reviewed["review"]["events"], [review_event(), second_event])
 
+    def test_review_history_can_grow_across_candidate_revisions(self):
+        assessment = assess_candidate(candidate(), oracle(), [evidence()])
+        first_event = review_event()
+        reviewed = append_review_event(assessment, first_event)
+
+        next_revision = candidate(
+            revision=2,
+            reviewEvents=reviewed["review"]["events"],
+        )
+        next_assessment = assess_candidate(next_revision, oracle(), [evidence()])
+        second_event = review_event(eventId="REV-002", candidateRevision=2)
+        updated = append_review_event(next_assessment, second_event)
+
+        self.assertEqual(
+            [event["candidateRevision"] for event in updated["review"]["events"]],
+            [1, 2],
+        )
+
+    def test_historical_review_event_requires_a_positive_candidate_revision(self):
+        with self.assertRaises(ValueError):
+            assess_candidate(
+                candidate(revision=2, reviewEvents=[review_event(candidateRevision=0)]),
+                oracle(),
+                [evidence()],
+            )
+
     def test_review_event_must_bind_candidate_revision_and_evidence(self):
         assessment = assess_candidate(candidate(), oracle(), [evidence()])
         with self.assertRaises(ValueError):
@@ -488,6 +514,14 @@ class CandidateAssessmentTests(unittest.TestCase):
             append_review_event(
                 assessment, review_event(reviewedAt="2026-13-22T10:00:00Z")
             )
+
+    def test_new_review_event_must_reference_the_current_candidate_revision(self):
+        assessment = assess_candidate(
+            candidate(revision=2), oracle(), [evidence()]
+        )
+
+        with self.assertRaises(ValueError):
+            append_review_event(assessment, review_event(candidateRevision=1))
 
     def test_review_event_rejects_invalid_assessment_evidence_refs(self):
         assessment = assess_candidate(candidate(), oracle(), [evidence()])
