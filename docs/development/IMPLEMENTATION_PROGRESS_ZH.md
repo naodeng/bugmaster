@@ -1,11 +1,11 @@
 # BugMaster 工程实施进度矩阵
 
 **更新日期：** 2026-11-23
-**当前状态：** PR #13（候选评估与 Q15 治理）已合并到个人仓库 `naodeng/bugmaster` 的 `main`，合并提交为 `5c640a21`。当前 W7 Oracle（预期行为判定依据）/Evidence（证据）数据结构与本地绑定切片已在独立工作分支实现。单元、契约、安全测试及行/分支覆盖均已通过；Codex 代码扫描没有发现可执行缺陷。本轮 PR 尚未建立，等待提交到远端供项目所有者确认。该切片不认证来源，也不接入自动 `rejected`（拒绝）或 `Confirmed Gate`（缺陷确认门禁）。持久化、可信来源适配器、浏览器运行时和真实基准评测仍未完成，完整产品仍为 Release No-Go（暂不发布）。
+**当前状态：** PR #13（候选评估与 Q15 治理）已合并到个人仓库 `naodeng/bugmaster` 的 `main`，合并提交为 `5c640a21`。W7 Oracle（预期行为判定依据）/Evidence（证据）数据结构与本地绑定切片已在独立分支实现；单元、契约、安全测试及行/分支覆盖均已通过，Codex 代码扫描没有发现可执行缺陷。[PR #14](https://github.com/naodeng/bugmaster/pull/14) 已打开，[GitHub Actions（自动化检查）运行 #115](https://github.com/naodeng/bugmaster/actions/runs/45107193804) 全部通过，等待项目所有者确认并手动合并。该切片不认证来源，也不接入自动 `rejected`（拒绝）或 `Confirmed Gate`（缺陷确认门禁）。持久化、可信来源适配器、浏览器运行时和真实基准评测仍未完成，完整产品仍为 Release No-Go（暂不发布）。
 
 ## 仓库审计摘要
 
-- 当前开发工作树：`/Users/inaodeng/.codex/worktrees/w7-evidence-oracle/bugmaster`，分支 `codex/w7-evidence-oracle-provenance`，远端 `origin` 指向个人仓库 `naodeng/bugmaster`，HEAD 为 PR #13 合并提交 `5c640a21`。GitHub 查询确认个人仓库和组织上游均无未合并 PR。完成实现验证、Q15（代码扫描门禁）及适用的安全扫描后，交项目所有者确认并手动合并，再开始下一项；不叠加未合并功能分支。
+- 当前开发工作树：`/Users/inaodeng/.codex/worktrees/w7-evidence-oracle/bugmaster`，分支 `codex/w7-evidence-oracle-provenance`，远端 `origin` 指向个人仓库 `naodeng/bugmaster`；PR #14 以 PR #13 合并提交 `5c640a21` 为基线，本地与远端文件树一致。当前 PR 已通过实现验证、Q15（逐 PR 代码扫描门禁）、适用的安全扫描及远端自动化检查，等待项目所有者确认并手动合并；合并前不开始下一功能，也不叠加未合并功能分支。
 - GitHub 上游：`AI-Native-QA-Lab/bugmaster`；个人项目 fork：`naodeng/bugmaster`。两者均为公开仓库，当前连接具有管理员权限。
 - 仓库简介与 13 个主题标签的同步、起始提交 `cef3cb5` 推送到个人 fork（分叉仓库），均为早期历史记录；当前开发基线以 PR #13 合并提交 `5c640a21` 为准，未向组织上游推送本轮代码。
 - 当前代码来源：用户提供的 `/Users/inaodeng/Downloads/bugmaster 2/`（128 个文件）。该 v1.1 基线采用 11 个 Discovery / Validation / Reporting（发现/验证/报告）Skill ID；旧 v1.0 的 `hunt-*` 目录不导入。
@@ -45,7 +45,7 @@
 | 本分支全量行/分支覆盖 | PASS（通过，100% / 100%） | `bugmaster_core` 与 `scripts`：2535/2535 语句、930/930 分支 |
 | PR #13 合并前验证（历史） | PASS | 准确 head `d6602dd`：单元 488/488、契约 96/96、安全测试 1/1、行/分支覆盖 2384/2384 与 880/880；Actions Run `45019266106` 全部通过。这些结果不包含当前 W7 改动 |
 | PR #13 Q15 代码/安全扫描（历史） | PASS | PR 描述记录的 Codex 代码复扫与安全复核针对 `d6602dd`；属于 AI 扫描结果，不代表独立真人安全复核，也不覆盖当前 W7 改动 |
-| 本轮 GitHub PR / Actions | 未建立 PR | PR #13 已合并；2026-11-23 查询个人 fork 和组织上游均无开放 PR。本轮分支尚未推送，因此没有远端 CI 结果 |
+| 本轮 GitHub 拉取请求 / GitHub Actions（自动化检查） | PASS（通过） | [PR #14](https://github.com/naodeng/bugmaster/pull/14)；[运行 #115](https://github.com/naodeng/bugmaster/actions/runs/45107193804) 单元、契约、安全、覆盖率、目录、基准清单结构与品牌校验全部成功 |
 | 本轮 Q15 Codex 代码扫描 | PASS（通过） | `codex review --uncommitted` 未发现可执行缺陷；扫描复跑单测、契约和安全测试 |
 | 本轮安全复核 | PASS（静态 AI 复核） | 复核范围为本地数据校验和日志绑定；复核者未运行测试，测试状态见上方单独记录 |
 | 独立真人安全复核 | 未进行 | 本切片不处理来源认证、动作授权或缺陷确认；来源真实性仍未验证且缺陷确认门禁保持阻断。后续适配器、签名或门禁改动前，再与项目所有者单独讨论真人复核要求 |
@@ -63,6 +63,6 @@
 ## 执行顺序
 
 1. 运行基线静态检查、单元/契约测试与当前质量门禁，记录真实输出。
-2. 当前 W7 切片已完成 Oracle/Evidence 数据结构、本地绑定实现、测试、全量覆盖和 Codex 代码扫描。将分支提交到远端并开 PR，供项目所有者确认后手动合并。合并后再单独设计 Evidence adapter（证据适配器）和可信 Oracle provenance（来源可追溯性），之后才进入 Candidate/Finding 持久化。来源未认证期间，自动拒绝和 Confirmed Gate（缺陷确认门禁）始终关闭。浏览器工具按既定依赖顺序先与隔离 Order Demo 做同场对照，再评估运行时实现。
+2. W7 切片的 Oracle（预期行为判定依据）/Evidence（证据）数据结构、本地绑定实现、测试、全量覆盖和 Codex 代码扫描已完成；PR #14 已开并通过 GitHub Actions（自动化检查）运行 #115，等待项目所有者确认后手动合并。合并后再单独设计 Evidence adapter（证据适配器）和可信 Oracle provenance（来源可追溯性），之后才进入 Candidate（候选记录）/Finding（缺陷记录）持久化。来源未认证期间，自动拒绝和 Confirmed Gate（缺陷确认门禁）始终关闭。浏览器工具按既定依赖顺序先与隔离 Order Demo（订单演示项目）做同场对照，再评估运行时实现。
 3. 每次只推进一个功能 PR；当前 PR 合并后再开始后续功能。每轮更新本矩阵和独立中文 TDD 记录。不得将内部纵向切片作为缩水 MVP 对外发布。
 
