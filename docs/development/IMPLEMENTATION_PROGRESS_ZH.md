@@ -1,11 +1,11 @@
 # BugMaster 工程实施进度矩阵
 
 **更新日期：** 2026-11-23
-**当前状态：** PR #13（候选评估与 Q15 治理）已合并，PR #14（Oracle/Evidence 本地绑定校验）也已由项目所有者合并到个人仓库 `naodeng/bugmaster` 的 `main`；最新合并提交为 `e594946ca4d823c044897c000c1975a7301631c7`。[PR #14](https://github.com/naodeng/bugmaster/pull/14) 对应的 [GitHub Actions（自动化检查）运行 #116](https://github.com/naodeng/bugmaster/actions/runs/45107658770) 全部成功。当前工作树已完成已批准的 Candidate（候选记录）/Finding（缺陷记录）元数据 Schema（数据结构规则）与私有本地持久化实现；615 项单元测试、129 项契约测试、1 项安全测试和 100% 行/分支覆盖通过。Codex 代码扫描与安全审查已通过。实现仍未提交；远端分支目前领先 `main` 5 个仅含测试的提交、落后 0 个提交，且没有开放 PR。开 PR 前还需将实现和文档写入该分支，再确认最终 head（提交版本）及远端 CI。本切片不保存原始 Evidence Blob（证据原件字节），不认证来源或审核人，也不接入 `Confirmed Gate`（缺陷确认门禁）。可信来源适配器、浏览器运行时和真实基准评测仍未完成，完整产品仍为 Release No-Go（暂不发布）。
+**当前状态：** PR #13（候选评估与 Q15 治理）已合并，PR #14（Oracle/Evidence 本地绑定校验）也已由项目所有者合并到个人仓库 `naodeng/bugmaster` 的 `main`；最新合并提交为 `e594946ca4d823c044897c000c1975a7301631c7`。[PR #14](https://github.com/naodeng/bugmaster/pull/14) 对应的 [GitHub Actions（自动化检查）运行 #116](https://github.com/naodeng/bugmaster/actions/runs/45107658770) 全部成功。当前批准的 Candidate（候选记录）/Finding（缺陷记录）元数据 Schema（数据结构规则）与私有本地持久化实现已提交为 [`1a86eeabffad401df3f5e1f484c856e548a10360`](https://github.com/naodeng/bugmaster/commit/1a86eeabffad401df3f5e1f484c856e548a10360)。615 项单元测试、129 项契约测试、1 项安全测试和 100% 行/分支覆盖通过；Codex 代码扫描与安全审查已通过。远端 W7 分支目前领先 `main` 7 个提交、落后 0 个提交，没有开放 PR；该分支已绑定实现提交与 TDD 证据记录，接下来创建单个 PR 并确认远端 Actions（自动化检查）。本切片不保存原始 Evidence Blob（证据原件字节），不认证来源或审核人，也不接入 `Confirmed Gate`（缺陷确认门禁）。可信来源适配器、浏览器运行时和真实基准评测仍未完成，完整产品仍为 Release No-Go（暂不发布）。
 
 ## 仓库审计摘要
 
-- 当前开发工作树：`/Users/inaodeng/.codex/worktrees/w7-evidence-oracle/bugmaster`，活动分支 `codex/w7-finding-metadata-store`，远端 `origin` 指向个人仓库 `naodeng/bugmaster`。PR #14 已合入；本地活动切片从已合并内容继续，不以任何未合并 PR 作为父分支。Candidate/Finding（候选记录/缺陷记录）切片的本地实现、测试验证及 Codex 代码/安全审查已完成；提交实现并复核远端 CI 后，再交项目所有者确认。尚未开始后续功能。
+- 当前开发工作树：`/Users/inaodeng/.codex/worktrees/w7-evidence-oracle/bugmaster`，活动分支 `codex/w7-finding-metadata-store`，远端 `origin` 指向个人仓库 `naodeng/bugmaster`。PR #14 已合入；本切片基于已合并内容，不以未合并 PR 为父分支。Candidate/Finding（候选记录/缺陷记录）实现、测试验证及 Codex 代码/安全审查已完成，实现已推送至 W7 功能分支；在创建 PR 前复核了 `main` 与功能分支，当前领先 6 个提交且无落后提交。远端 CI 和项目所有者确认待 PR 创建后完成。尚未开始后续功能。
 - GitHub 上游：`AI-Native-QA-Lab/bugmaster`；个人项目 fork：`naodeng/bugmaster`。两者均为公开仓库，当前连接具有管理员权限。
 - 仓库简介与 13 个主题标签的同步、起始提交 `cef3cb5` 推送到个人 fork（分叉仓库），均为早期历史记录；当前开发基线以 PR #13 合并提交 `5c640a21` 为准，未向组织上游推送本轮代码。
 - 当前代码来源：用户提供的 `/Users/inaodeng/Downloads/bugmaster 2/`（128 个文件）。该 v1.1 基线采用 11 个 Discovery / Validation / Reporting（发现/验证/报告）Skill ID；旧 v1.0 的 `hunt-*` 目录不导入。
@@ -25,7 +25,7 @@
 | W4 | 风险路由与有界自主探索 | 部分实现 | `scripts/discover_openapi.py` 可从本地 OpenAPI（开放 API 描述格式）3 JSON 输出稳定 ID 和 JSON Pointer（JSON 指针）来源清单；URL（统一资源定位符）/Browser（浏览器）发现、风险路由与动态执行仍待实现 |
 | W5 | R0–R3 风险级别动作授权 | 部分实现 | `scripts/validate_gates.py` 的 `can_dispatch()` 在可信 Scope/Approval 验证器接入前对所有风险等级恒拒绝；自述 `scopeValidated` 不再授权。真实范围解析、授权网关、审批摘要和修订绑定仍待实现 |
 | W6 | Action Journal（动作日志）、Session（会话）/Checkpoint（检查点）持久化与安全恢复 | 部分实现 | 早期 PR #9 与 PR #11 已合入个人仓库 `main`；PR #11 增加待对账 Action（动作）枚举与进程崩溃验证。V-2 至 V-6 仍待核验。可信授权、事件来源真实性、预算对账和安全恢复授权未实现。 |
-| W7 | Finding（缺陷记录）、跨入口去重与报告 | 部分实现：候选评估 + Oracle/Evidence 绑定 + Candidate/Finding 元数据存储 | Candidate Assessment（候选评估）辅助函数仍只生成 `candidate`、`needs_review` 或暂定 `duplicate`。PR #14 已加入 Oracle（预期行为判定依据）来源字节、Evidence（证据）制品摘要、精确 Oracle 版本与 Action Journal（动作日志）结果引用绑定；当前切片新增 Candidate（候选记录）/Finding（缺陷记录）私有本地元数据持久化、不可变修订和摘要链。以上仍不认证来源/审核人、不保存证据原件字节、不验证外部引用、不抑制规范重复项，也不解锁 `Confirmed Gate`（缺陷确认门禁）；报告、真实可信来源适配器和审核身份认证仍待实现 |
+| W7 | Finding（缺陷记录）、跨入口去重与报告 | 部分实现：候选评估 + Oracle/Evidence 绑定 + Candidate/Finding 元数据存储 | Candidate Assessment（候选评估）辅助函数仍只生成 `candidate`、`needs_review` 或暂定 `duplicate`。PR #14 已加入 Oracle（预期行为判定依据）来源字节、Evidence（证据）制品摘要、精确 Oracle 版本与 Action Journal（动作日志）结果引用绑定；本切片实现提交 [`1a86eea`](https://github.com/naodeng/bugmaster/commit/1a86eeabffad401df3f5e1f484c856e548a10360) 新增 Candidate（候选记录）/Finding（缺陷记录）私有本地元数据持久化、不可变修订和摘要链。以上仍不认证来源/审核人、不保存证据原件字节、不验证外部引用、不抑制规范重复项，也不解锁 `Confirmed Gate`（缺陷确认门禁）；报告、真实可信来源适配器和审核身份认证仍待实现 |
 | W8 | 回归建议 | 待实现 | 只输出建议，不自动修改/提交测试代码 |
 | W9 | 50 场景 Benchmark（基准评测） | 计划细化，仍未执行 | 保持 50 总数；7 个既有 API（应用程序接口）/UI（用户界面）场景映射候选正例、可信正常反证、模糊 Oracle、模型与执行矛盾、错误拒绝风险、人工反馈、跨表面去重；Manifest（清单）仍为 `planned`（计划中），需隔离 Ground Truth（真实结论）并进行 G0–G3 对照实验 |
 | W10 | Codex 与 Claude Code 双宿主验证 | 未验证 | W10-02 首项交付为浏览器工具比较与选型记录；满足 W5-02/W7-02/W9-02 依赖后，再跑两宿主真实安装和 API（应用程序接口）/Browser（浏览器）权限测试 |
