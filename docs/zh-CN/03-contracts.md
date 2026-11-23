@@ -15,8 +15,9 @@
 | Action | Session Action Journal | 事前写意图；未知执行结果禁止重放 |
 | Oracle（预期行为判定依据） | `.bugmaster/oracles/<id>/revisions/` | ID + `revision`（版本号）+ `canonical record digest`（规范记录摘要）；记录预期行为和来源指纹，尚未认证来源与作者身份 |
 | Evidence（证据） | 元数据 + `content-addressed artifact`（按内容摘要寻址的制品） | EV ID + 制品 SHA-256（内容摘要）+ Oracle/Journal 引用；校验本地字节完整性和引用关系，来源真实性仍未验证 |
-| Candidate Assessment | Candidate revision 中的 `candidateAssessment` | 只表示筛选结果；不能是 `confirmed`；拒绝必须关联反证 |
-| Finding | 不可变 Revision + `current.json` | 报告/索引由权威数据生成 |
+| Candidate Assessment（候选评估） | 嵌入 Candidate（候选记录）版本 | Candidate ID + revision（版本号）；只表示筛选结果；拒绝需可信反证审核 |
+| Candidate（候选记录） | `<root>/candidates/<sha256(candidateId)>/revisions/` | 本地不可变元数据版本；评估结果仍是暂定状态 |
+| Finding（缺陷记录） | `<root>/findings/<sha256(findingId)>/revisions/` + `metadata.head`（最新版本指针） | 只保存本地元数据，不生成报告或索引 |
 | Review | 真实审核记录 | 绑定 Finding、Oracle 和证据摘要 |
 | Session | 不可变版本 + `ActionJournalStore` + Checkpoint | Session 身份确定本地 Journal 路径；恢复门禁仍独立 |
 | Regression Recommendation | 不可变版本 | 只提供建议，不写测试代码 |
@@ -34,6 +35,8 @@
 - Pattern：`candidate`, `reviewed`, `verified`, `deprecated`。
 - Regression Recommendation：`draft`, `needs_review`, `approved`, `rejected`, `exported`, `superseded`, `archived`。
 
+Candidate/Finding Schema（数据结构规则）描述未来完整状态枚举；当前本地存储只接受 Candidate 决策 `candidate`、`needs_review` 和暂定的 `duplicate`，以及 Finding 状态 `hypothesis`、`observed`、`suspected` 和 `needs_review`。接入可信验证与所需真人审核前，存储会阻止 Candidate `rejected`，也会阻止 Finding `confirmed`、`rejected`、`duplicate`、`resolved` 和 `reopened`。
+
 ## 缺陷确认准入
 
 Confirmed 需要有效且适用的 Oracle、真实且可追溯的执行证据、明确的预期违反、环境/因果排查、没有阻断级矛盾、至少 E3 的门禁评估，以及策略要求时的真实人工 Review。E4 独立复核不作为普遍强制条件。偶现无法再次复现不自动推翻可信原始证据。Evidence Level 与 Severity/Confidence 完全独立。
@@ -44,7 +47,17 @@ Candidate Assessment Schema 为未来可信 Host verifier 流程保留 `rejected
 
 `candidate` 和 `duplicate` 是基于调用方所给记录的本地暂定筛选结果。helper 不认证来源标志，也不通过规范存储核验 `duplicateOf`。Host 在把这些结果当作权威状态，或据此抑制/汇总记录前，必须核验来源真实性和被引用的 Candidate。Candidate Assessment 始终被 Confirmed Gate 阻断。
 
-跨表面去重只关联目标、业务对象、操作、Oracle 和违规签名均相同的候选。表面字段不参与该身份，因此 API 与 Browser 观测可以关联且不重复计数。人工反馈以事件列表追加，并绑定 Candidate revision 和证据引用。当前 helper 只返回更新后的内存值；本次改动没有实现不可变 Candidate/Finding 持久化或证据来源真实性校验。
+跨表面去重只关联目标、业务对象、操作、Oracle 和违规签名均相同的候选。表面字段不参与该身份，因此 API（应用程序接口）与 Browser（浏览器）观测可以关联且不重复计数。人工反馈以事件列表追加，并绑定 Candidate revision（候选记录版本）和证据引用。helper（辅助函数）仍只返回更新后的内存值；元数据存储是独立 API（应用程序接口），尚未接入候选评估、去重或报告。下方的本地绑定校验器也未接入 Candidate Assessment。
+
+## Candidate/Finding 元数据持久化
+
+`CandidateStore` 和 `FindingStore` 默认校验对应 JSON Schema（JSON 数据结构规则），并在配置的私有目录下追加不可变版本文件。存储使用 ID 的哈希值选择每条记录的独立目录；每条记录有 POSIX（类 Unix 操作系统接口）文件锁、包含最新版本和历史摘要的当前指针，以及基于 `expected_revision`（预期当前版本）的乐观并发检查。版本和指针通过私有临时文件、`fsync`（将数据同步到磁盘）及不可覆盖的版本发布方式写入。读取时会重新校验完整版本历史；遇到缺失或孤立版本、未知目录项、软/硬链接、不安全所有者、已有文件权限不私有、可检测到的扩展 ACL（访问控制列表）、非规范 JSON、Schema 校验失败或摘要不匹配时，都会 fail-closed（失败时保持阻断）。不存在的配置根目录会以仅所有者访问权限创建；已存在的根目录必须本来就是私有目录，存储不会擅自修改其权限。子级记录目录在核验所有者与 ACL 后，写入时可收紧为仅所有者访问；读取时拒绝权限不私有的目录。已有文件权限不安全时始终拒绝且不修改权限。
+
+Candidate revision（候选记录版本）嵌入 Candidate Assessment（候选评估），并要求两者的 ID、版本、观测表面、Pattern（缺陷模式）、Oracle（预期行为判定依据）引用、证据引用、误报检查、审核要求和可选去重身份保持一致。审核事件必须引用同一 Candidate 和该记录已经存在的版本；事件 ID 不能重复，事件中的 Evidence ID（证据标识）必须存在于事件所引用的确切版本中。Candidate 不能将自身列为重复项。这些检查只校验引用关系，不认证审核人身份，也不证明真人实际审核过。身份字段在版本间不能变化；证据引用、误报检查和审核事件不能删除或重排。Finding（缺陷记录）中的 Candidate、表面、Action（动作）和 Evidence（证据）引用也只能追加。Candidate 的证据引用只保存 Evidence ID；Finding 的证据引用还包含 SHA-256 摘要和字节长度。两者都不保存 Evidence 原件字节。存储不核验外部引用，不认证来源声明或审核人身份，不抑制重复项，也不把任何状态接入 Confirmed Gate（缺陷确认门禁）。已保存的审核人 ID 或审核决定只是未经验证的声明，不能证明真人实际审核过。发布过程被中断时不会自动恢复；后续读取会因孤立版本或临时项而阻断，直至由操作者处理。Windows 行为尚未验证。
+
+摘要链可以发现局部或不一致修改，无法抵御拥有整个根目录写权限的本地用户重算全部摘要或恢复完整的旧目录。调用方不得将 Evidence（证据）原文或 Base64（文本编码格式）证据内容放入描述性自由文本。存储会把这些字段当作普通文本，不会检查其中是否嵌入了证据内容。
+
+每条 Finding 中的 Evidence ID 必须唯一；即使重复 ID 携带不同摘要或字节长度，也会被拒绝。
 
 ## Oracle（预期行为判定依据）与 Evidence（证据）数据校验
 

@@ -15,8 +15,9 @@
 | Action | session journal | session ID + action ID + sequence | write-ahead intent; unknown outcomes never replayed |
 | Oracle | `.bugmaster/oracles/<id>/revisions/` | ID + revision + canonical record digest | expected behavior and source fingerprint; source and author remain unauthenticated |
 | Evidence | metadata and content-addressed artifacts | EV ID + artifact SHA-256 + Oracle/Journal references | local byte integrity and references are checked; authenticity remains unverified |
-| Candidate Assessment | candidate revision's `candidateAssessment` | candidate ID + revision | screening only; never `confirmed`; rejection requires linked counter-evidence |
-| Finding | immutable revisions + current pointer | Finding ID + revision | report and indexes are generated |
+| Candidate Assessment | embedded in a Candidate revision | Candidate ID + revision | screening only; never `confirmed`; rejection requires trusted counter-evidence review |
+| Candidate | `<root>/candidates/<sha256(candidateId)>/revisions/` | Candidate ID + revision | local immutable metadata; assessment stays provisional |
+| Finding | `<root>/findings/<sha256(findingId)>/revisions/` + `metadata.head` | Finding ID + revision | local metadata only; reports and indexes are not generated |
 | Review | signed-off/host-attested review record | review ID + bound revision/digest | model cannot approve itself |
 | Session | immutable revisions + `ActionJournalStore` + checkpoints | session ID + revision | deterministic local Journal identity mapping; safe resume gate remains separate |
 | Regression Recommendation | immutable revisions | REG ID + revision | no test code writes |
@@ -34,6 +35,8 @@
 - Pattern: `candidate`, `reviewed`, `verified`, `deprecated`.
 - Recommendation: `draft`, `needs_review`, `approved`, `rejected`, `exported`, `superseded`, `archived`.
 
+The Candidate/Finding schemas describe the full future status vocabulary. The current local store only accepts Candidate decisions `candidate`, `needs_review`, and provisional `duplicate`, and Finding statuses `hypothesis`, `observed`, `suspected`, and `needs_review`. It blocks Candidate `rejected` and Finding `confirmed`, `rejected`, `duplicate`, `resolved`, and `reopened` until trusted verification and required human review are integrated.
+
 ## Confirmation invariant
 
 `confirmed` requires valid applicable Oracle, authentic independently attributable execution artifact(s), observable violation, sufficiently checked environment and causality, no blocking contradiction, >=E3 gate assessment, and bound human review when policy requires. E4 independent review is optional. Non-reproduction does not automatically invalidate original credible evidence. Confidence and severity are independent of maturity.
@@ -44,7 +47,17 @@ The Candidate Assessment schema reserves `rejected` for a future trusted-host ve
 
 `candidate` and `duplicate` are provisional local screening results based on supplied records. The helper does not authenticate provenance flags or verify `duplicateOf` against canonical storage. A Host must verify source provenance and the referenced candidate before treating these results as authoritative or suppressing/aggregating records. Candidate Assessment remains blocked from the Confirmed Gate.
 
-Cross-surface deduplication links only candidates with the same target, business object, operation, Oracle, and violation signature. The observed surface is omitted from that identity so an API and browser observation can link without counting twice. Review feedback is an append-only event list bound to a candidate revision and evidence references. The current helper returns an updated in-memory value; durable immutable Candidate/Finding storage and trusted evidence provenance verification are not implemented. The local binding checker below is not integrated into Candidate assessment.
+Cross-surface deduplication links only candidates with the same target, business object, operation, Oracle, and violation signature. The observed surface is omitted from that identity so an API and browser observation can link without counting twice. Review feedback is an append-only event list bound to a candidate revision and evidence references. The helper still returns an updated in-memory value; the metadata store is a separate API and is not wired into assessment, deduplication, or reporting. The local binding checker below is also not integrated into Candidate assessment.
+
+## Candidate and Finding metadata persistence
+
+`CandidateStore` and `FindingStore` validate their JSON Schema by default and append immutable revision files under a configured private root. Hashed IDs select per-record directories. Each record has a POSIX file lock, a current head containing the latest revision and history digests, and optimistic `expected_revision` checks. Revision and head writes use private temporary files, `fsync`, and no-replace publication for immutable revisions. Reads revalidate the entire history and fail closed on missing or orphan revisions, unknown directory entries, symlinks, hard links, unsafe owners, non-private existing file permissions, detectable extended ACLs, non-canonical JSON, schema failures, or digest mismatches. A missing configured root is created with owner-only access; an existing root must already be private and is never permission-repaired. Record directories may be repaired to owner-only access after ownership and ACL checks. Reads reject non-private directory permissions, and existing files with unsafe permissions are always rejected without modification.
+
+Candidate revisions embed a Candidate Assessment and require its ID, revision, surface, Pattern, Oracle reference, evidence references, false-positive checks, review-required flag, and optional deduplication identity to match. Each review event must reference the same Candidate and an existing revision; event IDs must be unique and event evidence references must exist in the exact revision named by the event. A Candidate cannot reference itself as a duplicate. This binding does not authenticate the reviewer or prove that a human performed the review. Identity fields are stable across revisions; evidence references, false-positive checks, and review events cannot be removed or reordered. Finding references to Candidates, surfaces, Actions, and Evidence are also append-only. Candidate evidence references contain Evidence IDs; Finding evidence references also contain SHA-256 digests and byte lengths. The store does not read or write Evidence bytes, verify referenced records, authenticate source or reviewer claims, verify the human identity represented by a review event, suppress duplicates, or connect any state to the Confirmed Gate. A persisted reviewer ID or decision is an unverified statement, not proof that a person reviewed the record. Interrupted publication is not automatically recovered; the next read fails closed until an operator resolves the orphan/temporary entry. Windows behavior is not verified.
+
+The digest chain detects partial or inconsistent edits, not a local actor with write access to the entire root who can recompute all digests or roll back the complete directory. Callers must keep raw or Base64-encoded Evidence content out of descriptive free-text fields. The store treats those fields as opaque text and does not inspect embedded content.
+
+Finding evidence references must use a unique Evidence ID within each revision, even when duplicate IDs carry different digests or byte lengths.
 
 ## Oracle and Evidence data checks
 

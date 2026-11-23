@@ -128,16 +128,10 @@ class CandidateAssessmentTests(unittest.TestCase):
             )
 
     def test_review_event_rejects_noncanonical_evidence_id(self):
-        assessment = assess_candidate(
-            candidate(evidenceRefs=["evidence-1"]),
-            oracle(),
-            [evidence("evidence-1")],
-        )
+        assessment = assess_candidate(candidate(), oracle(), [evidence()])
 
         with self.assertRaisesRegex(ValueError, "review-event-evidence-invalid"):
-            append_review_event(
-                assessment, review_event(evidenceRefs=["evidence-1"])
-            )
+            append_review_event(assessment, review_event(evidenceRefs=["EV-001\n"]))
 
     def test_real_bug_is_retained_as_candidate_not_confirmed(self):
         assessment = assess_candidate(candidate(), oracle(), [evidence()])

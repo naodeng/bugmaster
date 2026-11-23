@@ -158,7 +158,7 @@ def _open_directory_at(parent_fd, name, *, create, private, repair):
         raise
 
 
-def _open_absolute_directory(path, *, create):
+def _open_absolute_directory(path, *, create, repair_root=True):
     flags = _directory_flags()
     try:
         directory_fd = os.open("/", flags)
@@ -183,7 +183,7 @@ def _open_absolute_directory(path, *, create):
                 name,
                 create=create,
                 private=is_root,
-                repair=create and is_root,
+                repair=create and is_root and repair_root,
             )
             os.close(directory_fd)
             directory_fd = child_fd

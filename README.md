@@ -8,7 +8,7 @@
 
 BugMaster's target is a portable Agent Skills bundle for evidence-driven exploratory testing on **authorized** APIs and web applications. The current local implementation can create a source-linked inventory from an OpenAPI 3 JSON file. URL/Browser discovery, risk-driven execution, and autonomous end-to-end testing are not implemented or verified.
 
-The W7 Oracle/Evidence data slice validates versioned expected-behavior records, artifact digests, and references to local Action Journal outcomes. It checks content integrity and local binding only; it does not authenticate sources, persist Findings, or unlock confirmation.
+The W7 data layer now has versioned Candidate and Finding schemas and private local metadata persistence. Revisions retain identifiers, references, and digests, not raw Evidence bytes. The store has no Evidence Blob field or blob service. It does not detect raw or Base64-encoded evidence placed in free-text fields, so callers must keep evidence content out of those fields. This storage checks local structure and integrity only: it does not authenticate sources or reviewers, connect the records to a trusted workflow, or unlock Finding confirmation.
 
 ## Target installation (not verified)
 ```bash
