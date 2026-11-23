@@ -136,6 +136,19 @@ class MetadataStoreTests(unittest.TestCase):
         with self.assertRaises(self.api.MetadataStoreError):
             self.candidates.create(document)
 
+    def test_candidate_store_rejects_noncanonical_oracle_and_evidence_ids(self):
+        invalid_oracle = candidate_document()
+        invalid_oracle["oracleRef"] = "oracle-001"
+        invalid_oracle["candidateAssessment"]["oracleRef"] = "oracle-001"
+        invalid_evidence = candidate_document()
+        invalid_evidence["evidenceRefs"] = ["evidence-001"]
+        invalid_evidence["candidateAssessment"]["evidenceRefs"] = ["evidence-001"]
+
+        for document in (invalid_oracle, invalid_evidence):
+            with self.subTest(document=document):
+                with self.assertRaises(self.api.MetadataStoreError):
+                    self.candidates.create(document)
+
     def test_candidate_assessment_must_reference_record_evidence(self):
         document = candidate_document()
         document["candidateAssessment"]["evidenceRefs"] = ["EV-OTHER"]

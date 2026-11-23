@@ -73,6 +73,34 @@ class CandidateSchemaTests(unittest.TestCase):
         document["evidenceRefs"] = [""]
         self.assert_invalid(document)
 
+    def test_candidate_oracle_reference_uses_canonical_id(self):
+        document = candidate_document()
+        document["oracleRef"] = "oracle-001"
+        self.assert_invalid(document)
+
+    def test_candidate_evidence_references_use_canonical_ids(self):
+        document = candidate_document()
+        document["evidenceRefs"] = ["evidence-001"]
+        self.assert_invalid(document)
+
+    def test_candidate_identity_oracle_reference_uses_canonical_id(self):
+        document = candidate_document()
+        document["identity"] = {
+            "targetRef": "target:orders",
+            "businessObjectRef": "order:1",
+            "operationRef": "POST /orders",
+            "oracleRef": "oracle-001",
+            "violationSignature": "duplicate-order",
+        }
+        self.assert_invalid(document)
+
+    def test_embedded_assessment_references_use_canonical_ids(self):
+        for field, value in (("oracleRef", "oracle-001"), ("evidenceRefs", ["evidence-001"])):
+            with self.subTest(field=field):
+                document = candidate_document()
+                document["candidateAssessment"][field] = value
+                self.assert_invalid(document)
+
     def test_candidate_rejects_embedded_evidence_bytes(self):
         document = candidate_document()
         document["evidenceBlob"] = "base64-content-is-out-of-scope"
