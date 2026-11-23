@@ -863,6 +863,35 @@ class ActionJournal:
             "failed": "terminal",
         }[state["status"]]
 
+    def recorded_outcome(self, action_id):
+        """Return the validated local event binding for a recorded outcome.
+
+        This checks the Journal's local hash chain and event transition only. It
+        does not authenticate the event, its source, or the referenced result.
+        """
+        _require_action_id(action_id)
+        events, _ = self._load_current()
+        event = next(
+            (
+                candidate
+                for candidate in reversed(events)
+                if candidate["actionId"] == action_id
+                and candidate["eventType"] == "action_outcome"
+            ),
+            None,
+        )
+        if event is None:
+            raise JournalError("action has no recorded outcome")
+        return {
+            "sessionId": self.session_id,
+            "journalId": self.journal_id,
+            "actionId": action_id,
+            "outcome": event["data"]["outcome"],
+            "resultRef": event["data"]["resultRef"],
+            "sequence": event["sequence"],
+            "entryHash": event["entryHash"],
+        }
+
     def actions_needing_reconciliation(self):
         """List action IDs whose journal-recorded outcomes remain unresolved.
 

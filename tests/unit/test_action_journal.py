@@ -94,6 +94,52 @@ def _matches_prefix(test_case, journal, sequence, head_hash):
 
 
 class ActionJournalRecoveryTests(unittest.TestCase):
+    def test_recorded_outcome_returns_validated_event_binding(self):
+        ActionJournal, _, _ = _journal_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "journal.jsonl"
+            journal = ActionJournal(
+                path, session_id="session-1", journal_id="journal-session-1"
+            )
+            _prepare_and_dispatch(journal)
+            event = journal.record_outcome(
+                "action-1", "completed", "artifacts/result.json"
+            )
+
+            recovered = ActionJournal(
+                path,
+                session_id="session-1",
+                journal_id="journal-session-1",
+                require_existing=True,
+            )
+            binding = recovered.recorded_outcome("action-1")
+
+        self.assertEqual(binding["sessionId"], "session-1")
+        self.assertEqual(binding["journalId"], "journal-session-1")
+        self.assertEqual(binding["actionId"], "action-1")
+        self.assertEqual(binding["outcome"], "completed")
+        self.assertEqual(binding["resultRef"], "artifacts/result.json")
+        self.assertEqual(binding["sequence"], event["sequence"])
+        self.assertEqual(binding["entryHash"], event["entryHash"])
+
+    def test_recorded_outcome_rejects_actions_without_outcome(self):
+        ActionJournal, _, JournalError = _journal_types(self)
+
+        with tempfile.TemporaryDirectory() as directory:
+            journal = ActionJournal(
+                Path(directory) / "journal.jsonl", session_id="session-1"
+            )
+            journal.prepare(
+                action_id="action-1",
+                intent_digest="a" * 64,
+                scope_revision=1,
+                risk="R0",
+            )
+
+            with self.assertRaises(JournalError):
+                journal.recorded_outcome("action-1")
+
     def test_restart_blocks_replaying_an_action_with_unknown_result(self):
         ActionJournal, _, JournalError = _journal_types(self)
 
