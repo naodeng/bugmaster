@@ -65,11 +65,11 @@
 | Codex Q15 代码扫描 | PASS（通过） | `codex review --uncommitted`；Codex CLI 0.171.0 对与实现提交相同的生产代码和测试差异扫描，未发现可执行缺陷；扫描复核单元测试 615/615、契约测试 129/129、安全测试 1/1，行/分支覆盖率均为 100%。后续只修改了验证记录文档 |
 | Codex 安全审查 | PASS（通过） | 聚焦复核未发现新阻断项；尾换行 ID、helper（辅助函数）与 Schema（数据结构规则）不一致及重复目标格式问题均已修复。摘要链不防止根目录所有者整体篡改或回滚；Windows 未验证，扩展 ACL（访问控制列表）直接检查限于 macOS |
 | 独立真人安全审查 | 未进行 | 当前批准范围不认证来源/审核人、不修改 R2/R3 动作授权、不接入 Confirmed Gate；如后续跨入这些边界，先单独与项目所有者讨论真人审查范围 |
-| GitHub PR / Actions | 待创建 | 本实现提交及其验证记录已在 W7 功能分支；该分支相对 `main` 领先 7 个提交、落后 0 个提交，当前没有开放 PR。审查完成后创建单个 PR，再记录远端 Actions（自动化检查）结果；不自动合并 |
+| GitHub PR / Actions | PR #15 已创建，首轮通过 | [PR #15](https://github.com/naodeng/bugmaster/pull/15) 初始 head `b5bdc088d36f545ad21f368dca3036bda23afa83` 的 Actions（自动化检查）运行 #118 为 PASS（通过）；该提交相对 `main` 领先 7 个、落后 0 个，GitHub 标记可合并。本次进度文档更新仅改文档；最新 head 和后续检查状态以 PR 页面为准。不自动合并 |
 | Release（正式发布）质量门禁 | NO-GO（不满足发布门槛，预期） | `PYTHONPATH=/private/tmp/bugmaster-provenance-test-deps PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/bin/python3.12 scripts/quality_gate.py --mode release --coverage /private/tmp/bugmaster-w7-finding-metadata-final.json`；exit 1 的原因是功能义务清单未冻结、真实功能覆盖未超过 60%，并缺少核心功能三类场景证据。本切片不提供真实业务覆盖、50 个 Benchmark（基准评测）场景执行、双宿主验证或正式发布所需双人授权 |
 
 ## 后续顺序
 
-1. 在当前 W7 功能分支创建单个 PR，确认远端 CI 后交项目所有者最终确认并手动合并。
+1. 等待 PR #15 最新 head 的远端 CI；由项目所有者最终确认并手动合并。
 2. 在本 PR 合并前，不启动下一个功能 PR；浏览器探索工具仍按 W5/W7/W9 依赖顺序另行推进。
 3. 若后续需要来源认证、审核人身份认证、R2/R3 授权或 Confirmed Gate 集成，先把真人审查边界单独提出来与项目所有者讨论。
