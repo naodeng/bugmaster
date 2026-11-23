@@ -123,6 +123,8 @@ class CandidateAssessmentSchemaTests(unittest.TestCase):
             "violationSignature": "duplicate-side-effect",
         }
         self.assert_invalid(document)
+        document["duplicateOf"] = {"candidateId": "legacy-1", "revision": 1}
+        self.assert_invalid(document)
         document["duplicateOf"] = {"candidateId": "CF-000", "revision": 1}
         self.assertEqual(list(self.validator.iter_errors(document)), [])
 

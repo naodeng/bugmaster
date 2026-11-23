@@ -67,6 +67,78 @@ def review_event(**updates):
 
 
 class CandidateAssessmentTests(unittest.TestCase):
+    def test_assess_candidate_rejects_noncanonical_record_reference_ids(self):
+        invalid_candidates = (
+            candidate(candidateId="candidate-1"),
+            candidate(oracleRef="oracle-1"),
+            candidate(evidenceRefs=["evidence-1"]),
+        )
+        for invalid_candidate in invalid_candidates:
+            with self.subTest(candidate=invalid_candidate):
+                with self.assertRaisesRegex(
+                    ValueError, "candidate-assessment-input-invalid"
+                ):
+                    assess_candidate(invalid_candidate, oracle(), [evidence()])
+
+    def test_noncanonical_optional_identity_is_not_emitted(self):
+        identity = candidate()["identity"]
+        identity["oracleRef"] = "oracle-1"
+        assessment = assess_candidate(
+            candidate(identity=identity), oracle(), [evidence()]
+        )
+
+        self.assertNotIn("identity", assessment)
+
+    def test_false_positive_check_with_noncanonical_evidence_id_is_omitted(self):
+        checks = [
+            {
+                "check": "authorization_scope",
+                "result": "unknown",
+                "evidenceRefs": ["evidence-1"],
+            }
+        ]
+
+        assessment = assess_candidate(
+            candidate(falsePositiveChecks=checks), oracle(), [evidence()]
+        )
+
+        self.assertEqual(assessment["falsePositiveChecks"], [])
+        self.assertIn("FALSE_POSITIVE_CHECK_INCONCLUSIVE", assessment["reasonCodes"])
+
+    def test_noncanonical_counterevidence_reference_is_not_emitted(self):
+        assessment = assess_candidate(
+            candidate(),
+            oracle(),
+            [evidence()],
+            {"oracleRef": "OR-001", "evidenceRefs": ["evidence-1"]},
+        )
+
+        self.assertEqual(assessment["evidenceRefs"], ["EV-001"])
+
+    def test_duplicate_target_requires_canonical_candidate_id(self):
+        duplicate = candidate(candidateId="legacy-1")
+        duplicate["decision"] = "candidate"
+
+        with self.assertRaisesRegex(ValueError, "duplicate-identity-mismatch"):
+            assess_candidate(
+                candidate(candidateId="CF-002"),
+                oracle(),
+                [evidence()],
+                duplicate_of=duplicate,
+            )
+
+    def test_review_event_rejects_noncanonical_evidence_id(self):
+        assessment = assess_candidate(
+            candidate(evidenceRefs=["evidence-1"]),
+            oracle(),
+            [evidence("evidence-1")],
+        )
+
+        with self.assertRaisesRegex(ValueError, "review-event-evidence-invalid"):
+            append_review_event(
+                assessment, review_event(evidenceRefs=["evidence-1"])
+            )
+
     def test_real_bug_is_retained_as_candidate_not_confirmed(self):
         assessment = assess_candidate(candidate(), oracle(), [evidence()])
         self.assertEqual(assessment["decision"], "candidate")

@@ -219,6 +219,27 @@ class MetadataStoreTests(unittest.TestCase):
         with self.assertRaises(self.api.MetadataStoreError):
             self.candidates.create(document)
 
+    def test_candidate_store_rejects_noncanonical_duplicate_target_id(self):
+        document = candidate_document(decision="duplicate")
+        document["candidateAssessment"]["reasonCodes"] = ["DUPLICATE_CANDIDATE"]
+        document["oracleRef"] = "OR-001"
+        document["candidateAssessment"]["oracleRef"] = "OR-001"
+        document["identity"] = {
+            "targetRef": "API-ORDERS",
+            "businessObjectRef": "order:17",
+            "operationRef": "POST /orders",
+            "oracleRef": "OR-001",
+            "violationSignature": "duplicate-side-effect",
+        }
+        document["candidateAssessment"]["identity"] = dict(document["identity"])
+        document["candidateAssessment"]["duplicateOf"] = {
+            "candidateId": "legacy-1",
+            "revision": 1,
+        }
+
+        with self.assertRaises(self.api.MetadataStoreError):
+            self.candidates.create(document)
+
     def test_schema_invalid_candidate_is_not_persisted(self):
         document = candidate_document()
         document["unrecognized"] = True
