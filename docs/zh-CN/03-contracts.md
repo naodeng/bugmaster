@@ -13,8 +13,8 @@
 | Scope | `.bugmaster/scopes/<id>.json` | 审批引用仍须由可信网关核验 |
 | Approval | Scope/Action 引用的审批记录 | Approval ID + Scope Revision；宿主验证来源事件与精确意图绑定 |
 | Action | Session Action Journal | 事前写意图；未知执行结果禁止重放 |
-| Oracle | `.bugmaster/oracles/` 不可变版本 | 来源、适用条件、有效性 |
-| Evidence | 元数据 + 内容哈希 Artifact | 哈希证明完整性，不单独证明真实性 |
+| Oracle（预期行为判定依据） | `.bugmaster/oracles/<id>/revisions/` | ID + `revision`（版本号）+ `canonical record digest`（规范记录摘要）；记录预期行为和来源指纹，尚未认证来源与作者身份 |
+| Evidence（证据） | 元数据 + `content-addressed artifact`（按内容摘要寻址的制品） | EV ID + 制品 SHA-256（内容摘要）+ Oracle/Journal 引用；校验本地字节完整性和引用关系，来源真实性仍未验证 |
 | Candidate Assessment | Candidate revision 中的 `candidateAssessment` | 只表示筛选结果；不能是 `confirmed`；拒绝必须关联反证 |
 | Finding | 不可变 Revision + `current.json` | 报告/索引由权威数据生成 |
 | Review | 真实审核记录 | 绑定 Finding、Oracle 和证据摘要 |
@@ -45,6 +45,12 @@ Candidate Assessment Schema 为未来可信 Host verifier 流程保留 `rejected
 `candidate` 和 `duplicate` 是基于调用方所给记录的本地暂定筛选结果。helper 不认证来源标志，也不通过规范存储核验 `duplicateOf`。Host 在把这些结果当作权威状态，或据此抑制/汇总记录前，必须核验来源真实性和被引用的 Candidate。Candidate Assessment 始终被 Confirmed Gate 阻断。
 
 跨表面去重只关联目标、业务对象、操作、Oracle 和违规签名均相同的候选。表面字段不参与该身份，因此 API 与 Browser 观测可以关联且不重复计数。人工反馈以事件列表追加，并绑定 Candidate revision 和证据引用。当前 helper 只返回更新后的内存值；本次改动没有实现不可变 Candidate/Finding 持久化或证据来源真实性校验。
+
+## Oracle（预期行为判定依据）与 Evidence（证据）数据校验
+
+`Oracle Schema`（预期行为判定依据数据结构规则）v1.0 记录 `revision`（版本号）、预期行为描述、目标/功能适用范围，以及来源字节的 SHA-256（内容摘要）和长度。`Evidence Schema`（证据数据结构规则）v1.0 记录证据制品的媒体类型、SHA-256（内容摘要）和长度、精确的 Oracle ID、`revision`（版本号）、`canonical record digest`（规范记录摘要），以及 `Action Journal`（动作日志）结果事件的 Session（会话）、Journal（动作日志）、Action ID（动作标识）、结果引用、序号和事件摘要。E0–E4 是证据等级标签，此校验器不会独立核验等级。
+
+`bugmaster_core.provenance.verify_provenance()` 会重新计算给定 Oracle 来源和 Evidence 制品的摘要，匹配规范化 Oracle 记录摘要，然后要求具体的 `ActionJournal` 实例校验完整本地事件链并返回所引用的结果事件。摘要、引用不一致或结果不可读取时，都会 `fail-closed`（失败时保持阻断）。返回结果只说明本地内容完整、引用对应：SHA-256（内容摘要算法）是内容指纹，Journal（动作日志）哈希链不是数字签名。Oracle 作者身份、证据采集过程、事件来源和外部事实仍未认证；结果明确保持来源真实性未验证，并阻断 `Confirmed Finding`（已确认缺陷记录）门禁。这一阶段只增加 Schema（数据结构规则）和内存校验器，尚未实现持久化、可信适配器、签名身份或门禁接入。
 
 ## 审批与恢复
 

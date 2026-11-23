@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bugmaster.dev/schemas/evidence.schema.json",
+  "title": "BugMaster Evidence",
+  "description": "An evidence artifact fingerprint and exact Oracle/Action Journal references. Hashes and local Journal checks do not authenticate a source or prove external truth.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "evidenceId",
+    "evidenceLevel",
+    "capturedAt",
+    "artifact",
+    "oracleRef",
+    "journalRef"
+  ],
+  "properties": {
+    "schemaVersion": {"const": "1.0"},
+    "evidenceId": {"type": "string", "pattern": "^EV-[A-Z0-9][A-Z0-9-]{0,63}$"},
+    "evidenceLevel": {"enum": ["E0", "E1", "E2", "E3", "E4"]},
+    "capturedAt": {"type": "string", "format": "date-time"},
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reference", "mediaType", "sha256", "byteLength"],
+      "properties": {
+        "reference": {"type": "string", "minLength": 1, "pattern": "[^\\u0009-\\u000D\\u001C-\\u0020\\u0085\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000]"},
+        "mediaType": {"type": "string", "minLength": 1, "pattern": "[^\\u0009-\\u000D\\u001C-\\u0020\\u0085\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000]"},
+        "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "byteLength": {"type": "integer", "minimum": 0}
+      }
+    },
+    "oracleRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["oracleId", "revision", "sha256"],
+      "properties": {
+        "oracleId": {"type": "string", "pattern": "^OR-[A-Z0-9][A-Z0-9-]{0,63}$"},
+        "revision": {"type": "integer", "minimum": 1},
+        "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+      }
+    },
+    "journalRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sessionId",
+        "journalId",
+        "actionId",
+        "outcome",
+        "resultRef",
+        "sequence",
+        "entryHash"
+      ],
+      "properties": {
+        "sessionId": {"type": "string", "minLength": 1, "pattern": "[^\\u0009-\\u000D\\u001C-\\u0020\\u0085\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000]"},
+        "journalId": {"type": "string", "minLength": 1, "pattern": "[^\\u0009-\\u000D\\u001C-\\u0020\\u0085\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000]"},
+        "actionId": {"type": "string", "minLength": 1, "pattern": "[^\\u0009-\\u000D\\u001C-\\u0020\\u0085\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000]"},
+        "outcome": {"enum": ["completed", "failed"]},
+        "resultRef": {"type": "string", "minLength": 1, "pattern": "[^\\u0009-\\u000D\\u001C-\\u0020\\u0085\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000]"},
+        "sequence": {"type": "integer", "minimum": 1},
+        "entryHash": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+      }
+    }
+  }
+}

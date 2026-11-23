@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bugmaster.dev/schemas/oracle.schema.json",
+  "title": "BugMaster Oracle",
+  "description": "A versioned expected-behavior record with a source fingerprint. The source and Oracle author are not authenticated by this schema.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "oracleId",
+    "revision",
+    "statement",
+    "appliesTo",
+    "source",
+    "recordedAt"
+  ],
+  "properties": {
+    "schemaVersion": {"const": "1.0"},
+    "oracleId": {"type": "string", "pattern": "^OR-[A-Z0-9][A-Z0-9-]{0,63}$"},
+    "revision": {"type": "integer", "minimum": 1},
+    "statement": {"type": "string", "minLength": 1, "pattern": "[^\\u0009-\\u000D\\u001C-\\u0020\\u0085\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000]"},
+    "appliesTo": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["targetRef", "featureRef"],
+      "properties": {
+        "targetRef": {"type": "string", "minLength": 1, "pattern": "[^\\u0009-\\u000D\\u001C-\\u0020\\u0085\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000]"},
+        "featureRef": {"type": "string", "minLength": 1, "pattern": "[^\\u0009-\\u000D\\u001C-\\u0020\\u0085\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000]"}
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reference", "sha256", "byteLength"],
+      "properties": {
+        "reference": {"type": "string", "minLength": 1, "pattern": "[^\\u0009-\\u000D\\u001C-\\u0020\\u0085\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000]"},
+        "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "byteLength": {"type": "integer", "minimum": 0}
+      }
+    },
+    "recordedAt": {"type": "string", "format": "date-time"}
+  }
+}

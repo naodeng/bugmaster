@@ -8,6 +8,8 @@
 
 BugMaster's target is a portable Agent Skills bundle for evidence-driven exploratory testing on **authorized** APIs and web applications. The current local implementation can create a source-linked inventory from an OpenAPI 3 JSON file. URL/Browser discovery, risk-driven execution, and autonomous end-to-end testing are not implemented or verified.
 
+The W7 Oracle/Evidence data slice validates versioned expected-behavior records, artifact digests, and references to local Action Journal outcomes. It checks content integrity and local binding only; it does not authenticate sources, persist Findings, or unlock confirmation.
+
 ## Target installation (not verified)
 ```bash
 # Repository exists; this host install path remains unverified until release checks pass.

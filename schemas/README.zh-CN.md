@@ -6,6 +6,9 @@ Schema 使用 JSON Schema Draft 2020-12。契约测试同时校验 Schema 本身
 
 ## 已实现
 
+- `oracle.schema.json`：校验带版本的 `Oracle`（预期行为判定依据）、目标/功能适用范围，以及来源字节的 SHA-256（内容摘要）和长度；不会认证来源或 Oracle 作者。该 `Schema`（数据结构规则）描述记录字段，不证明来源真实。
+- `evidence.schema.json` 与 `bugmaster_core.provenance.verify_provenance`：校验 `Evidence artifact`（证据制品）的摘要，以及对 Oracle 版本和本地 `Action Journal`（动作日志）结果事件的精确引用。该辅助函数会检查给定来源/制品的字节、规范化 Oracle 记录摘要和完整本地 Journal 事件链。匹配只证明本地完整性和引用关系；结果仍标记来源真实性为 `unverified`（未验证），`Confirmed Finding`（已确认缺陷记录）门禁为 `blocked`（阻断）。这不是持久化存储、可信适配器、签名器或来源认证器。`ActionJournal.recorded_outcome(action_id)` 返回校验过的本地结果绑定，但不认证事件来源或外部结果。
+
 - `scope.schema.json`：校验带版本的 Scope、逐目标授权决定、已知表面与风险、in-scope 目标的审批引用及有限动作预算。
 - `feature-inventory.schema.json`：校验带来源的 Feature Inventory；授权与执行进度保存在独立账本。
 - `approval.schema.json`：校验 Scope 或 Action 审批记录、Scope revision 和目标绑定、来源/审批人引用、有效期，以及 R2 所需动作意图字段。
@@ -29,9 +32,13 @@ Session Schema 保存结构化历史和计数；`SessionStore` 增加本地不�
 
 ## 尚未实现的契约
 
-Skill Manifest、Pattern、Catalog、Capability Registry、Recovery Decision、Oracle、Evidence、完整 Finding 持久化、签署 Review 记录、Report、Regression Recommendation、Eval Manifest 和 Release Manifest 尚未实现。Candidate Assessment 契约不代表这些实体已经完成，也不能取代它们。其证据引用和验证标志只是结构输入；可信 Host verifier 接入前，当前 helper 不会输出 `rejected` 决策。真实可信来源仍依赖对应 Adapter。可从 [统一契约](../docs/en/03-contracts.md) 与 [中文统一契约](../docs/zh-CN/03-contracts.md) 中查阅状态和身份约束。当前部分 Schema 不能被视为完整契约套件已通过。
+Oracle/Evidence Schema（预期行为判定依据与证据的数据结构规则）与本地绑定校验只是第一阶段契约：目前没有持久化 Evidence（证据）存储、可信适配器、来源认证，也未接入 Candidate Assessment（候选评估）或缺陷确认门禁。Candidate Assessment（候选评估）契约不代表这些实体已经完成，也不能取代它们；其证据引用和验证标志仍是结构输入。
 
-Scope、Feature Inventory、Approval、Action、Event、Checkpoint、Session 和 Candidate Assessment Schema 均有对应的契约测试。Candidate 筛选、Review Event 绑定、拒绝反证和 Benchmark 场景映射由 `tests/unit/test_candidate_assessment.py`、`tests/contracts/test_candidate_assessment_schema.py` 与 `tests/contracts/test_contracts.py` 覆盖；这些测试不能证明证据真实性，也没有运行正式 Eval 场景。Feature Inventory 测试验证 `examples/openapi/orders.json` 的实际 CLI 输出；Event 测试校验实际 Journal 事件（包括 R2 审批引用）；CheckpointStore 持久化由 `tests/unit/test_checkpoint_store.py` 单测和基于 Schema 的契约集成测试覆盖。`CheckpointReferenceValidator` 使用真实本地存储校验 Session revision、Scope history、最新 Session 登记项、Journal ID 确定性路径解析和 Journal 前缀一致性；它不认证 Journal 内容或事件来源，也不验证可信授权、预算对账或恢复授权。SessionStore 持久化由 `tests/unit/test_session_store.py` 和基于 Session Schema 的契约集成测试覆盖；这些测试不运行可信授权、预算对账或恢复流程。
+新增 Oracle/Evidence Schema 结构测试位于 `tests/contracts/test_provenance_schema.py`；它们只检查格式和字段约束，不证明来源真实性。
+
+Skill Manifest、Pattern、Catalog、Capability Registry、Recovery Decision、Oracle/Evidence 持久化与可信认证、完整 Finding 持久化、签署 Review 记录、Report、Regression Recommendation、Eval Manifest 和 Release Manifest 尚未实现。Candidate Assessment 契约不代表这些实体已经完成，也不能取代它们。其证据引用和验证标志只是结构输入；可信 Host verifier 接入前，当前 helper 不会输出 `rejected` 决策。真实可信来源仍依赖对应 Adapter。可从 [统一契约](../docs/en/03-contracts.md) 与 [中文统一契约](../docs/zh-CN/03-contracts.md) 中查阅状态和身份约束。当前部分 Schema 不能被视为完整契约套件已通过。
+
+Oracle、Evidence、Scope、Feature Inventory、Approval、Action、Event、Checkpoint、Session 和 Candidate Assessment Schema 均有 `tests/contracts/` 中的契约测试。Candidate 筛选、Review Event 绑定、拒绝反证和 Benchmark 场景映射由 `tests/unit/test_candidate_assessment.py`、`tests/contracts/test_candidate_assessment_schema.py` 与 `tests/contracts/test_contracts.py` 覆盖；这些测试不能证明证据真实性，也没有运行正式 Eval 场景。Feature Inventory 测试验证 `examples/openapi/orders.json` 的实际 CLI 输出；Event 测试校验实际 Journal 事件（包括 R2 审批引用）；CheckpointStore 持久化由 `tests/unit/test_checkpoint_store.py` 单测和基于 Schema 的契约集成测试覆盖。`CheckpointReferenceValidator` 使用真实本地存储校验 Session revision、Scope history、最新 Session 登记项、Journal ID 确定性路径解析和 Journal 前缀一致性；它不认证 Journal 内容或事件来源，也不验证可信授权、预算对账或恢复授权。SessionStore 持久化由 `tests/unit/test_session_store.py` 和基于 Session Schema 的契约集成测试覆盖；这些测试不运行可信授权、预算对账或恢复流程。
 
 CI 安装固定版本的测试验证器并执行契约套件。本地使用 Python 3.12，并安装 `jsonschema[format-nongpl]==4.26.0`；可选格式验证器确保 RFC3339 时间字段被执行检查。该依赖仅用于测试，不是 BugMaster 运行时依赖。低于 Python 3.10 的环境应使用仓库 CI 的 Python 3.12 或兼容环境。
 

@@ -13,8 +13,8 @@
 | Scope | `.bugmaster/scopes/<id>.json` | scope ID + revision | approval references require trusted gateway verification |
 | Approval | Approval record referenced by Scope/Action | approval ID + Scope revision | host-authenticated source event; exact intent binding |
 | Action | session journal | session ID + action ID + sequence | write-ahead intent; unknown outcomes never replayed |
-| Oracle | `.bugmaster/oracles/<id>/revisions/` | ID + revision + digest | approved/validated where required |
-| Evidence | metadata and content-addressed artifacts | EV ID + artifact SHA-256 | hash proves integrity, not authenticity |
+| Oracle | `.bugmaster/oracles/<id>/revisions/` | ID + revision + canonical record digest | expected behavior and source fingerprint; source and author remain unauthenticated |
+| Evidence | metadata and content-addressed artifacts | EV ID + artifact SHA-256 + Oracle/Journal references | local byte integrity and references are checked; authenticity remains unverified |
 | Candidate Assessment | candidate revision's `candidateAssessment` | candidate ID + revision | screening only; never `confirmed`; rejection requires linked counter-evidence |
 | Finding | immutable revisions + current pointer | Finding ID + revision | report and indexes are generated |
 | Review | signed-off/host-attested review record | review ID + bound revision/digest | model cannot approve itself |
@@ -44,7 +44,13 @@ The Candidate Assessment schema reserves `rejected` for a future trusted-host ve
 
 `candidate` and `duplicate` are provisional local screening results based on supplied records. The helper does not authenticate provenance flags or verify `duplicateOf` against canonical storage. A Host must verify source provenance and the referenced candidate before treating these results as authoritative or suppressing/aggregating records. Candidate Assessment remains blocked from the Confirmed Gate.
 
-Cross-surface deduplication links only candidates with the same target, business object, operation, Oracle, and violation signature. The observed surface is omitted from that identity so an API and browser observation can link without counting twice. Review feedback is an append-only event list bound to a candidate revision and evidence references. The current helper returns an updated in-memory value; durable immutable Candidate/Finding storage and evidence provenance verification are not implemented by this change.
+Cross-surface deduplication links only candidates with the same target, business object, operation, Oracle, and violation signature. The observed surface is omitted from that identity so an API and browser observation can link without counting twice. Review feedback is an append-only event list bound to a candidate revision and evidence references. The current helper returns an updated in-memory value; durable immutable Candidate/Finding storage and trusted evidence provenance verification are not implemented. The local binding checker below is not integrated into Candidate assessment.
+
+## Oracle and Evidence data checks
+
+Oracle schema v1.0 records a revision, expected-behavior statement, target/feature applicability, and the SHA-256 digest and byte length of the cited source bytes. Evidence schema v1.0 records an artifact's media type, SHA-256 digest and byte length, the exact Oracle ID/revision/canonical-record digest, and the Action Journal outcome's session/journal/action IDs, result reference, sequence, and event hash. The E0–E4 level is a supplied classification; this checker does not validate that level.
+
+`bugmaster_core.provenance.verify_provenance()` recomputes the supplied Oracle source and Evidence artifact digests, matches the canonical Oracle record digest, then asks the concrete `ActionJournal` to validate its full local event chain and return the referenced outcome. Any mismatch or unavailable outcome fails closed. The result describes local integrity and reference binding only: SHA-256 is a content fingerprint, and the Journal hash chain is not a signature. Oracle authors, evidence capture, event origin, and external facts remain unauthenticated; the result keeps source authenticity unverified and the Confirmed Finding gate blocked. This slice adds schemas and an in-memory checker, not persistence, a trusted adapter, signer identity, or Gate integration.
 
 ## Approval invariant
 
