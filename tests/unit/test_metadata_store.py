@@ -149,6 +149,69 @@ class MetadataStoreTests(unittest.TestCase):
                 with self.assertRaises(self.api.MetadataStoreError):
                     self.candidates.create(document)
 
+    def test_candidate_and_finding_stores_reject_trailing_newlines_in_ids_and_digests(self):
+        invalid_candidates = []
+
+        invalid = candidate_document()
+        invalid["oracleRef"] = "OR-001\n"
+        invalid["candidateAssessment"]["oracleRef"] = "OR-001\n"
+        invalid_candidates.append(invalid)
+
+        invalid = candidate_document()
+        invalid["evidenceRefs"] = ["EV-001\n"]
+        invalid["candidateAssessment"]["evidenceRefs"] = ["EV-001\n"]
+        invalid_candidates.append(invalid)
+
+        invalid = candidate_document()
+        invalid["falsePositiveChecks"] = [
+            {
+                "check": "authorization_scope",
+                "result": "unknown",
+                "evidenceRefs": ["EV-001\n"],
+            }
+        ]
+        invalid_candidates.append(invalid)
+
+        invalid_findings = []
+
+        invalid = finding_document()
+        invalid["candidateRefs"][0]["candidateId"] = "CF-001\n"
+        invalid_findings.append(invalid)
+
+        invalid = finding_document()
+        invalid["patternId"] = "BP-API-002\n"
+        invalid_findings.append(invalid)
+
+        invalid = finding_document()
+        invalid["oracleRef"]["oracleId"] = "OR-001\n"
+        invalid_findings.append(invalid)
+
+        invalid = finding_document()
+        invalid["oracleRef"]["sha256"] = "a" * 64 + "\n"
+        invalid_findings.append(invalid)
+
+        invalid = finding_document()
+        invalid["actionRefs"][0]["entryHash"] = "b" * 64 + "\n"
+        invalid_findings.append(invalid)
+
+        invalid = finding_document()
+        invalid["evidenceRefs"][0]["evidenceId"] = "EV-001\n"
+        invalid_findings.append(invalid)
+
+        invalid = finding_document()
+        invalid["evidenceRefs"][0]["sha256"] = "c" * 64 + "\n"
+        invalid_findings.append(invalid)
+
+        for document in invalid_candidates:
+            with self.subTest(document=document):
+                with self.assertRaises(self.api.MetadataStoreError):
+                    self.candidates.create(document)
+
+        for document in invalid_findings:
+            with self.subTest(document=document):
+                with self.assertRaises(self.api.MetadataStoreError):
+                    self.findings.create(document)
+
     def test_candidate_assessment_must_reference_record_evidence(self):
         document = candidate_document()
         document["candidateAssessment"]["evidenceRefs"] = ["EV-OTHER"]

@@ -112,6 +112,62 @@ class CandidateSchemaTests(unittest.TestCase):
                 document["candidateAssessment"][field] = value
                 self.assert_invalid(document)
 
+    def test_candidate_reference_patterns_reject_trailing_newlines(self):
+        invalid_documents = []
+
+        invalid = candidate_document()
+        invalid["candidateId"] = "CF-001\n"
+        invalid_documents.append(invalid)
+
+        invalid = candidate_document()
+        invalid["patternId"] = "BP-API-002\n"
+        invalid_documents.append(invalid)
+
+        invalid = candidate_document()
+        invalid["oracleRef"] = "OR-001\n"
+        invalid_documents.append(invalid)
+
+        invalid = candidate_document()
+        invalid["evidenceRefs"] = ["EV-001\n"]
+        invalid_documents.append(invalid)
+
+        invalid = candidate_document()
+        invalid["falsePositiveChecks"] = [
+            {
+                "check": "authorization_scope",
+                "result": "unknown",
+                "evidenceRefs": ["EV-001\n"],
+            }
+        ]
+        invalid_documents.append(invalid)
+
+        for document in invalid_documents:
+            with self.subTest(document=document):
+                self.assert_invalid(document)
+
+    def test_embedded_assessment_reference_patterns_reject_trailing_newlines(self):
+        invalid_documents = []
+
+        invalid = candidate_document()
+        invalid["candidateAssessment"]["candidateId"] = "CF-001\n"
+        invalid_documents.append(invalid)
+
+        invalid = candidate_document()
+        invalid["candidateAssessment"]["patternId"] = "BP-API-002\n"
+        invalid_documents.append(invalid)
+
+        invalid = candidate_document()
+        invalid["candidateAssessment"]["oracleRef"] = "OR-001\n"
+        invalid_documents.append(invalid)
+
+        invalid = candidate_document()
+        invalid["candidateAssessment"]["evidenceRefs"] = ["EV-001\n"]
+        invalid_documents.append(invalid)
+
+        for document in invalid_documents:
+            with self.subTest(document=document):
+                self.assert_invalid(document)
+
     def test_candidate_rejects_embedded_evidence_bytes(self):
         document = candidate_document()
         document["evidenceBlob"] = "base64-content-is-out-of-scope"

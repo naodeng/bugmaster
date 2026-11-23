@@ -207,6 +207,68 @@ class CandidateAssessmentSchemaTests(unittest.TestCase):
             with self.subTest(document=document):
                 self.assert_invalid(document)
 
+    def test_identifier_patterns_reject_trailing_newlines(self):
+        invalid_documents = []
+
+        invalid = copy.deepcopy(self.needs_review)
+        invalid["candidateId"] = "CF-001\n"
+        invalid_documents.append(invalid)
+
+        invalid = copy.deepcopy(self.needs_review)
+        invalid["patternId"] = "BP-API-002\n"
+        invalid_documents.append(invalid)
+
+        invalid = copy.deepcopy(self.needs_review)
+        invalid["oracleRef"] = "OR-001\n"
+        invalid_documents.append(invalid)
+
+        invalid = copy.deepcopy(self.needs_review)
+        invalid["evidenceRefs"] = ["EV-001\n"]
+        invalid_documents.append(invalid)
+
+        invalid = copy.deepcopy(self.needs_review)
+        invalid["falsePositiveChecks"] = [
+            {
+                "check": "authorization_scope",
+                "result": "unknown",
+                "evidenceRefs": ["EV-001\n"],
+            }
+        ]
+        invalid_documents.append(invalid)
+
+        invalid = copy.deepcopy(self.needs_review)
+        invalid["identity"] = {
+            "targetRef": "API-ORDERS",
+            "businessObjectRef": "order:17",
+            "operationRef": "POST /orders",
+            "oracleRef": "OR-001\n",
+            "violationSignature": "duplicate-side-effect",
+        }
+        invalid_documents.append(invalid)
+
+        invalid = copy.deepcopy(self.rejected)
+        invalid["counterEvidenceRefs"] = ["EV-002\n"]
+        invalid_documents.append(invalid)
+
+        invalid = copy.deepcopy(self.needs_review)
+        invalid["review"]["events"] = [
+            {
+                "eventId": "REV-001",
+                "candidateId": "CF-001\n",
+                "candidateRevision": 1,
+                "reviewerId": "reviewer-1",
+                "decision": "needs_evidence",
+                "reason": "需要证据",
+                "evidenceRefs": ["EV-001\n"],
+                "reviewedAt": "2026-11-22T10:00:00Z",
+            }
+        ]
+        invalid_documents.append(invalid)
+
+        for document in invalid_documents:
+            with self.subTest(document=document):
+                self.assert_invalid(document)
+
 
 if __name__ == "__main__":
     unittest.main()

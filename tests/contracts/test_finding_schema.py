@@ -95,6 +95,45 @@ class FindingSchemaTests(unittest.TestCase):
         document["recordedAt"] = "not-a-date"
         self.assert_invalid(document)
 
+    def test_identifier_and_digest_patterns_reject_trailing_newlines(self):
+        invalid_documents = []
+
+        invalid = finding_document()
+        invalid["findingId"] = "FND-001\n"
+        invalid_documents.append(invalid)
+
+        invalid = finding_document()
+        invalid["candidateRefs"][0]["candidateId"] = "CF-001\n"
+        invalid_documents.append(invalid)
+
+        invalid = finding_document()
+        invalid["patternId"] = "BP-API-002\n"
+        invalid_documents.append(invalid)
+
+        invalid = finding_document()
+        invalid["oracleRef"]["oracleId"] = "OR-001\n"
+        invalid_documents.append(invalid)
+
+        invalid = finding_document()
+        invalid["oracleRef"]["sha256"] = "a" * 64 + "\n"
+        invalid_documents.append(invalid)
+
+        invalid = finding_document()
+        invalid["actionRefs"][0]["entryHash"] = "b" * 64 + "\n"
+        invalid_documents.append(invalid)
+
+        invalid = finding_document()
+        invalid["evidenceRefs"][0]["evidenceId"] = "EV-001\n"
+        invalid_documents.append(invalid)
+
+        invalid = finding_document()
+        invalid["evidenceRefs"][0]["sha256"] = "c" * 64 + "\n"
+        invalid_documents.append(invalid)
+
+        for document in invalid_documents:
+            with self.subTest(document=document):
+                self.assert_invalid(document)
+
 
 if __name__ == "__main__":
     unittest.main()
