@@ -79,9 +79,20 @@ class CandidateSchemaTests(unittest.TestCase):
         self.assert_invalid(document)
 
     def test_candidate_evidence_references_use_canonical_ids(self):
-        document = candidate_document()
-        document["evidenceRefs"] = ["evidence-001"]
-        self.assert_invalid(document)
+        invalid_top_level = candidate_document()
+        invalid_top_level["evidenceRefs"] = ["evidence-001"]
+        invalid_false_positive = candidate_document()
+        invalid_false_positive["falsePositiveChecks"] = [
+            {
+                "check": "authorization_scope",
+                "result": "unknown",
+                "evidenceRefs": ["evidence-001"],
+            }
+        ]
+
+        for document in (invalid_top_level, invalid_false_positive):
+            with self.subTest(document=document):
+                self.assert_invalid(document)
 
     def test_candidate_identity_oracle_reference_uses_canonical_id(self):
         document = candidate_document()

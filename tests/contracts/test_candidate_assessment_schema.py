@@ -162,6 +162,16 @@ class CandidateAssessmentSchemaTests(unittest.TestCase):
         invalid_evidence["evidenceRefs"] = ["evidence-001"]
         invalid_documents.append(invalid_evidence)
 
+        invalid_false_positive = copy.deepcopy(self.needs_review)
+        invalid_false_positive["falsePositiveChecks"] = [
+            {
+                "check": "authorization_scope",
+                "result": "unknown",
+                "evidenceRefs": ["evidence-001"],
+            }
+        ]
+        invalid_documents.append(invalid_false_positive)
+
         invalid_counter_evidence = copy.deepcopy(self.rejected)
         invalid_counter_evidence["counterEvidenceRefs"] = ["evidence-001"]
         invalid_documents.append(invalid_counter_evidence)
