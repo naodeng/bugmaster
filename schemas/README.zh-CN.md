@@ -17,6 +17,7 @@ Schema 使用 JSON Schema Draft 2020-12。契约测试同时校验 Schema 本身
 - `checkpoint.schema.json`：校验 Checkpoint 的不可变 Session revision、Scope revision 与 Journal 序号/哈希锚点，并覆盖空 Journal 边界。它只做结构验证；恢复仍需验证所引用的 revision 和 Journal，并重新核验当前授权与预算。
 - `session.schema.json`：校验版本化 Session revision、规范生命周期状态、Scope revision 历史、绑定 Scope revision 的审批引用、预算上限与已用计数，以及 Journal/Checkpoint 引用。引用不构成授权或安全恢复证明。
 - `candidate-assessment.schema.json` 与 `bugmaster_core.candidate_assessment`：将候选筛选结果与 Confirmed Finding 分离，校验稳定原因码；人工反馈绑定 Candidate revision 与证据并以事件追加；支持基于确定性业务身份的跨表面去重，并统计精确率、召回率和人工审核工作量。`candidate` 与 `duplicate` 是本地暂定筛选结果；Host 在把它们当作权威状态，或据此抑制/汇总记录前，必须核验来源真实性和规范重复引用。Schema 为未来可信 Host 流程保留 `rejected`，当前 helper 不会输出它，也不接受调用方传入的 verifier 回调；`candidate-assessment-rejected.json` 仅为 Schema 测试夹具。它只是筛选契约和内存 helper，不是 Finding 存储或证据真实性服务。
+- `candidate.schema.json`、`finding.schema.json` 与 `bugmaster_core.metadata_store.CandidateStore` / `FindingStore`：按配置的私有目录保存带版本的 Candidate（候选记录）/Finding（缺陷记录）元数据。记录目录由 ID 的 SHA-256 摘要命名；写入使用仅所有者可读写的 POSIX 文件锁、不可变 revision（修订版）文件、当前 head（最新版本指针）、规范 JSON 摘要及乐观版本检查。存储默认执行对应 Schema，也可再执行调用方增加的校验器。它拒绝软链接、硬链接、不安全的所有者、已有文件的不安全权限、macOS 上可检测到的扩展 ACL（访问控制列表）、版本缺口、未登记文件和摘要不匹配。不存在的配置根目录会以仅所有者访问权限创建；已存在的根目录必须本来就是私有目录，存储不会擅自修改其权限。子级记录目录在核验所有者与 ACL 后，写入时可收紧为仅所有者访问。读取时拒绝不符合私有权限要求的目录；已有文件权限不安全时一律拒绝且不修改权限。Candidate 的 `evidenceRefs` 只保存 Evidence ID；Finding 的 `evidenceRefs` 还保存 SHA-256 摘要和字节长度。存储没有专用 Evidence Blob（证据原件）字段或字节存储通路；自由文本字段仍可承载证据原文或 Base64 编码内容，调用方须避免写入。Candidate Assessment（候选评估）身份会与对应 Candidate revision 及顶层 Oracle（判定依据）引用绑定；Candidate 不能将自身列为重复项。审核事件只能引用同一 Candidate 已存在的版本，且事件证据引用必须存在于事件所指的确切版本。存储拒绝 Candidate 的 `rejected`，也拒绝 Finding 的 `confirmed`、`rejected`、`duplicate`、`resolved` 和 `reopened` 状态。本地完整性检查不认证证据来源、来源声明或审核人身份；不会验证外部引用、抑制重复项、接入 Confirmed Gate（缺陷确认门禁）或生成报告。写入中断留下的孤立版本或临时文件会 fail-closed（失败时保持阻断），本切片不自动修复；Windows 行为尚未验证。
 - `bugmaster_core.session_store.SessionStore`：将每个通过校验的 Session revision 保存为独立不可变文件，使用私有 Session 目录和 POSIX 文件锁串行化写入，通过同步临时文件后再以不可覆盖方式落盘；拒绝替换、序号缺口、权限错误和不一致的历史转换。`lock_revisions()` 提供已提交数量；新增的 `lock_revision_snapshot()` 会在同一把锁内提供数量和最新 revision，避免 Journal 初始化与首次 Session 发布发生竞争，也防止绑定错误的 Journal ID。只读路径会校验私有目录的所有者、权限与 ACL，且不修改目录；写入路径则先校验所有者与 ACL，再修复权限。既有 Session 锁文件必须仅允许所有者访问、没有扩展 ACL 且没有硬链接。它不会认证 Approval 引用、将预算与 Action Journal 对账，也不授权恢复。Windows 行为尚未验证。
 - `bugmaster_core.filesystem_security`：供 Session 与 Action Journal 存储共用的底层 ACL 检查。macOS 上会查询文件描述符的 ACL，无法检查时失败关闭；其他平台通过这项 macOS 专用检查报告没有扩展 ACL。
 - `bugmaster_core.checkpoint_store.CheckpointStore`：按 Checkpoint ID 的哈希在私有 Session 目录下持久化通过 Schema 校验的 Checkpoint。它与 SessionStore 共用 POSIX 单 Session 锁，通过同步临时文件和不可覆盖硬链接落盘，并拒绝损坏记录以及所有者、权限或 ACL 不安全的 Checkpoint 目录。读取不会修复已有路径。它不会验证引用的 Session revision、Scope revision 或 Journal head 是否存在或真实，也不授权恢复。Windows 行为尚未验证。
@@ -30,15 +31,23 @@ Session Schema 保存结构化历史和计数；`SessionStore` 增加本地不�
 
 本地 Action Journal 使用受限文件权限、单操作 POSIX 文件锁、追加并 `fsync`，以及保守的恢复状态。事件哈希不证明来源或事实。重启后没有结果的 prepared/dispatched 动作仍保持阻断。调用方提供的只读观察只作为未验证的对账声明保存，不会解锁派发；R1/R2 失败结果也仍保持阻断。`scripts/validate_gates.py` 在可信只读验证器和当前授权门禁实现前拒绝所有重放。
 
+## Candidate/Finding 存储的安全边界
+
+摘要链可以发现局部或不一致修改，无法抵御拥有整个根目录写权限的本地用户重算全部摘要或恢复完整的旧目录。调用方不得将 Evidence（证据）原文或 Base64（文本编码格式）证据内容放入描述性自由文本。存储会把这些字段当作普通文本，不会检查其中是否嵌入了证据内容。Windows 行为尚未验证，扩展 ACL 的直接检查限于 macOS。
+
+每条 Finding 中的 Evidence ID 必须唯一；即使重复 ID 携带不同摘要或字节长度，也会被拒绝。
+
 ## 尚未实现的契约
 
-Oracle/Evidence Schema（预期行为判定依据与证据的数据结构规则）与本地绑定校验只是第一阶段契约：目前没有持久化 Evidence（证据）存储、可信适配器、来源认证，也未接入 Candidate Assessment（候选评估）或缺陷确认门禁。Candidate Assessment（候选评估）契约不代表这些实体已经完成，也不能取代它们；其证据引用和验证标志仍是结构输入。
+Oracle/Evidence Schema（预期行为判定依据与证据的数据结构规则）与本地绑定校验只是第一阶段契约：目前没有持久化 Evidence Blob（证据原件）存储、可信适配器、来源认证，也未接入 Candidate Assessment（候选评估）或缺陷确认门禁。Candidate/Finding（候选记录/缺陷记录）元数据支持本地持久化，Candidate 中也会保存已绑定的 Candidate Assessment；但存储尚未接入 `assess_candidate()`（候选评估辅助函数）、规范重复项查询、可信工作流或报告流程。Candidate Assessment（候选评估）契约不代表这些实体生命周期已经完成，也不能取代它们；其证据引用和验证标志仍是结构输入。
 
 新增 Oracle/Evidence Schema 结构测试位于 `tests/contracts/test_provenance_schema.py`；它们只检查格式和字段约束，不证明来源真实性。
 
-Skill Manifest、Pattern、Catalog、Capability Registry、Recovery Decision、Oracle/Evidence 持久化与可信认证、完整 Finding 持久化、签署 Review 记录、Report、Regression Recommendation、Eval Manifest 和 Release Manifest 尚未实现。Candidate Assessment 契约不代表这些实体已经完成，也不能取代它们。其证据引用和验证标志只是结构输入；可信 Host verifier 接入前，当前 helper 不会输出 `rejected` 决策。真实可信来源仍依赖对应 Adapter。可从 [统一契约](../docs/en/03-contracts.md) 与 [中文统一契约](../docs/zh-CN/03-contracts.md) 中查阅状态和身份约束。当前部分 Schema 不能被视为完整契约套件已通过。
+Skill Manifest（技能清单）、Pattern（缺陷模式）、Catalog（目录）、Capability Registry（能力注册表）、Recovery Decision（恢复决策）、Evidence Blob（证据原件）持久化与可信认证、可信来源 Adapter（适配器）、已签名或已认证的 Review（审核）记录、Report（报告）生成、Regression Recommendation（回归建议）、Eval Manifest（评测清单）和 Release Manifest（发布清单）尚未实现。Candidate（候选记录）/Finding（缺陷记录）现在支持本地元数据持久化，但还没有接入候选评估 helper（辅助函数）、可信工作流或报告；它不代表这些实体的完整生命周期已经完成，也不会授权任何决定。Candidate Assessment（候选评估）契约不代表其他实体已经完成，也不能取代它们。其证据引用和验证标志只是结构输入；可信 Host verifier（宿主验证器）接入前，当前 helper 不会输出 `rejected` 决策。真实可信来源仍依赖对应 Adapter（适配器）。可从 [统一契约](../docs/en/03-contracts.md) 与 [中文统一契约](../docs/zh-CN/03-contracts.md) 中查阅状态和身份约束。当前部分 Schema（数据结构规则）不能被视为完整契约套件已通过。
 
 Oracle、Evidence、Scope、Feature Inventory、Approval、Action、Event、Checkpoint、Session 和 Candidate Assessment Schema 均有 `tests/contracts/` 中的契约测试。Candidate 筛选、Review Event 绑定、拒绝反证和 Benchmark 场景映射由 `tests/unit/test_candidate_assessment.py`、`tests/contracts/test_candidate_assessment_schema.py` 与 `tests/contracts/test_contracts.py` 覆盖；这些测试不能证明证据真实性，也没有运行正式 Eval 场景。Feature Inventory 测试验证 `examples/openapi/orders.json` 的实际 CLI 输出；Event 测试校验实际 Journal 事件（包括 R2 审批引用）；CheckpointStore 持久化由 `tests/unit/test_checkpoint_store.py` 单测和基于 Schema 的契约集成测试覆盖。`CheckpointReferenceValidator` 使用真实本地存储校验 Session revision、Scope history、最新 Session 登记项、Journal ID 确定性路径解析和 Journal 前缀一致性；它不认证 Journal 内容或事件来源，也不验证可信授权、预算对账或恢复授权。SessionStore 持久化由 `tests/unit/test_session_store.py` 和基于 Session Schema 的契约集成测试覆盖；这些测试不运行可信授权、预算对账或恢复流程。
 
-CI 安装固定版本的测试验证器并执行契约套件。本地使用 Python 3.12，并安装 `jsonschema[format-nongpl]==4.26.0`；可选格式验证器确保 RFC3339 时间字段被执行检查。该依赖仅用于测试，不是 BugMaster 运行时依赖。低于 Python 3.10 的环境应使用仓库 CI 的 Python 3.12 或兼容环境。
+Candidate（候选记录）/Finding（缺陷记录）Schema（数据结构规则）由 `tests/contracts/test_candidate_schema.py` 和 `tests/contracts/test_finding_schema.py` 覆盖；本地版本持久化、摘要校验及安全文件系统边界由 `tests/unit/test_metadata_store.py` 覆盖。这些测试不证明证据来源真实、审核人身份有效，也不运行正式 Eval（评测）场景。
+
+CI 安装固定版本的 `jsonschema[format-nongpl]==4.26.0` 并执行契约套件。Candidate/Finding 存储的默认 Schema 校验器也使用此依赖；可选格式验证器会检查 RFC3339（日期时间格式）字段。低于 Python 3.10 的环境应使用仓库 CI 的 Python 3.12 或兼容环境。
 

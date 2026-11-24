@@ -16,7 +16,7 @@
   ],
   "properties": {
     "schemaVersion": {"const": "1.0"},
-    "evidenceId": {"type": "string", "pattern": "^EV-[A-Z0-9][A-Z0-9-]{0,63}$"},
+    "evidenceId": {"type": "string", "pattern": "^EV-[A-Z0-9][A-Z0-9-]{0,63}(?![\\s\\S])"},
     "evidenceLevel": {"enum": ["E0", "E1", "E2", "E3", "E4"]},
     "capturedAt": {"type": "string", "format": "date-time"},
     "artifact": {
@@ -26,7 +26,7 @@
       "properties": {
         "reference": {"type": "string", "minLength": 1, "pattern": "[^\\u0009-\\u000D\\u001C-\\u0020\\u0085\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000]"},
         "mediaType": {"type": "string", "minLength": 1, "pattern": "[^\\u0009-\\u000D\\u001C-\\u0020\\u0085\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000]"},
-        "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}(?![\\s\\S])"},
         "byteLength": {"type": "integer", "minimum": 0}
       }
     },
@@ -35,9 +35,9 @@
       "additionalProperties": false,
       "required": ["oracleId", "revision", "sha256"],
       "properties": {
-        "oracleId": {"type": "string", "pattern": "^OR-[A-Z0-9][A-Z0-9-]{0,63}$"},
+        "oracleId": {"type": "string", "pattern": "^OR-[A-Z0-9][A-Z0-9-]{0,63}(?![\\s\\S])"},
         "revision": {"type": "integer", "minimum": 1},
-        "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+        "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}(?![\\s\\S])"}
       }
     },
     "journalRef": {
@@ -59,7 +59,7 @@
         "outcome": {"enum": ["completed", "failed"]},
         "resultRef": {"type": "string", "minLength": 1, "pattern": "[^\\u0009-\\u000D\\u001C-\\u0020\\u0085\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000]"},
         "sequence": {"type": "integer", "minimum": 1},
-        "entryHash": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+        "entryHash": {"type": "string", "pattern": "^[a-f0-9]{64}(?![\\s\\S])"}
       }
     }
   }

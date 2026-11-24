@@ -16,6 +16,9 @@ _IDENTITY_FIELDS = (
 _REVIEW_DECISIONS = {"accept", "reject", "needs_evidence"}
 _CANDIDATE_DECISIONS = {"candidate", "needs_review", "rejected", "duplicate"}
 _GROUND_TRUTH = {"bug", "normal", "ambiguous"}
+_CANDIDATE_ID = re.compile(r"CF-[A-Z0-9][A-Z0-9-]{0,63}")
+_ORACLE_ID = re.compile(r"OR-[A-Z0-9][A-Z0-9-]{0,63}")
+_EVIDENCE_ID = re.compile(r"EV-[A-Z0-9][A-Z0-9-]{0,63}")
 _PATTERN_ID = re.compile(r"BP-[A-Z]+-[0-9]{3}")
 _RFC3339_TIMESTAMP = re.compile(
     r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]+)?(?:Z|[+-][0-9]{2}:[0-9]{2})"
@@ -48,6 +51,18 @@ REASON_CODES = frozenset({
 
 def _nonempty(value):
     return isinstance(value, str) and bool(value.strip())
+
+
+def _matches_identifier(value, pattern):
+    return isinstance(value, str) and pattern.fullmatch(value) is not None
+
+
+def _valid_evidence_refs(refs, *, allow_empty=True):
+    return (
+        isinstance(refs, list)
+        and (allow_empty or bool(refs))
+        and all(_matches_identifier(ref, _EVIDENCE_ID) for ref in refs)
+    )
 
 
 def _valid_oracle(candidate, oracle):
@@ -99,7 +114,7 @@ def _matching_refs(
     return [
         ref
         for ref in dict.fromkeys(refs)
-        if _nonempty(ref)
+        if _matches_identifier(ref, _EVIDENCE_ID)
         and _evidence_for(
             ref,
             evidences,
@@ -116,7 +131,10 @@ def _identity(candidate):
     if not isinstance(identity, dict) or set(identity) != set(_IDENTITY_FIELDS):
         return None
     values = tuple(identity.get(field) for field in _IDENTITY_FIELDS)
-    if not all(_nonempty(value) for value in values):
+    if (
+        not all(_nonempty(value) for value in values)
+        or not _matches_identifier(identity.get("oracleRef"), _ORACLE_ID)
+    ):
         return None
     return values
 
@@ -152,8 +170,7 @@ def _normalize_false_positive_checks(checks):
             continue
         evidence_refs = item.get("evidenceRefs")
         if "evidenceRefs" in item and (
-            not isinstance(evidence_refs, list)
-            or not all(_nonempty(ref) for ref in evidence_refs)
+            not _valid_evidence_refs(evidence_refs)
         ):
             continue
         normalized.append(deepcopy(item))
@@ -200,15 +217,20 @@ def assess_candidate(
     revision = candidate.get("revision")
     pattern_id = candidate.get("patternId")
     oracle_ref = candidate.get("oracleRef")
+    evidence_refs = candidate.get("evidenceRefs")
     if (
-        not _nonempty(candidate_id)
+        not _matches_identifier(candidate_id, _CANDIDATE_ID)
         or not isinstance(revision, int)
         or isinstance(revision, bool)
         or revision < 1
         or not _nonempty(candidate.get("observedSurface"))
         or not isinstance(pattern_id, str)
         or _PATTERN_ID.fullmatch(pattern_id) is None
-        or (oracle_ref is not None and not _nonempty(oracle_ref))
+        or (oracle_ref is not None and not _matches_identifier(oracle_ref, _ORACLE_ID))
+        or (
+            isinstance(evidence_refs, list)
+            and not _valid_evidence_refs(evidence_refs)
+        )
     ):
         raise ValueError("candidate-assessment-input-invalid")
     if not isinstance(evidences, list):
@@ -223,14 +245,20 @@ def assess_candidate(
         and counter_evidence.get("oracleRef") == oracle_ref
         and isinstance(counter_evidence.get("evidenceRefs"), list)
     ):
-        counter_refs = [ref for ref in counter_evidence["evidenceRefs"] if _nonempty(ref)]
+        counter_refs = [
+            ref
+            for ref in counter_evidence["evidenceRefs"]
+            if _matches_identifier(ref, _EVIDENCE_ID)
+        ]
         assessment["evidenceRefs"] = list(dict.fromkeys(candidate_refs + counter_refs))
 
     review_events = candidate.get("reviewEvents", [])
     if not isinstance(review_events, list):
         raise ValueError("candidate-review-history-invalid")
     for event in review_events:
-        assessment = append_review_event(assessment, event)
+        assessment = _append_review_event(
+            assessment, event, allow_historical_event=True
+        )
     if duplicate_of is not None:
         if not isinstance(duplicate_of, dict):
             raise ValueError("duplicate-reference-invalid")
@@ -238,7 +266,7 @@ def assess_candidate(
         duplicate_identity = _identity(duplicate_of)
         identity = candidate.get("identity")
         if (
-            not _nonempty(duplicate_of.get("candidateId"))
+            not _matches_identifier(duplicate_of.get("candidateId"), _CANDIDATE_ID)
             or duplicate_of.get("candidateId") == candidate_id
             or not isinstance(duplicate_of.get("decision"), str)
             or duplicate_of.get("decision") not in {"candidate", "needs_review"}
@@ -327,32 +355,78 @@ def assess_candidate(
 
 def append_review_event(assessment, event):
     """Return a copy with an append-only review event bound to this revision."""
+    return _append_review_event(assessment, event, allow_historical_event=False)
+
+
+def _append_review_event(assessment, event, *, allow_historical_event):
     if not isinstance(assessment, dict) or not isinstance(event, dict):
         raise TypeError("assessment-and-event-must-be-objects")
     revision = assessment.get("revision")
     decision = assessment.get("decision")
     pattern_id = assessment.get("patternId")
+    candidate_id = assessment.get("candidateId")
+    oracle_ref = assessment.get("oracleRef")
+    assessment_refs = assessment.get("evidenceRefs")
+    false_positive_checks = assessment.get("falsePositiveChecks")
+    false_positive_refs_are_invalid = not isinstance(false_positive_checks, list) or any(
+        not isinstance(check, dict)
+        or (
+            "evidenceRefs" in check
+            and not _valid_evidence_refs(check["evidenceRefs"])
+        )
+        for check in false_positive_checks
+    )
+    counter_refs_are_invalid = (
+        "counterEvidenceRefs" in assessment
+        and not _valid_evidence_refs(
+            assessment.get("counterEvidenceRefs"), allow_empty=False
+        )
+    )
+    identity_is_invalid = (
+        "identity" in assessment and _identity(assessment) is None
+    )
+    duplicate_reference = assessment.get("duplicateOf")
+    duplicate_reference_is_invalid = (
+        "duplicateOf" in assessment
+        and (
+            not isinstance(duplicate_reference, dict)
+            or not _matches_identifier(
+                duplicate_reference.get("candidateId"), _CANDIDATE_ID
+            )
+        )
+    )
     if (
         assessment.get("schemaVersion") != "1.0"
-        or not _nonempty(assessment.get("candidateId"))
+        or not _matches_identifier(candidate_id, _CANDIDATE_ID)
         or not isinstance(revision, int)
         or isinstance(revision, bool)
         or revision < 1
         or not _nonempty(assessment.get("observedSurface"))
         or not isinstance(pattern_id, str)
         or _PATTERN_ID.fullmatch(pattern_id) is None
+        or (oracle_ref is not None and not _matches_identifier(oracle_ref, _ORACLE_ID))
+        or false_positive_refs_are_invalid
+        or counter_refs_are_invalid
+        or identity_is_invalid
+        or duplicate_reference_is_invalid
         or not isinstance(decision, str)
         or decision not in _CANDIDATE_DECISIONS
     ):
         raise ValueError("review-assessment-invalid")
     event_revision = event.get("candidateRevision")
+    revision_mismatch = (
+        event_revision > revision
+        if allow_historical_event and isinstance(event_revision, int)
+        else event_revision != revision
+    )
     if (
         event.get("candidateId") != assessment.get("candidateId")
         or not isinstance(revision, int)
         or isinstance(revision, bool)
         or not isinstance(event_revision, int)
         or isinstance(event_revision, bool)
-        or event_revision != revision
+        or event_revision < 1
+        or revision_mismatch
         or not _nonempty(event.get("eventId"))
         or not _nonempty(event.get("reviewerId"))
         or not isinstance(event.get("decision"), str)
@@ -363,14 +437,10 @@ def append_review_event(assessment, event):
     ):
         raise ValueError("review-event-binding-invalid")
     evidence_refs = event.get("evidenceRefs")
-    assessment_refs = assessment.get("evidenceRefs")
     if (
-        not isinstance(evidence_refs, list)
-        or not evidence_refs
-        or not all(_nonempty(ref) for ref in evidence_refs)
+        not _valid_evidence_refs(evidence_refs, allow_empty=False)
+        or not _valid_evidence_refs(assessment_refs)
         or len(set(evidence_refs)) != len(evidence_refs)
-        or not isinstance(assessment_refs, list)
-        or not all(_nonempty(ref) for ref in assessment_refs)
         or len(set(assessment_refs)) != len(assessment_refs)
         or not set(evidence_refs).issubset(assessment_refs)
     ):
@@ -399,16 +469,15 @@ def append_review_event(assessment, event):
             or previous.get("candidateId") != copied.get("candidateId")
             or not isinstance(previous_revision, int)
             or isinstance(previous_revision, bool)
-            or previous_revision != revision
+            or previous_revision < 1
+            or previous_revision > revision
             or not _nonempty(previous_id)
             or not _nonempty(previous.get("reviewerId"))
             or not isinstance(previous.get("decision"), str)
             or previous.get("decision") not in _REVIEW_DECISIONS
             or not _nonempty(previous.get("reason"))
             or not _valid_review_timestamp(previous.get("reviewedAt"))
-            or not isinstance(previous_refs, list)
-            or not previous_refs
-            or not all(_nonempty(ref) for ref in previous_refs)
+            or not _valid_evidence_refs(previous_refs, allow_empty=False)
             or len(set(previous_refs)) != len(previous_refs)
             or not set(previous_refs).issubset(assessment_refs)
         ):

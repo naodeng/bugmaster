@@ -110,6 +110,47 @@ class OracleEvidenceSchemaTests(unittest.TestCase):
         document["journalRef"]["resultRef"] = "\u0085"
         self.assertNotEqual(list(self.evidence_validator.iter_errors(document)), [])
 
+    def test_oracle_and_evidence_identifiers_and_digests_reject_trailing_newlines(self):
+        invalid_oracles = []
+
+        invalid = copy.deepcopy(self.oracle)
+        invalid["oracleId"] = "OR-ORDER-001\n"
+        invalid_oracles.append(invalid)
+
+        invalid = copy.deepcopy(self.oracle)
+        invalid["source"]["sha256"] = "a" * 64 + "\n"
+        invalid_oracles.append(invalid)
+
+        for document in invalid_oracles:
+            with self.subTest(document=document):
+                self.assertNotEqual(list(self.oracle_validator.iter_errors(document)), [])
+
+        invalid_evidence = []
+
+        invalid = copy.deepcopy(self.evidence)
+        invalid["evidenceId"] = "EV-ORDER-001\n"
+        invalid_evidence.append(invalid)
+
+        invalid = copy.deepcopy(self.evidence)
+        invalid["artifact"]["sha256"] = "b" * 64 + "\n"
+        invalid_evidence.append(invalid)
+
+        invalid = copy.deepcopy(self.evidence)
+        invalid["oracleRef"]["oracleId"] = "OR-ORDER-001\n"
+        invalid_evidence.append(invalid)
+
+        invalid = copy.deepcopy(self.evidence)
+        invalid["oracleRef"]["sha256"] = "c" * 64 + "\n"
+        invalid_evidence.append(invalid)
+
+        invalid = copy.deepcopy(self.evidence)
+        invalid["journalRef"]["entryHash"] = "d" * 64 + "\n"
+        invalid_evidence.append(invalid)
+
+        for document in invalid_evidence:
+            with self.subTest(document=document):
+                self.assertNotEqual(list(self.evidence_validator.iter_errors(document)), [])
+
 
 if __name__ == "__main__":
     unittest.main()

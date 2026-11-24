@@ -123,6 +123,8 @@ class CandidateAssessmentSchemaTests(unittest.TestCase):
             "violationSignature": "duplicate-side-effect",
         }
         self.assert_invalid(document)
+        document["duplicateOf"] = {"candidateId": "legacy-1", "revision": 1}
+        self.assert_invalid(document)
         document["duplicateOf"] = {"candidateId": "CF-000", "revision": 1}
         self.assertEqual(list(self.validator.iter_errors(document)), [])
 
@@ -151,6 +153,123 @@ class CandidateAssessmentSchemaTests(unittest.TestCase):
         document = copy.deepcopy(self.needs_review)
         document["modelConfirmed"] = True
         self.assert_invalid(document)
+
+    def test_oracle_and_evidence_references_use_canonical_ids(self):
+        invalid_documents = []
+        invalid_oracle = copy.deepcopy(self.needs_review)
+        invalid_oracle["oracleRef"] = "oracle-001"
+        invalid_documents.append(invalid_oracle)
+
+        invalid_evidence = copy.deepcopy(self.needs_review)
+        invalid_evidence["evidenceRefs"] = ["evidence-001"]
+        invalid_documents.append(invalid_evidence)
+
+        invalid_false_positive = copy.deepcopy(self.needs_review)
+        invalid_false_positive["falsePositiveChecks"] = [
+            {
+                "check": "authorization_scope",
+                "result": "unknown",
+                "evidenceRefs": ["evidence-001"],
+            }
+        ]
+        invalid_documents.append(invalid_false_positive)
+
+        invalid_counter_evidence = copy.deepcopy(self.rejected)
+        invalid_counter_evidence["counterEvidenceRefs"] = ["evidence-001"]
+        invalid_documents.append(invalid_counter_evidence)
+
+        for document in invalid_documents:
+            with self.subTest(document=document):
+                self.assert_invalid(document)
+
+    def test_nested_review_and_identity_references_use_canonical_ids(self):
+        invalid_review = copy.deepcopy(self.needs_review)
+        invalid_review["review"]["events"] = [
+            {
+                "eventId": "REV-001",
+                "candidateId": "CF-001",
+                "candidateRevision": 1,
+                "reviewerId": "reviewer-1",
+                "decision": "needs_evidence",
+                "reason": "需要证据",
+                "evidenceRefs": ["evidence-001"],
+                "reviewedAt": "2026-11-22T10:00:00Z",
+            }
+        ]
+        invalid_identity = copy.deepcopy(self.needs_review)
+        invalid_identity["identity"] = {
+            "targetRef": "API-ORDERS",
+            "businessObjectRef": "order:17",
+            "operationRef": "POST /orders",
+            "oracleRef": "oracle-001",
+            "violationSignature": "duplicate-side-effect",
+        }
+
+        for document in (invalid_review, invalid_identity):
+            with self.subTest(document=document):
+                self.assert_invalid(document)
+
+    def test_identifier_patterns_reject_trailing_newlines(self):
+        invalid_documents = []
+
+        invalid = copy.deepcopy(self.needs_review)
+        invalid["candidateId"] = "CF-001\n"
+        invalid_documents.append(invalid)
+
+        invalid = copy.deepcopy(self.needs_review)
+        invalid["patternId"] = "BP-API-002\n"
+        invalid_documents.append(invalid)
+
+        invalid = copy.deepcopy(self.needs_review)
+        invalid["oracleRef"] = "OR-001\n"
+        invalid_documents.append(invalid)
+
+        invalid = copy.deepcopy(self.needs_review)
+        invalid["evidenceRefs"] = ["EV-001\n"]
+        invalid_documents.append(invalid)
+
+        invalid = copy.deepcopy(self.needs_review)
+        invalid["falsePositiveChecks"] = [
+            {
+                "check": "authorization_scope",
+                "result": "unknown",
+                "evidenceRefs": ["EV-001\n"],
+            }
+        ]
+        invalid_documents.append(invalid)
+
+        invalid = copy.deepcopy(self.needs_review)
+        invalid["identity"] = {
+            "targetRef": "API-ORDERS",
+            "businessObjectRef": "order:17",
+            "operationRef": "POST /orders",
+            "oracleRef": "OR-001\n",
+            "violationSignature": "duplicate-side-effect",
+        }
+        invalid_documents.append(invalid)
+
+        invalid = copy.deepcopy(self.rejected)
+        invalid["counterEvidenceRefs"] = ["EV-002\n"]
+        invalid_documents.append(invalid)
+
+        invalid = copy.deepcopy(self.needs_review)
+        invalid["review"]["events"] = [
+            {
+                "eventId": "REV-001",
+                "candidateId": "CF-001\n",
+                "candidateRevision": 1,
+                "reviewerId": "reviewer-1",
+                "decision": "needs_evidence",
+                "reason": "需要证据",
+                "evidenceRefs": ["EV-001\n"],
+                "reviewedAt": "2026-11-22T10:00:00Z",
+            }
+        ]
+        invalid_documents.append(invalid)
+
+        for document in invalid_documents:
+            with self.subTest(document=document):
+                self.assert_invalid(document)
 
 
 if __name__ == "__main__":

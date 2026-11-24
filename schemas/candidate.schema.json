@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bugmaster.dev/schemas/candidate.schema.json",
+  "title": "BugMaster Candidate metadata",
+  "description": "A versioned local screening record. Its evidence references and review statements are unverified metadata and never authorize rejection or Finding confirmation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "candidateId",
+    "revision",
+    "observedSurface",
+    "patternId",
+    "oracleRef",
+    "evidenceRefs",
+    "environmentCheck",
+    "falsePositiveChecks",
+    "reviewRequired",
+    "candidateAssessment"
+  ],
+  "properties": {
+    "schemaVersion": {"const": "1.0"},
+    "candidateId": {"type": "string", "pattern": "^CF-[A-Z0-9][A-Z0-9-]{0,63}(?![\\s\\S])"},
+    "revision": {"type": "integer", "minimum": 1},
+    "observedSurface": {"type": "string", "minLength": 1},
+    "patternId": {"type": "string", "pattern": "^BP-[A-Z]+-[0-9]{3}(?![\\s\\S])"},
+    "oracleRef": {"type": ["string", "null"], "minLength": 1, "pattern": "^OR-[A-Z0-9][A-Z0-9-]{0,63}(?![\\s\\S])"},
+    "evidenceRefs": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"type": "string", "pattern": "^EV-[A-Z0-9][A-Z0-9-]{0,63}(?![\\s\\S])"}
+    },
+    "environmentCheck": {"enum": ["passed", "failed", "pending", "unknown"]},
+    "falsePositiveChecks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["check", "result"],
+        "properties": {
+          "check": {"type": "string", "minLength": 1},
+          "result": {"enum": ["clear", "detected", "unknown"]},
+          "evidenceRefs": {
+            "type": "array",
+            "items": {"type": "string", "pattern": "^EV-[A-Z0-9][A-Z0-9-]{0,63}(?![\\s\\S])"}
+          }
+        }
+      }
+    },
+    "reviewRequired": {"type": "boolean"},
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["targetRef", "businessObjectRef", "operationRef", "oracleRef", "violationSignature"],
+      "properties": {
+        "targetRef": {"type": "string", "minLength": 1},
+        "businessObjectRef": {"type": "string", "minLength": 1},
+        "operationRef": {"type": "string", "minLength": 1},
+        "oracleRef": {"type": "string", "pattern": "^OR-[A-Z0-9][A-Z0-9-]{0,63}(?![\\s\\S])"},
+        "violationSignature": {"type": "string", "minLength": 1}
+      }
+    },
+    "candidateAssessment": {
+      "$ref": "https://bugmaster.dev/schemas/candidate-assessment.schema.json"
+    }
+  }
+}
