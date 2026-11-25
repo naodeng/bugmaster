@@ -3,18 +3,18 @@
 ## 1. 开发原则
 本文件是全部开发过程的中文权威规范。代码符号、公开 README 与技术契约英文为主并提供对应中文页；实施计划、ADR 过程讨论、PR、风险台账、测试执行日志、Eval 审查、迭代总结均用中文。AGENTS.md 强制遵守此规范。
 
-冻结 Q1–Q17 及测试对象 B 范围：v0.1 API-first + Browser Basic；Android/iOS 仅未来适配。全量 11 Skills、16 Patterns、50 Benchmark、双宿主、治理能力一次性交付；不得用内部垂直切片冒充完整 MVP。
+冻结 Q1–Q17 及测试对象 B 范围：v0.1 优先支持应用程序接口（API-first）与基础浏览器能力（Browser Basic）；Android/iOS 仅未来适配。全量 11 Skills（技能包）、16 Patterns（缺陷模式）、50 Benchmark（基准评测）、双宿主及治理能力一次性交付；不得用内部垂直切片冒充完整 MVP（最小可行产品）。
 
-## 2. 强 TDD 四阶段
+## 2. 强测试驱动开发（Test-Driven Development，TDD）四阶段
 | 阶段 | 开发者动作 | 必须保存的证据 | 不允许 |
 |---|---|---|---|
-| RED | 根据需求/Oracle 先写 Happy/Negative/Edge 测试，实际执行并确认针对缺失行为失败 | 测试 ID、命令、环境、失败输出、Git SHA | 提前修改生产代码；只新建无断言测试 |
+| RED | 根据需求/Oracle 先写正向（Happy）/反向（Negative）/边界（Edge）测试，实际执行并确认针对缺失行为失败 | 测试 ID、命令、环境、失败输出、Git SHA | 提前修改生产代码；只新建无断言测试 |
 | GREEN | 用最小实现使刚才的测试通过 | 通过命令和日志；变更 Diff | 删除/跳过失败测试；硬编码不符合需求的特例 |
 | REFACTOR | 在测试保护下改善代码结构 | 受影响测试及回归结果 | 暗中引入新行为或弱化 Oracle |
 | VERIFY | 执行全量单元覆盖、功能矩阵、静态/安全/契约、基准和必要宿主测试 | 可复现命令、Coverage 数据、Eval run ID、Q15 扫描记录；公开 Release 另附 Q16 授权 | 用计划、生成内容或截屏代替真实运行 |
 
 ### 单项任务步骤
-1. 从 `docs/development/BACKLOG_ZH.md` 领取 W0–W11 任务，定位需求 ID 和归属等级 R0–R3。
+1. 从 [实施计划](BUGMASTER_IMPLEMENTATION_PLAN_ZH.md) 选择未完成的 W0–W11 工作，并对照 [实时进度矩阵](IMPLEMENTATION_PROGRESS_ZH.md) 与 Feature/Obligation ID（功能/义务编号）；确认 R0–R3 风险范围和已有依赖。
 2. 先更新 `tests/` 场景及验收矩阵；执行 RED 记录在中文 PR。
 3. 开发小步 GREEN；运行目标单测；REFACTOR；VERIFY。
 4. 更新 Feature Coverage Ledger：实际探索路径、真实工具证据与确认状态，而非自述“测过”。

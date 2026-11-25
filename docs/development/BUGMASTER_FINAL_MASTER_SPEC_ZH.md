@@ -1,6 +1,6 @@
 # BugMaster 最终开发基线总规范 v1.0（中文权威）
 
-> **状态：工程基线定稿 / 产品尚未实现完成 / Release No-Go。** 本文件整合 Q1–Q17、全量品牌变更、测试对象范围 B、后续讨论中已经确定的自主范围发现、判定规则、报告与强 TDD。未声称已完成尚无实测证据的能力。
+> **状态：工程基线定稿 / 产品尚未实现完成 / Release No-Go。** 本文件整合 Q1–Q17、全量品牌变更、测试对象范围 B、后续讨论中已经确定的自主范围发现、判定规则、报告与强 TDD（测试驱动开发）。未声称已完成尚无实测证据的能力。
 
 ## 目录
 1. 品牌、定位及用户目标
@@ -26,7 +26,7 @@
 - 品牌：**BugMaster（Bug 大师）**。
 - 对外英文说明：**Evidence-driven Bug Discovery Skills for AI Agents**。
 - 中文说明：面向 Agent 的证据驱动软件缺陷探索、验证与报告 Skills。
-- 仓库：`AI-Native-QA-Lab/bugmaster`（尚未创建或验证可用）；工作区：`.bugmaster/`。
+- 仓库：上游 `AI-Native-QA-Lab/bugmaster` 已创建；当前协作 fork（分叉仓库）为 `naodeng/bugmaster`。默认分支为 `main`，持续开发分支为 `develop`；运行数据目标目录为 `.bugmaster/`。
 - 本包所有公开名称、缩写、路径均使用新品牌；**不建立旧品牌兼容别名**。Pattern/Finding 稳定 ID 和 Q/ADR 序号保留；尚未公开发布的 11 个 Skill ID 已统一迁移，不保留旧 ID。
 - 产品定位：Agent 宿主上的独立 Skills Bundle，不是独立后台 Agent Runtime、安全扫描器、自动修复服务或 QA 可视化平台。
 - 核心价值：用户不指定具体测试点时，也能发现可测试功能并解释测试选择，在授权范围内动态探索，以 Oracle/证据验证缺陷，生成适合 QA、开发及项目负责人复核的报告。
@@ -43,7 +43,7 @@
 ```bash
 npx skills add https://github.com/AI-Native-QA-Lab/bugmaster -g -a codex
 ```
-仅是**目标命令**：正式 GitHub 仓库未创建且尚未完成双宿主实际安装验证，不得宣称现在可用。应支持完整 Bundle 与独立 Skill 安装、中文说明、多种风险模式，宿主决定实际工具执行。
+仓库已创建并可访问，但该命令仍是**目标安装路径**：Codex 与 Claude Code 的独立安装和实际宿主验证尚未完成，因此不能宣称已正式支持安装。目标仍是支持完整 Bundle 与独立 Skill 安装、中文说明和多种风险模式，由宿主决定实际工具执行。
 
 ### 3.2 输入示例
 - “使用 BugMaster 探索已授权的本地网站 `http://localhost:3000`，请自主确定测试功能，先规划和请求写操作授权，最终出报告。”
@@ -163,8 +163,8 @@ bugmaster/
 ├── skills/                   # 11 canonical SKILL.md
 ├── patterns/                 # taxonomy 和 16 Candidate Patterns
 ├── registry/                 # capability/aliases (仅稳定非品牌 ID)
-├── schemas/                  # 待实现的版本化完整 Schema
-├── bugmaster_core/           # 新增最小确定性范围合同示例
+├── schemas/                  # 已有部分版本化结构 Schema，完整契约仍待补齐
+├── bugmaster_core/           # 数据契约、静态发现、来源绑定与本地持久化
 ├── scripts/                  # 静态检查、打包、Fail-closed quality gates
 ├── tests/
 │   ├── unit/ contracts/ functional/ integration/ e2e/
@@ -176,10 +176,10 @@ bugmaster/
 │   └── development/          # 全中文工程过程、TDD、任务与证据
 └── .github/                 # PR 模板和 CI 占位
 ```
-必须最终补齐：Test Surface、Scope Proposal、Feature Inventory、Oracle、Experiment、Action Journal、Evidence Manifest、Finding Revision、Session Summary、Report、Approval、Regression Recommendation 和 Release Manifest 的 JSON Schema。当前实现状态以 `schemas/README.md` 为准：Scope、Feature Inventory、Approval、Action 已有结构 Schema，其余契约仍待实现；结构验证不等同于可信授权或运行能力。
+当前已有结构 Schema：Scope（授权范围）、Feature Inventory（功能清单）、Approval（审批）、Action（动作）、Event（事件）、Checkpoint（检查点）、Session（会话）、Oracle（预期行为依据）、Evidence（证据）、Candidate Assessment（候选评估）、Candidate（候选记录）和 Finding（缺陷记录）。独立 Test Surface（测试表面）、Scope Proposal（范围提案）、Experiment（测试实验）、Evidence Manifest（证据清单）、Session Summary（会话总结）、Report（报告）、Regression Recommendation（回归建议）及 Release Manifest（发布清单）等完整契约仍待补齐或集成。Evidence Blob（证据原件）存储、可信来源与身份验证、授权和恢复验证也未实现。详细状态见 [中文 Schema 说明](../../schemas/README.zh-CN.md)；结构验证不等同于来源真实性、授权或运行能力。
 
 ## 13. 标准工程与强 TDD
-所有开发活动遵循**先 Red → Green → Refactor → Verify**，每次行为变更先写能失败的测试、记录失败日志，再最小实现、重构和全量验证。中文 PR 模板留存四阶段命令、Commit SHA、测试 Evidence 和人工审查。
+所有开发活动遵循**先 Red → Green → Refactor → Verify**，每次行为变更先写能失败的测试、记录失败日志，再最小实现、重构和全量验证。中文 PR（拉取请求）模板留存四阶段命令、Commit SHA、测试 Evidence 和人工审查。
 
 **质量覆盖率严格口径：**
 - 100% **所有生产单元代码**行覆盖率，不能只覆盖简单包就声称全项目达成；多语言分别审核。
@@ -206,22 +206,25 @@ W0 冻结/更名，W1 Contracts，W2 Skills，W3 Patterns，W4 Dynamic Router，
 | 内容 | 现状 |
 |---|---|
 | 品牌全迁移（本包） | 完成，文字扫描通过 |
-| 决策/实施规范 | 已有中英文文档和中文过程规范 |
-| `bugmaster_core.scope` | 严格 surface / R0 / R1 辅助门禁；12 个单测，R2 无可信网关时拒绝 |
-| `bugmaster_core.openapi_discovery` / `openapi_cli` | 本地 OpenAPI 3 JSON 声明操作静态发现与 JSON Pointer 来源；提供 CLI，不联网、不执行；核心模块单元范围覆盖率已验证 100% |
-| 核心 Skills/Patterns | 候选初始骨架；11 个 Skill 的 Pattern 闭包与 manifest 摘要可离线构建验证；未完成双宿主干净安装或真实 Eval |
-| 50 Benchmark | 规划清单，没有真实完整运行 |
-| 自主范围发现与 API/Browser 端到端 | 局部：本地 OpenAPI 3 JSON 静态发现和 CLI 已实现；URL/Browser 动态发现与端到端执行未实现/未验证 |
-| GitHub 仓库信息 | 上游和 fork 已存在，描述与 topics 已更新；代码/Issues 未推送 |
-| 所有生产代码 100% 单元覆盖 | **未证实**；当前 `bugmaster_core` 156/156 语句、68/68 分支覆盖，未覆盖所有生产脚本与端到端能力 |
-| 业务功能 >60% 与核心三类用例 | **未完成**，Release Gate 应失败 |
-| 最终发布 | **No-Go** |
+| 决策/实施规范 | Q1–Q17 已冻结；完整 v0.1 范围未缩减 |
+| Scope（授权范围）、Action（动作）、Approval（审批）契约 | 已有结构校验与跨记录绑定校验；结果不认证来源、不授权或派发 |
+| 派发、重放和 Confirmed Finding（已确认缺陷）门禁 | `can_dispatch()`、`can_replay()` 对所有风险/未知结果保持拒绝；可信证据验证器不可用，缺陷确认门禁保持阻断 |
+| OpenAPI 发现 | 从本地 OpenAPI 3 JSON 静态抽取声明操作及 JSON Pointer（JSON 指针）来源；不联网、不执行 API 请求 |
+| Session（会话）、Journal（动作日志）、Checkpoint（检查点） | 有本地持久化、修订与摘要链校验；不认证事件来源，不对账预算，也不授权安全恢复 |
+| Candidate（候选记录）/Finding（缺陷记录）元数据 | 支持私有本地目录和不可变修订；不保存证据原件字节、不认证来源/审核人、不确认 Finding、不生成报告 |
+| Skills/Patterns | 11 个 Skill（技能包）、16 个 Pattern（缺陷模式）文件齐全，仍是候选资产；真实宿主安装和评测未完成 |
+| 50 Benchmark（基准评测） | 50 个案例仍为 planned（计划中），没有真实执行记录 |
+| API（应用程序接口）/Browser（浏览器）自主探索 | 只有本地 OpenAPI 静态发现；URL（统一资源定位符）/浏览器动态发现、应用程序接口/浏览器执行闭环未实现或验证 |
+| GitHub 工程状态 | 上游与个人 fork 均已存在；PR #18 已合并，fork 的 `main` 与 `develop` 同步于 `9d83f5a` |
+| 单元代码覆盖 | 最新记录的 W1-02 验证覆盖 `bugmaster_core/` 与 `scripts/`：行覆盖为 3159/3159，分支覆盖为 1152/1152；这是该次代码验证记录，不代表业务功能门禁或发布门禁通过 |
+| 业务功能覆盖与核心三类用例 | 未达成：Feature Inventory（功能清单）未冻结、没有真实业务执行证据，核心用例矩阵为空 |
+| 最终发布 | No-Go（暂不发布）：完整功能、真实 Benchmark、双宿主和 Q16 发布授权均未完成 |
 
-## 18. 开发启动指南和文档导航
-1. 在组织中创建 `AI-Native-QA-Lab/bugmaster`（当前连接工具无创建仓库能力）。
-2. 解压本包的 `bugmaster/` 作为源文件提交到**新建的 feature 分支或新仓库**，配置保护后 PR，不把 CI 占位当成生产级门禁。
-3. 读取根目录 `AGENTS.md`、`PRODUCT.md`、中文强 TDD 手册；将 [中文全量任务](BUGMASTER_IMPLEMENTATION_PLAN_ZH.md) 拆分成 W0–W11 Issues，按阻断 Spike 优先。
-4. 首先以本地订单系统“只有 URL/OpenAPI”开展可证伪完整纵向实验：正常/缺陷实现+Oracle+执行证据+动态范围计划+最终报告+安全恢复，然后扩展完整 Scope。
-5. 每次实施前先 Red，不允许先写代码后补测试；最终在 CI 与实际宿主环境都执行覆盖门禁和 50 Benchmark。
+## 18. 开发现行工作流和文档导航
+1. 开始工作前读取根目录 `AGENTS.md`、本规范、[实施计划](BUGMASTER_IMPLEMENTATION_PLAN_ZH.md)、[进度矩阵](IMPLEMENTATION_PROGRESS_ZH.md)及相关 TDD 记录；冻结目标不得被单个切片缩减。
+2. 所有持续开发直接在 `develop` 上进行；不创建临时 `codex/*` 功能分支或功能 worktree（独立工作树）。一次只实施一个切片，并关联 W0–W11 工作流和 Feature/Obligation ID（功能/义务编号）。
+3. 代码行为变更遵守 RED → GREEN → REFACTOR → VERIFY；记录测试、覆盖率、质量门禁以及适用的 Q15 扫描证据。仅文档变更不声称运行了代码测试。
+4. 完成实现、验证、Q15 扫描和项目所有者确认后，只开一个从 `develop` 到 `main` 的 PR（拉取请求）；由项目所有者审阅并手动合并，不自动合并。
+5. PR 合并后先将 `develop` 快进同步到最新 `main`，再开始下一片。首个完整纵向路径仍按实施计划执行；任何内部切片都不能作为缩水 MVP（最小可交付产品）对外发布。
 
 英文默认规范见 `docs/en/`，中文对应见 `docs/zh-CN/`；开发过程中文权威全部位于 `docs/development/`。任何无证据的完成宣称不得写入 README。

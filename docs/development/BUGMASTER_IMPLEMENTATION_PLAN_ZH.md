@@ -1,4 +1,4 @@
-# BugMaster v0.1 完整 MVP 实施顺序（中文）
+# BugMaster v0.1 完整最小可行产品（Minimum Viable Product，MVP）实施顺序（中文）
 
 ## 开发分解（全部必须验收）
 | W | 模块 | 实际实施与强 TDD 路径 |
@@ -13,8 +13,15 @@
 | W7 | 发现与报告 | 确认可追溯 Bug、跨入口去重、Feature Coverage、Session Summary、中英文 Finding 报告与 Redaction |
 | W8 | 回归建议 | 基于 Confirmed Finding 给可执行测试建议但不修改测试代码 |
 | W9 | Benchmark | 50 场景 real-run correct/defect/ambiguous 变体，隔离 Ground Truth，G0–G3 对照；BLK-05 |
-| W10 | 双宿主 | 先比较 Codex Computer Use、ego-browser、agent-browser、Playwright CLI/MCP 等浏览器工具并记录 local-first / 证据 / 隔离 / 权限取舍，再做 Codex 和 Claude Code 实际安装、API/Browser 与权限/兼容矩阵；BLK-01/06；不新增 BugMaster Skill 或 Agent Runtime |
+| W10 | 双宿主 | 先比较 Codex Computer Use、ego-browser、agent-browser、Playwright CLI（命令行接口）/MCP（模型上下文协议）等浏览器工具，并记录本地优先（local-first）、证据留存、隔离与权限取舍；再做 Codex 和 Claude Code 实际安装，验证 API（应用程序接口）/Browser（浏览器）能力及权限/兼容矩阵；BLK-01/06；不新增 BugMaster Skill（技能包）或 Agent Runtime（智能体运行时） |
 | W11 | 发布治理 | Q15 Codex 代码/安全扫描记录、Tag/Attestation、Q16 双人发行批准、恢复演练；BLK-07 |
+
+## W5 授权来源边界与停止条件
+
+- **调研基线：** 2026-11-25 的 [Codex 宿主审批边界调研](2026-11-25_W5_CODEX_HOST_APPROVAL_BOUNDARY_RESEARCH_ZH.md)显示，普通 MCP（模型上下文协议）审批只门控宿主工具调用；BugMaster 无法从调用结果验证本次动作的真人授权。实验性 `userVerification`（设备用户验证）路由按当前官方源码仅接受特定宿主自有 Apps（宿主集成应用）服务；当前安装的 Codex Desktop 协议和界面尚未核实。
+- **当前门禁：** `scripts/validate_gates.py` 中的 `can_dispatch()` 对所有风险等级均拒绝。W5-01 授权来源 Spike（阻断验证项）保持未解决；没有批准放宽门禁或实现可放行的宿主适配。
+- **依赖停止条件：** 在项目所有者确认已验证的宿主集成来源，或另行审议并批准 BugMaster 自有签名服务设计前，暂停依赖 W5-01 授权来源的 W5-02 与 W6-01。来源、签名和审批生命周期设计都尚未获批。
+- **真人审查边界：** 按 Q15（逐 PR 代码扫描及适用的安全扫描）先由 Codex 完成代码与安全审查，再由项目所有者确认并手动合并。若具体改动确实要求独立真人审查，先单列审查对象、依据和影响，与项目所有者讨论；Codex 审查不代替真人签署。Q16（正式发布双人授权）仍要求两名不同人员。
 
 ## 阻断 Spikes
 BLK-01 独立安装；BLK-02 动作权限强制；BLK-03 Crash Consistency；BLK-04 证据真伪；BLK-05 Ground Truth 隔离；BLK-06 双宿主 Browser scope；BLK-07 全链路。每个 Spike 的 Red/GREEN/反例/环境证据需纳入 `docs/development/` 中文记录。
