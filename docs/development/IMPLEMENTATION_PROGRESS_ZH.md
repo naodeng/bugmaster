@@ -1,13 +1,13 @@
 # BugMaster 工程实施进度矩阵
 
 **更新日期：** 2026-11-25
-**当前状态：** PR（拉取请求）#15–#18 均已合并到个人 fork（分叉仓库）的 `main`；PR #18 合并提交为 `9d83f5a`。当前本地和远端 `main`、`develop` 均同步于该提交，没有开放 PR。PR #18 完成 W5 Codex Host（宿主）审批信任边界调研；没有接入浏览器运行时或完成 Codex 与 Claude Code 两种宿主的实测。调研认为普通第三方 MCP（模型上下文协议）插件不满足当前 `userVerification`（设备用户验证）路由的服务来源要求；Codex Desktop（桌面端）安装版本的协议与界面仍未实测。W5-01 保持 fail-closed（失败时保持阻断），`can_dispatch()` 对所有风险等级拒绝，尚无获批的替代授权来源或签名服务。PR #18 的 PR 描述记录了 Codex 文档范围代码审查与安全边界复核通过；GitHub 自动审查摘要仅记录代码审查。项目所有者手动合并；没有独立真人安全审查签署。W7 证据原件存储、可信来源适配器、浏览器运行时和真实基准评测仍未完成；完整产品仍为 Release No-Go（暂不发布）。
+**当前状态：** PR（拉取请求）#15–#19 均已合并到个人 fork（分叉仓库）的 `main`。PR #19 是文档同步，合并提交为 `132fbcf`；由于该 PR 未改运行时代码，当前代码基线仍为 PR #18 的 `9d83f5a`。PR #19 合并后核对时，本地和远端 `main`、`develop` 均同步于 `132fbcf`。PR #18 完成 W5 Codex Host（宿主）审批信任边界调研；没有接入浏览器运行时或完成 Codex 与 Claude Code 两种宿主的实测。调研认为普通第三方 MCP（模型上下文协议）插件不满足当前 `userVerification`（设备用户验证）路由的服务来源要求；Codex Desktop（桌面端）安装版本的协议与界面仍未实测。W5-01 保持 fail-closed（失败时保持阻断），`can_dispatch()` 对所有风险等级拒绝，尚无获批的替代授权来源或签名服务。PR #18 的 PR 描述记录了 Codex 文档范围代码审查与安全边界复核通过；GitHub 自动审查摘要仅记录代码审查。项目所有者手动合并；没有独立真人安全审查签署。W7 证据原件存储、可信来源适配器、浏览器运行时和真实基准评测仍未完成；完整产品仍为 Release No-Go（暂不发布）。
 
 ## 仓库审计摘要
 
-- 当前开发工作树：`/Users/inaodeng/.codex/worktrees/w5-scope-action-gateway/bugmaster`，活动分支 `develop`；PR #15–#18 均已合并到个人 fork。PR #18 合并提交为 `9d83f5a`；当前远端 `main`、`develop` 和本地 `develop` 均指向该提交，没有打开中的 PR。最近的代码验证证据仍是 W1-02 记录；PR #17、#18 是文档变更，不代表浏览器运行时或双宿主已验证。
+- 当前开发工作树：`/Users/inaodeng/.codex/worktrees/w5-scope-action-gateway/bugmaster`，活动分支 `develop`；PR #15–#19 均已合并。PR #19 合并提交为 `132fbcf`，合并后本地与远端 `main`、`develop` 均已同步；PR #19 仅改文档，当前运行时代码基线仍为 `9d83f5a`。最近的代码验证证据仍是 W1-02 记录；PR #17–#19 是文档变更，不代表浏览器运行时或双宿主已验证。
 - GitHub 上游：`AI-Native-QA-Lab/bugmaster`；个人项目 fork：`naodeng/bugmaster`。两者均为公开仓库，当前连接具有管理员权限。
-- 仓库简介与 13 个主题标签的同步、起始提交 `cef3cb5` 推送到个人 fork，均为早期历史记录；PR #13 合并提交 `5c640a21` 是治理基线；当前 `develop` 已包含 PR #15–#18。
+- 仓库简介与 13 个主题标签的同步、起始提交 `cef3cb5` 推送到个人 fork，均为早期历史记录；PR #13 合并提交 `5c640a21` 是治理基线；当前 `develop` 已包含 PR #15–#19。
 - 当前代码来源：用户提供的 `/Users/inaodeng/Downloads/bugmaster 2/`（128 个文件）。该 v1.1 基线采用 11 个 Discovery / Validation / Reporting（发现/验证/报告）Skill ID；旧 v1.0 的 `hunt-*` 目录不导入。
 - 现有实现仍是工程起点：`bugmaster_core` 已有严格表面/范围门禁与本地 OpenAPI（开放 API 描述格式）3 静态发现；没有 URL（统一资源定位符）/Browser（浏览器）动态发现或真实 API（应用程序接口）/浏览器执行闭环。
 - 16 个 Patterns 属于候选规则，50 个 Benchmark 属于计划清单；不能据此声称真实验证完成。
@@ -71,7 +71,7 @@
 ## 执行顺序
 
 1. 运行基线静态检查、单元/契约测试与当前质量门禁，记录真实输出。
-2. PR #15–#18 均已合并，远端 `main` 与 `develop` 同步于 `9d83f5a`。PR #18 记录了 W5 Codex Host（宿主）审批边界调研；W1-02 的 RED（先写失败测试）/GREEN（实现使测试通过）/REFACTOR（重构）/VERIFY（全面验证）证据见 [W1-02 契约绑定测试驱动开发（TDD）记录](2026-11-25_W1_APPROVAL_EXECUTION_BINDING_TDD_ZH.md)。本轮计划与实现对齐复核见[复核记录](2026-11-25_POST_PR18_PLAN_ALIGNMENT_REVIEW_ZH.md)。
+2. PR #15–#19 均已合并；PR #19 合并后远端 `main` 与 `develop` 同步于 `132fbcf`。PR #19 只改文档，运行时代码基线仍是 PR #18 的 `9d83f5a`。PR #18 记录了 W5 Codex Host（宿主）审批边界调研；W1-02 的 RED（先写失败测试）/GREEN（实现使测试通过）/REFACTOR（重构）/VERIFY（全面验证）证据见 [W1-02 契约绑定测试驱动开发（TDD）记录](2026-11-25_W1_APPROVAL_EXECUTION_BINDING_TDD_ZH.md)。本轮计划与实现对齐复核见[复核记录](2026-11-25_POST_PR18_PLAN_ALIGNMENT_REVIEW_ZH.md)。
 3. PR #17 完成浏览器探索工具比较、真人审核边界和隔离 Order Demo（订单演示项目）的验收方案；文档审查已完成，未接入浏览器运行时或完成双宿主验证。后续 W5 调研记录了当前 Codex 宿主用户验证路由的服务来源限制。W5-01 暂无可用的第三方插件授权通道，维持全风险拒绝；在项目所有者确认可信授权来源或批准另行设计前，不启动依赖 W5-01 的 W5-02/W6-01，也不开启动作派发。
 4. 变更若实质需要独立真人安全审查，先由 Codex 完成代码与安全审查，再把审查对象、依据、影响和待决定事项单独列出，与项目所有者讨论。不得把 Codex 审查写成真人独立签署；是否接受剩余风险由项目所有者确认，PR 仍由项目所有者手动合并。Q16 公开发行的双人授权维持独立规则。
 5. 每次只推进一个功能 PR；每轮更新本矩阵和独立中文开发记录。不得将内部纵向切片作为缩水 MVP 对外发布。
