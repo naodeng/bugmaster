@@ -1,7 +1,7 @@
 # BugMaster 工程实施进度矩阵
 
 **更新日期：** 2026-11-25
-**当前状态：** PR（拉取请求）#15–#20 均已合并；PR #20 是计划与进度文档同步，合并提交为 `42f9b5d`，运行时代码基线仍为 PR #18 的 `9d83f5a`。W1-03 实现与复核记录已推送到 `origin/develop`，实现提交为 `f2a3d3a`，复核记录提交为 `f90bd8d`；`main` 仍在 PR #20 基线。Q15 Codex 代码与聚焦安全扫描均通过；项目所有者已指示继续推进 W1-03 的 PR 流程。当前只处理这一片，PR 合并前不启动下一片。W5-01 仍保持 fail-closed（失败时保持阻断），`can_dispatch()` 对所有风险等级拒绝；W7 证据原件存储、可信来源适配器、浏览器运行时和真实基准评测仍未完成；完整产品仍为 Release No-Go（暂不发布）。
+**当前状态：** PR（拉取请求）#15–#20 均已合并；PR #21 是 W1-03 实现。PR #21 的两条 P2 代码审查意见已在本地 `develop` 的 `a80e57b` 修复；674 项单测、134 项契约测试、安全测试及 100% 行/分支覆盖率通过，Standards、Spec 与聚焦安全复核未发现问题。修复提交的 Q15 Codex 代码/安全扫描尚未完成；推送更新现有 PR 后复扫。当前只处理这一片，PR 合并前不启动下一片。W5-01 仍保持 fail-closed（失败时保持阻断），`can_dispatch()` 对所有风险等级拒绝；W7 证据原件存储、可信来源适配器、浏览器运行时和真实基准评测仍未完成；完整产品仍为 Release No-Go（暂不发布）。
 
 ## 仓库审计摘要
 
@@ -19,7 +19,7 @@
 | 工作流 | 目标 | 状态 | 验收证据 / 下一步 |
 |---|---|---|---|
 | W0 | 开发基线与品牌/Skill 名称统一 | 本地检查通过 | `check_branding.py`、`validate_catalog.py`、Skill 命名契约通过；基线提交 `cef3cb5` 已推送到 fork |
-| W1 | Scope（授权范围）、Surface（测试表面）、Feature（功能）、Oracle（预期行为判定依据）、Finding（缺陷记录）、Evidence（证据）、Journal（动作日志）数据契约 | 部分实现；W1-02 已合并；W1-03 实现、代码/安全扫描通过，所有者已指示继续推进 PR | 已有 Scope、Feature Inventory（功能清单）、Approval（审批）、Action（动作）、Event（事件）、Checkpoint（检查点）、Session（会话）、Oracle（预期行为判定依据）/Evidence（证据）和 Candidate Assessment（候选评估）契约；`validate_contract_bindings()` 完成记录结构与跨记录字段绑定。W1-03 新增全仓封闭本地 Schema 注册表和版本入口校验，详见 [TDD 记录](2026-11-25_W1_SCHEMA_REFERENCE_REGISTRY_TDD_ZH.md)。这些实现不认证来源/审核人、不授权或派发。Evidence 原件持久化、可信来源校验及 Confirmed Gate（缺陷确认门禁）仍未实现 |
+| W1 | Scope（授权范围）、Surface（测试表面）、Feature（功能）、Oracle（预期行为判定依据）、Finding（缺陷记录）、Evidence（证据）、Journal（动作日志）数据契约 | 部分实现；W1-02 已合并；W1-03 的两条 P2 复核意见已修复，本次 Q15 复扫待完成 | 已有 Scope、Feature Inventory（功能清单）、Approval（审批）、Action（动作）、Event（事件）、Checkpoint（检查点）、Session（会话）、Oracle（预期行为判定依据）/Evidence（证据）和 Candidate Assessment（候选评估）契约；`validate_contract_bindings()` 完成记录结构与跨记录字段绑定。W1-03 新增全仓封闭本地 Schema 注册表和版本入口校验，并递归检查被引用目标的引用闭包，详见 [TDD 记录](2026-11-25_W1_SCHEMA_REFERENCE_REGISTRY_TDD_ZH.md)。这些实现不认证来源/审核人、不授权或派发。Evidence 原件持久化、可信来源校验及 Confirmed Gate（缺陷确认门禁）仍未实现 |
 | W2 | 11 个独立 Skill（技能包） | 本地闭包验证通过 | 11 个包均含规范 Skill/Pattern（缺陷模式）闭包且 Manifest（清单）摘要一致；Codex/Claude 干净安装和真实 Eval（评测）未验证 |
 | W3 | 16 个 Bug Pattern（缺陷模式） | 候选规则 | 需适用/排除条件、Oracle（预期行为判定依据）、反例和真实对照评测 |
 | W4 | 风险路由与有界自主探索 | 部分实现 | `scripts/discover_openapi.py` 可从本地 OpenAPI（开放 API 描述格式）3 JSON 输出稳定 ID 和 JSON Pointer（JSON 指针）来源清单；URL（统一资源定位符）/Browser（浏览器）发现、风险路由与动态执行仍待实现 |
@@ -57,11 +57,11 @@
 | W1-02 最新修复后验证 | PASS（通过） | 单元 639/639、契约 134/134、安全 1/1；行/分支覆盖 3159/3159 与 1152/1152（均 100%）；品牌、目录和 Benchmark（基准评测）结构扫描通过；Release（正式发布）门禁按预期 NO-GO，详见 [W1-02 契约绑定 TDD 记录](2026-11-25_W1_APPROVAL_EXECUTION_BINDING_TDD_ZH.md) |
 | 当前 W1-02 代码/安全复核 | PASS（通过） | Codex 代码复核未发现可执行缺陷；最终安全复核未发现代码问题，文档计数歧义已修复。Approval 不绑定 surface（测试表面）的目标粒度作为未来可信网关设计事项记录。Codex 安全复核不是独立真人审查。详见 [W1-02 契约绑定 TDD 记录](2026-11-25_W1_APPROVAL_EXECUTION_BINDING_TDD_ZH.md) |
 | W1-02 发布质量门禁 | NO-GO（预期） | 真实功能清单尚未冻结，功能执行证据未超过 60%，核心功能缺少实际 Happy（成功）/Negative（失败）/Edge（边界）场景；不影响本切片定向实现测试通过，产品仍不可发布 |
-| W1-03 Schema 引用完整性定向单测 | PASS（通过） | `test_schema_registry.py`：30/30；覆盖 URI 等价 ID、引用别名、非 Schema 目标、嵌套 `$id` 与外部引用拒绝 |
-| W1-03 全量单测/契约/安全套件 | PASS（通过） | 单测 669/669、契约 134/134、安全测试 1/1；Python 3.12.16，固定依赖位于 `/private/tmp/bugmaster-provenance-test-deps` |
-| W1-03 行/分支覆盖率 | PASS（通过，100% / 100%） | `bugmaster_core` 与 `scripts`：3294/3294 行、1200/1200 分支；覆盖 JSON `/private/tmp/bugmaster-w1-03-final-coverage.json` |
+| W1-03 Schema 引用完整性定向单测 | PASS（通过） | `test_schema_registry.py`：35/35；包含别名目标的相对引用、目标内外部引用拒绝及递归闭包终止 |
+| W1-03 全量单测/契约/安全套件（复核修复） | PASS（通过） | 单测 674/674、契约 134/134、安全测试 1/1；Python 3.12.16，固定依赖位于 `/private/tmp/bugmaster-provenance-test-deps` |
+| W1-03 行/分支覆盖率（复核修复） | PASS（通过，100% / 100%） | `bugmaster_core` 与 `scripts`：3311/3311 语句、1204/1204 分支；覆盖 JSON `/private/tmp/bugmaster-pr21-review-fix-coverage.json` |
 | W1-03 品牌/目录/基准结构检查 | PASS（通过） | `check_branding.py`、`validate_catalog.py`、`validate_benchmark.py` 结构检查通过；Benchmark（基准评测）场景未执行 |
-| W1-03 Q15 Codex 代码/聚焦安全扫描 | PASS（通过） | 代码扫描 `codex review --uncommitted` 未发现可执行缺陷；聚焦安全扫描针对提交 `f2a3d3a333b6b88e01c564a10cb42954ef845fc1`，未发现可执行安全问题。安全扫描仅为只读源码复核，不检查部署/打包、不等同完整渗透测试或独立真人审查；输出文件位于 `/private/tmp/bugmaster-w1-03-code-review-final3.txt` 与 `/private/tmp/bugmaster-w1-03-security-review-final.txt` |
+| W1-03 Q15 Codex 代码/聚焦安全扫描 | 原始实现 PASS；复核修复待扫 | 原始实现提交 `f2a3d3a` 的代码/安全扫描未发现问题；针对 `a80e57b` 的 Standards、Spec 和聚焦安全代码复核无发现，但正式 PR-head Codex 代码/安全扫描仍待完成。扫描不检查部署/打包，不等同完整渗透测试或独立真人审查 |
 | W1-03 Release Gate（发布门禁） | NO-GO（预期） | 功能清单未冻结、业务功能覆盖未超过 60%，且核心功能的 Happy/Negative/Edge 实际执行证据缺失；与本切片单测通过相互独立，完整产品仍不可发布 |
 | 历史单元测试与覆盖率 | 仅作历史参考 | 早期 PR #10 / Candidate Assessment 整合结果为 474/474、96/96 和 100% 行/分支覆盖；基线与范围均不同于当前 W7 工作树，不作为本轮门禁 |
 | 业务功能覆盖率 >60% | 未达成 | 目前没有真实业务执行证据 |
@@ -77,7 +77,7 @@
 ## 执行顺序
 
 1. 运行基线静态检查、单元/契约测试与当前质量门禁，记录真实输出。
-2. PR #15–#20 均已合并；PR #20 合并时远端 `main` 与 `develop` 同步于 `42f9b5d`，该 PR 只改计划/进度文档，运行时代码基线仍为 `9d83f5a`。W1-02 的证据见 [契约绑定 TDD 记录](2026-11-25_W1_APPROVAL_EXECUTION_BINDING_TDD_ZH.md)；本轮 W1-03 提交 `f2a3d3a` 的 RED/GREEN/REFACTOR/VERIFY 与代码/安全扫描证据见 [Schema 注册表 TDD 记录](2026-11-25_W1_SCHEMA_REFERENCE_REGISTRY_TDD_ZH.md)。项目所有者已指示继续推进 W1-03 PR；本片合并前不启动下一片。
+2. PR #15–#20 均已合并；PR #20 合并时远端 `main` 与 `develop` 同步于 `42f9b5d`，该 PR 只改计划/进度文档，运行时代码基线仍为 `9d83f5a`。W1-02 的证据见 [契约绑定 TDD 记录](2026-11-25_W1_APPROVAL_EXECUTION_BINDING_TDD_ZH.md)；W1-03 的原始实现与 PR #21 两条 P2 复核意见修复证据见 [Schema 注册表 TDD 记录](2026-11-25_W1_SCHEMA_REFERENCE_REGISTRY_TDD_ZH.md)。复核修复全量验证通过，Q15 最终复扫完成后更新现有 PR #21；合并前不启动下一片。
 3. PR #17 完成浏览器探索工具比较、真人审核边界和隔离 Order Demo（订单演示项目）的验收方案；文档审查已完成，未接入浏览器运行时或完成双宿主验证。后续 W5 调研记录了当前 Codex 宿主用户验证路由的服务来源限制。W5-01 暂无可用的第三方插件授权通道，维持全风险拒绝；在项目所有者确认可信授权来源或批准另行设计前，不启动依赖 W5-01 的 W5-02/W6-01，也不开启动作派发。
 4. 变更若实质需要独立真人安全审查，先由 Codex 完成代码与安全审查，再把审查对象、依据、影响和待决定事项单独列出，与项目所有者讨论。不得把 Codex 审查写成真人独立签署；是否接受剩余风险由项目所有者确认，PR 仍由项目所有者手动合并。Q16 公开发行的双人授权维持独立规则。
 5. 每次只推进一个功能 PR；每轮更新本矩阵和独立中文开发记录。不得将内部纵向切片作为缩水 MVP 对外发布。

@@ -6,7 +6,8 @@
 - **开发分支：** `develop`
 - **基线：** PR #20 合并提交 `42f9b5db5a2085fb6ce4e8c1f2db4582389179ef`
 - **实现提交：** `f2a3d3a333b6b88e01c564a10cb42954ef845fc1`
-- **状态：** 实现、全量验证、Codex 代码扫描与聚焦安全扫描均通过；提交已推送到 `origin/develop`；项目所有者已于 2026-11-25 指示继续推进 PR（拉取请求）。后续按 `develop` → `main` 单 PR 流程审阅和手动合并，合并前不启动下一片。
+- **PR #21 复核修复提交：** `a80e57b29d32e17c3a24764faac7ef7c91773c6b`
+- **状态：** PR #21 的两条 P2 代码审查意见已在本地 `develop` 修复并通过全量验证；原实现提交 `f2a3d3a` 的代码与聚焦安全扫描通过，但针对修复提交的 Q15（逐 PR 代码扫描及适用的安全扫描）复扫待完成。合并前不启动下一片。
 
 ## 范围
 
@@ -53,3 +54,38 @@ PYTHONPATH=/private/tmp/bugmaster-provenance-test-deps codex exec --sandbox read
 ```
 
 完整产品仍为 Release No-Go（暂不发布）。本切片未改变 W5 的 fail-closed（失败时保持阻断）授权边界，也未解除 Q16 公开发布的双人授权要求。
+
+## PR #21：Codex 代码审查意见修复
+
+PR #21 的 Codex Review（代码审查）在提交 `7176b34` 上指出两处 P2 问题：
+
+1. URI（统一资源标识符）等价别名解析到本地资源后，目标资源内的相对 `$ref`（Schema 规则引用）仍沿用别名基准 URI，导致本地注册的子资源无法解析。
+2. `$ref` 指向 `default`（默认值）等普通数据对象时，目标对象会作为 Schema（数据结构规则）执行；旧逻辑校验其结构后没有继续检查其中的传递引用，未注册的外部引用会延迟到实例验证时才失败。
+
+### RED：复现审查发现
+
+- 新增三份本地 Schema（数据结构规则）的回归用例：A 通过大写主机名与默认端口别名引用 B，B 再以 `c.json` 相对引用 C；旧实现加载成功，但验证合法嵌套记录时抛出 `Unresolvable: c.json`。
+- 新增目标指向 `properties.payload.default` 的用例，其中目标对象含未注册外部 `$ref`；旧实现未在加载期抛出 `SchemaRegistryError`。
+- 增加递归 `$ref`（规则引用）场景，要求引用闭包遍历在环路中终止。
+
+### GREEN：修复
+
+- 改用待处理资源队列递归检查每个已解析目标及其 Schema 子规则；仍通过 `Resource.subresources()` 区分 Schema 与普通数据，只有被实际引用的 `default` 对象才作为 Schema 检查。
+- 解析到 URI 等价的已注册别名后，保留运行时有效基准 URI，并沿相对引用补齐本地别名解析。候选目标仍必须命中已加载本地资源，不增加网络取回。
+- 使用 `(contents 对象身份, 有效基准 URI)` 作为访问键，终止递归闭包遍历，同时保留同一资源在不同别名基准下的解析。
+- 对片段引用保留当前基准 URI，支持不透明 `urn:` 根 URI 下的本地引用。
+
+### VERIFY：复核修复验证
+
+环境：macOS；Python 3.12.16；依赖位于 `/private/tmp/bugmaster-provenance-test-deps`。验证对应修复提交 `a80e57b29d32e17c3a24764faac7ef7c91773c6b`。
+
+| 检查 | 命令 / 范围 | 结果 |
+|---|---|---|
+| Schema 注册表定向单测 | `PYTHONPATH=/private/tmp/bugmaster-provenance-test-deps PYTHONDONTWRITEBYTECODE=1 python3.12 -m unittest discover -s tests/unit -p test_schema_registry.py -q` | 35/35 通过 |
+| 全量单测 | `COVERAGE_FILE=/private/tmp/bugmaster-pr21-review-fix.coverage PYTHONPATH=/private/tmp/bugmaster-provenance-test-deps PYTHONDONTWRITEBYTECODE=1 python3.12 -m coverage run --branch --source=bugmaster_core,scripts -m unittest discover -s tests/unit -q` | 674/674 通过 |
+| 契约 / 安全测试 | `python3.12 -m unittest discover -s tests/contracts -q`；`python3.12 -m unittest discover -s tests/security -q` | 134/134、1/1 通过 |
+| 行 / 分支覆盖率 | `python3.12 -m coverage report -m --fail-under=100` | 3311/3311 语句、1204/1204 分支，均 100%；JSON：`/private/tmp/bugmaster-pr21-review-fix-coverage.json` |
+| 品牌、目录、基准清单及 Diff | `check_branding.py`、`validate_catalog.py`、`validate_benchmark.py`、`git diff --check` | 通过；基准场景未执行 |
+| Release Gate（发布门禁） | `python3.12 scripts/quality_gate.py --mode release --coverage /private/tmp/bugmaster-pr21-review-fix-coverage.json` | 按预期 NO-GO：功能清单未冻结、业务执行覆盖未超过 60%、核心 Happy/Negative/Edge 场景缺少实际证据 |
+| 代码方案审查 | Standards（规范）与 Spec（方案） | 均无发现；聚焦安全复核也未发现可确认问题。安全复核为只读代码审查，不等于独立真人审查或渗透测试 |
+| Q15 Codex 代码/安全扫描 | 待完成 | 修复提交尚未推送到 PR #21；推送后触发针对最新 PR 头的代码与安全扫描，收到结果前不标记通过 |
