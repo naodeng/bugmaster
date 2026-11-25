@@ -102,27 +102,9 @@ def _create_temporary_file(directory_fd, prefix):
 
 def _schema_validator(schema_name):
     try:
-        from jsonschema import Draft202012Validator, FormatChecker
-        from referencing import Registry, Resource
+        from .schema_registry import get_schema_validator
 
-        schemas_directory = Path(__file__).resolve().parents[1] / "schemas"
-        schema = json.loads(
-            (schemas_directory / schema_name).read_text(encoding="utf-8")
-        )
-        registry = Registry()
-        if schema_name == "candidate.schema.json":
-            assessment = json.loads(
-                (schemas_directory / "candidate-assessment.schema.json").read_text(
-                    encoding="utf-8"
-                )
-            )
-            registry = registry.with_resource(
-                assessment["$id"], Resource.from_contents(assessment)
-            )
-        Draft202012Validator.check_schema(schema)
-        return Draft202012Validator(
-            schema, registry=registry, format_checker=FormatChecker()
-        ).validate
+        return get_schema_validator(schema_name).validate
     except (ImportError, OSError, ValueError, KeyError) as error:
         raise MetadataStoreError(
             "cannot load the {} contract validator".format(schema_name)

@@ -12,6 +12,8 @@ W7（第七条工作流）现在具备 Candidate（候选记录）和 Finding（
 
 W1-02（第一条工作流第 2 项）新增 `bugmaster_core.contract_binding.validate_contract_bindings()`，先校验 Scope（授权范围）、Action（动作）和 Approval（审批）Schema（数据结构规则），再检查记录间引用与字段绑定。结果只说明记录是否一致；不认证审批来源、不授予动作权限，也不开放派发。
 
+W1-03（第一条工作流第 3 项）新增共享本地 Schema（数据结构规则）加载器 `bugmaster_core.schema_registry`，供契约绑定校验和 Candidate/Finding（候选记录/缺陷记录）存储使用。它要求每份 Schema 声明固定的主版本号与次版本号、检查 Schema ID（规则标识）不重复，并在封闭的本地注册表中解析全部 `$ref`（引用）；引用目标必须是有效的对象 Schema 或布尔 Schema，不会从网络下载 Schema。
+
 ## 目标安装方式（尚未验证）
 ```bash
 # 仓库已存在；正式发布和宿主验证通过前不宣称此安装路径可用。

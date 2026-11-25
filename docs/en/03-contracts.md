@@ -23,6 +23,12 @@
 | Regression Recommendation | immutable revisions | REG ID + revision | no test code writes |
 | Eval Run | immutable run manifest | Run ID + dataset digest | private ground truth isolated |
 
+## Schema registry and compatibility
+
+The repository schema bundle uses JSON Schema Draft 2020-12. Every schema has a unique absolute, fragment-free `$id` and requires a pinned `schemaVersion` in `major.minor` form. ID and reference matching normalize scheme/host case and remove the standard HTTP/HTTPS default port. For a non-literal reference spelling, the loader adds an exact registry alias only when it maps to a known local schema resource. `bugmaster_core.schema_registry` loads schemas into a closed local registry, validates each schema, and resolves every `$ref` and `$dynamicRef` from the effective base URI, including nested `$id` values, before returning a validator. Each reference target must itself be a valid object or boolean schema. It traverses schema-bearing keywords, not object-shaped data under keywords such as `default`. Missing local references, non-schema targets, and unregistered external references fail closed; the loader does not retrieve schemas over the network.
+
+A schema accepts only its declared `schemaVersion`. There is no implicit migration or backward-compatibility claim: supporting another version requires an explicit schema and migration decision. This registry check validates schema definitions and their `$ref` graph; it does not prove that runtime records named by domain references exist or are authentic. Existing stores and contract validators keep their separate record-level binding checks.
+
 ## Normative canonical state enums
 
 - Finding status: `hypothesis`, `observed`, `suspected`, `needs_review`, `confirmed`, `rejected`, `duplicate`, `resolved`, `reopened`.

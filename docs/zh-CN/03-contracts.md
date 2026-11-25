@@ -23,6 +23,12 @@
 | Regression Recommendation | 不可变版本 | 只提供建议，不写测试代码 |
 | Eval Run | 不可变运行记录 | 隔离 Ground Truth |
 
+## Schema 注册表与兼容性
+
+仓库内的 Schema（数据结构规则）统一使用 Draft 2020-12（JSON Schema 数据结构标准版本）。每份规则都有唯一、绝对且不带片段的 `$id`（规则标识），并要求 `schemaVersion`（契约版本）固定为 `主版本号.次版本号` 格式；比较 ID 是否重复及匹配引用时，会统一 URI（统一资源标识符）的协议与主机名大小写，并移除 HTTP/HTTPS 默认端口。引用的字面拼写不同时，只有确认它指向本地已注册 Schema（数据结构规则）时才添加精确别名。`bugmaster_core.schema_registry` 会将所有规则装入封闭的本地 Registry（注册表），逐份校验规则，并依据有效基准 URI 解析全部 `$ref` 和 `$dynamicRef`（规则引用），包括嵌套 `$id`；每个引用目标还必须本身是有效的对象 Schema 或布尔 Schema。它只检查 Schema 子规则位置，不会把 `default`（默认值）等普通数据中的对象误当成子规则。本地引用缺失、目标不是有效 Schema，或引用到未注册的外部规则时，加载失败关闭，不会联网下载 Schema。
+
+记录只接受对应 Schema 声明的 `schemaVersion`。本项目不做隐式版本迁移，也不宣称自动向后兼容；要支持其他版本，必须显式增加规则并单独决定迁移方式。注册表检查的是 Schema 定义及其 `$ref` 引用图，不证明业务记录中命名的其他对象真实存在或可信。现有存储和契约校验器继续分别检查业务记录之间的绑定关系。
+
 ## 统一状态枚举
 
 - Finding：`hypothesis`, `observed`, `suspected`, `needs_review`, `confirmed`, `rejected`, `duplicate`, `resolved`, `reopened`。
