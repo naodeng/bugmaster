@@ -1,13 +1,13 @@
 # BugMaster 工程实施进度矩阵
 
 **更新日期：** 2026-11-25
-**当前状态：** PR #15 已合并到 `main`（合并提交 `d578c61`）；W1-02 已通过 [PR #16](https://github.com/naodeng/bugmaster/pull/16) 合并，合并提交 `718bc67`。本轮浏览器探索工具与真人审核边界文档切片基于该合并基线，在 `develop` 分支完成并接受 Codex 代码/安全审查；不接入浏览器运行时，也不声称完成双宿主实测。W1-02 的代码审查和安全审查由 Codex 完成，项目所有者已确认并合并；没有独立真人安全审查签署。该切片只验证记录一致性，不认证来源或审核人，不授权、不派发，也不修改 `can_dispatch()` 的全风险拒绝行为。W7 原始 Evidence Blob（证据原件字节）存储、可信来源适配器、浏览器运行时和真实基准评测仍未完成；完整产品仍为 Release No-Go（暂不发布）。
+**当前状态：** PR #15、PR #16 和 PR #17 均已合并到 `main`，最新合并提交为 `78d7746`；远端 `main` 与 `develop` 当前同步。本轮 PR #17 完成浏览器探索工具与真人审核边界调研文档，未接入浏览器运行时，也未声称完成双宿主实测。后续 W5 调研发现，当前 Codex `main` 源码中的 `userVerification`（设备用户验证）路由只接受特定的宿主自有 Apps（宿主集成应用）MCP 服务，普通第三方本机插件不满足服务来源检查；当前安装的 Desktop（桌面端）协议与界面尚未实测。W5-01 继续 fail-closed（失败时保持阻断），`can_dispatch()` 对所有风险等级拒绝；没有批准替代授权来源或签名架构。W1-02 与 PR #17 的代码/安全审查均由 Codex 完成，项目所有者已确认并手动合并；没有独立真人安全审查签署。W7 原始 Evidence Blob（证据原件字节）存储、可信来源适配器、浏览器运行时和真实基准评测仍未完成；完整产品仍为 Release No-Go（暂不发布）。
 
 ## 仓库审计摘要
 
-- 当前开发工作树：`/Users/inaodeng/.codex/worktrees/w5-scope-action-gateway/bugmaster`，活动分支 `develop`；PR #15 已合并到 `origin/main` 的 `d578c61`，PR #16 已合并到 `main`，合并提交为 `718bc67`。本轮文档切片在该合并基线上完成；分支推送和 PR 状态以 GitHub 实时状态为准。W1-02 的最新修复、全量测试、覆盖率与质量扫描、代码审查和 Codex 安全审查均有记录；该审查不等于独立真人安全签署。
+- 当前开发工作树：`/Users/inaodeng/.codex/worktrees/w5-scope-action-gateway/bugmaster`，活动分支 `develop`；PR #15（`d578c61`）、PR #16（`718bc67`）和 PR #17（`78d7746`）均已合并。已从 GitHub 核对远端 `main`、`develop` 均指向 `78d7746`，没有打开中的 PR；本地 `develop` 与远端一致。W1-02 的最新修复、全量测试、覆盖率与质量扫描、代码审查和 Codex 安全审查均有记录；该审查不等于独立真人安全签署。
 - GitHub 上游：`AI-Native-QA-Lab/bugmaster`；个人项目 fork：`naodeng/bugmaster`。两者均为公开仓库，当前连接具有管理员权限。
-- 仓库简介与 13 个主题标签的同步、起始提交 `cef3cb5` 推送到个人 fork（分叉仓库），均为早期历史记录；PR #13 合并提交 `5c640a21` 是治理基线；当前 `develop` 已包含 PR #15 和 PR #16。
+- 仓库简介与 13 个主题标签的同步、起始提交 `cef3cb5` 推送到个人 fork（分叉仓库），均为早期历史记录；PR #13 合并提交 `5c640a21` 是治理基线；当前 `develop` 已包含 PR #15、PR #16 和 PR #17。
 - 当前代码来源：用户提供的 `/Users/inaodeng/Downloads/bugmaster 2/`（128 个文件）。该 v1.1 基线采用 11 个 Discovery / Validation / Reporting（发现/验证/报告）Skill ID；旧 v1.0 的 `hunt-*` 目录不导入。
 - 现有实现仍是工程起点：`bugmaster_core` 已有严格表面/范围门禁与本地 OpenAPI（开放 API 描述格式）3 静态发现；没有 URL（统一资源定位符）/Browser（浏览器）动态发现或真实 API（应用程序接口）/浏览器执行闭环。
 - 16 个 Patterns 属于候选规则，50 个 Benchmark 属于计划清单；不能据此声称真实验证完成。
@@ -23,7 +23,7 @@
 | W2 | 11 个独立 Skill（技能包） | 本地闭包验证通过 | 11 个包均含规范 Skill/Pattern（缺陷模式）闭包且 Manifest（清单）摘要一致；Codex/Claude 干净安装和真实 Eval（评测）未验证 |
 | W3 | 16 个 Bug Pattern（缺陷模式） | 候选规则 | 需适用/排除条件、Oracle（预期行为判定依据）、反例和真实对照评测 |
 | W4 | 风险路由与有界自主探索 | 部分实现 | `scripts/discover_openapi.py` 可从本地 OpenAPI（开放 API 描述格式）3 JSON 输出稳定 ID 和 JSON Pointer（JSON 指针）来源清单；URL（统一资源定位符）/Browser（浏览器）发现、风险路由与动态执行仍待实现 |
-| W5 | R0–R3 风险级别动作授权 | fail-closed（失败时保持阻断） | `scripts/validate_gates.py` 的 `can_dispatch()` 对所有风险等级恒拒绝。W1-02 的绑定一致结果不构成授权；真实范围解析、可信审批网关、审批时效与身份认证、宿主执行控制仍待实现 |
+| W5 | R0–R3 风险级别动作授权 | fail-closed（失败时保持阻断）；W5-01 授权来源待定 | `scripts/validate_gates.py` 的 `can_dispatch()` 对所有风险等级恒拒绝。Codex Host（宿主）调研见[真人审批边界记录](2026-11-25_W5_CODEX_HOST_APPROVAL_BOUNDARY_RESEARCH_ZH.md)：普通第三方 MCP 插件不能使用当前 `userVerification` 路由；Desktop 实际版本未核实。W1-02 的绑定一致结果不构成授权。未确定可信审批来源前不实现放行适配，也不启动依赖 W5-01 的 W5-02/W6-01 |
 | W6 | Action Journal（动作日志）、Session（会话）/Checkpoint（检查点）持久化与安全恢复 | 部分实现 | 早期 PR #9 与 PR #11 已合入个人仓库 `main`；PR #11 增加待对账 Action（动作）枚举与进程崩溃验证。V-2 至 V-6 仍待核验。可信授权、事件来源真实性、预算对账和安全恢复授权未实现。 |
 | W7 | Finding（缺陷记录）、跨入口去重与报告 | 部分实现：候选评估 + Oracle/Evidence 绑定 + Candidate/Finding 元数据存储 | Candidate Assessment（候选评估）辅助函数仍只生成 `candidate`、`needs_review` 或暂定 `duplicate`。PR #14 已加入 Oracle（预期行为判定依据）来源字节、Evidence（证据）制品摘要、精确 Oracle 版本与 Action Journal（动作日志）结果引用绑定；本切片实现提交 [`1a86eea`](https://github.com/naodeng/bugmaster/commit/1a86eeabffad401df3f5e1f484c856e548a10360) 新增 Candidate（候选记录）/Finding（缺陷记录）私有本地元数据持久化、不可变修订和摘要链。以上仍不认证来源/审核人、不保存证据原件字节、不验证外部引用、不抑制规范重复项，也不解锁 `Confirmed Gate`（缺陷确认门禁）；报告、真实可信来源适配器和审核身份认证仍待实现 |
 | W8 | 回归建议 | 待实现 | 只输出建议，不自动修改/提交测试代码 |
@@ -71,8 +71,8 @@
 ## 执行顺序
 
 1. 运行基线静态检查、单元/契约测试与当前质量门禁，记录真实输出。
-2. PR #15、PR #16 均已合并；本轮 `develop` 文档切片基于 PR #16 合并提交 `718bc67`。W1-02 的 RED（先写失败测试）/GREEN（实现使测试通过）/REFACTOR（重构）/VERIFY（全面验证）证据见 [W1-02 契约绑定 TDD 记录](2026-11-25_W1_APPROVAL_EXECUTION_BINDING_TDD_ZH.md)。
-3. 当前文档切片已完善浏览器探索工具比较、真人审核边界和隔离 Order Demo（订单演示项目）的验收方案；Codex 代码/安全审查和文档检查已在 `develop` 完成。按照项目所有者已授权的单 PR 流程，下一步单独开一个 `develop` → `main` PR，供项目所有者查看审查结果并手动合并。合并后再评估 W5-02/W7-02/W9-02 依赖是否允许实测；不把文档调研算作运行时实现或双宿主验证。
+2. PR #15、PR #16 和 PR #17 均已合并，远端 `main` 与 `develop` 同步于 `78d7746`。W1-02 的 RED（先写失败测试）/GREEN（实现使测试通过）/REFACTOR（重构）/VERIFY（全面验证）证据见 [W1-02 契约绑定 TDD 记录](2026-11-25_W1_APPROVAL_EXECUTION_BINDING_TDD_ZH.md)。
+3. PR #17 完成浏览器探索工具比较、真人审核边界和隔离 Order Demo（订单演示项目）的验收方案；文档审查已完成，未接入浏览器运行时或完成双宿主验证。后续 W5 调研记录了当前 Codex 宿主用户验证路由的服务来源限制。W5-01 暂无可用的第三方插件授权通道，维持全风险拒绝；在项目所有者确认可信授权来源或批准另行设计前，不启动依赖 W5-01 的 W5-02/W6-01，也不开启动作派发。
 4. 变更若实质需要独立真人安全审查，先由 Codex 完成代码与安全审查，再把审查对象、依据、影响和待决定事项单独列出，与项目所有者讨论。不得把 Codex 审查写成真人独立签署；是否接受剩余风险由项目所有者确认，PR 仍由项目所有者手动合并。Q16 公开发行的双人授权维持独立规则。
 5. 每次只推进一个功能 PR；每轮更新本矩阵和独立中文开发记录。不得将内部纵向切片作为缩水 MVP 对外发布。
 
