@@ -5,7 +5,8 @@
 - **风险级别：** R2
 - **开发分支：** `develop`
 - **基线：** PR #20 合并提交 `42f9b5db5a2085fb6ce4e8c1f2db4582389179ef`
-- **状态：** 实现、全量验证和 Codex 代码扫描通过；聚焦安全扫描待提交后执行；未开 PR。
+- **实现提交：** `f2a3d3a333b6b88e01c564a10cb42954ef845fc1`
+- **状态：** 实现、全量验证、Codex 代码扫描与聚焦安全扫描均通过；等待项目所有者确认；未开 PR。
 
 ## 范围
 
@@ -43,6 +44,12 @@
 | Diff 空白检查 | `git diff --check` | PASS |
 | Release Gate（发布门禁） | `python3.12 scripts/quality_gate.py --mode release --coverage /private/tmp/bugmaster-w1-03-final-coverage.json` | 按预期 NO-GO：功能清单未冻结、真实功能覆盖未超过 60%、核心功能缺少 Happy/Negative/Edge 实际执行证据；不是本切片测试失败 |
 | Q15 Codex 代码扫描 | `PYTHONPATH=/private/tmp/bugmaster-provenance-test-deps codex review --uncommitted` | PASS；最终扫描未发现可执行缺陷；扫描输出 `/private/tmp/bugmaster-w1-03-code-review-final3.txt`，扫描包含 669 个单测通过证据 |
-| Q15 Codex 聚焦安全扫描 | 提交实现后，以 `42f9b5d` 为基线运行 Codex 安全复核 | 待运行；完成后补记审查提交 SHA 与结果 |
+| Q15 Codex 聚焦安全扫描 | 完整命令见下方 | PASS；针对提交 `f2a3d3a333b6b88e01c564a10cb42954ef845fc1` 未发现可执行安全问题；输出 `/private/tmp/bugmaster-w1-03-security-review-final.txt`。只读源码审查；未检查部署/打包，也未执行完整渗透测试，不代表独立真人审查 |
+
+安全扫描命令：
+
+```bash
+PYTHONPATH=/private/tmp/bugmaster-provenance-test-deps codex exec --sandbox read-only -C /Users/inaodeng/.codex/worktrees/w5-scope-action-gateway/bugmaster "Perform a focused security review of committed W1-03 changes from base 42f9b5d to commit f2a3d3a. Read the diff and source only; do not modify files or execute code. Inspect schema file/path handling, URI ID normalization, local alias registration, reference resolution and target validation, error/fail-closed behavior, and confirm whether any network retrieval or authorization/dispatch/provenance boundary changed. Report actionable findings with severity and file/line, or explicitly report no actionable security defects. State scope limits; do not claim an independent human review or full penetration test." > /private/tmp/bugmaster-w1-03-security-review-final.txt 2>&1
+```
 
 完整产品仍为 Release No-Go（暂不发布）。本切片未改变 W5 的 fail-closed（失败时保持阻断）授权边界，也未解除 Q16 公开发布的双人授权要求。

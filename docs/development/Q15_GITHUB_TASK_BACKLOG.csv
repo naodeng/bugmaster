@@ -4,7 +4,7 @@ W0-02,W0,Cross-contract state-machine and directory review,R3,IM,Codex code and 
 W0-03,W0,Blocking-spike risk register and tracking,R2,IM,Codex code and security scan,W0-01,GOV-001,BLK-01..07 owners and outcomes,planned
 W1-01,W1,Core JSON Schemas and negative fixtures,R2,IM,Codex code and security scan,W0-02,TDD-CON-001..020,Schema negative and positive runs,planned
 W1-02,W1,Approval and execution contract validators,R3,IM,Codex code and security scan,W1-01,TDD-SEC-001..012,"Parameters, scope and risk binding",planned
-W1-03,W1,Reference integrity and compatibility contract,R2,IM,Codex code and security scan,W1-01,TDD-CON-012..020,No broken cross-refs; versioned closed local schema registry,implementation_ready
+W1-03,W1,Reference integrity and compatibility contract,R2,IM,Codex code and security scan,W1-01,TDD-CON-012..020,No broken cross-refs; versioned closed local schema registry,owner_confirmation_pending
 W2-01,W2,Eleven canonical Skills and bilingual references,R2,IM,Codex code and security scan,W1-01,TDD-SKL-001..011,Complete Skills and examples,planned
 W2-02,W2,Standalone dependency-closure builder,R2,IM,Codex code and security scan,"W2-01,W3-01",TDD-SKL-011,Independent clean install,planned
 W3-01,W3,Sixteen canonical Bug Patterns and taxonomy,R2,IM,Codex code and security scan,W1-01,TDD-PAT-001..016,"16 unique IDs, source and oracle",planned
