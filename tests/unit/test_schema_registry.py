@@ -87,6 +87,36 @@ class SchemaRegistryTests(unittest.TestCase):
             )
         )
 
+    def test_uri_alias_preserves_relative_references_from_the_target(self):
+        root = _schema("https://example.test/a.json")
+        root["required"].append("branch")
+        root["properties"]["branch"] = {
+            "$ref": "HTTPS://EXAMPLE.TEST:443/b.json"
+        }
+        branch = _schema("https://example.test/b.json")
+        branch["required"].append("child")
+        branch["properties"]["child"] = {"$ref": "c.json"}
+        child = _schema("https://example.test/c.json")
+        child["required"].append("value")
+        child["properties"]["value"] = {"const": "ok"}
+        self.write_schema("a.schema.json", root)
+        self.write_schema("b.schema.json", branch)
+        self.write_schema("c.schema.json", child)
+
+        validator = get_schema_validator("a.schema.json", self.directory)
+
+        self.assertTrue(
+            validator.is_valid(
+                {
+                    "schemaVersion": "1.0",
+                    "branch": {
+                        "schemaVersion": "1.0",
+                        "child": {"schemaVersion": "1.0", "value": "ok"},
+                    },
+                }
+            )
+        )
+
     def test_ref_shaped_default_data_is_not_traversed_as_a_schema_reference(self):
         schema = _schema()
         schema["properties"]["payload"] = {
@@ -217,6 +247,65 @@ class SchemaRegistryTests(unittest.TestCase):
         self.write_schema("invalid-schema-reference.schema.json", schema)
 
         self.assert_registry_error("schema-reference-target-invalid")
+
+    def test_reference_closure_checks_refs_inside_the_referenced_target(self):
+        schema = _schema("https://example.test/root.json")
+        schema["properties"]["payload"] = {
+            "type": "object",
+            "default": {"$ref": "https://unregistered.invalid/external"},
+        }
+        schema["allOf"] = [{"$ref": "#/properties/payload/default"}]
+        self.write_schema("target-with-external-ref.schema.json", schema)
+
+        self.assert_registry_error("schema-reference-unresolved")
+
+    def test_referenced_target_relative_id_under_opaque_root_is_rejected(self):
+        schema = _schema("urn:bugmaster:test:opaque-root:1.0")
+        schema["properties"]["payload"] = {
+            "default": {
+                "$id": "nested.json",
+                "type": "object",
+            }
+        }
+        schema["allOf"] = [{"$ref": "#/properties/payload/default"}]
+        self.write_schema("referenced-relative-id.schema.json", schema)
+
+        self.assert_registry_error("schema-id-invalid")
+
+    def test_referenced_target_with_malformed_id_is_rejected(self):
+        schema = _schema("https://example.test/root.json")
+        schema["properties"]["payload"] = {
+            "default": {
+                "$id": "http://[::1",
+                "type": "object",
+            }
+        }
+        schema["allOf"] = [{"$ref": "#/properties/payload/default"}]
+        self.write_schema("referenced-malformed-id.schema.json", schema)
+
+        self.assert_registry_error("schema-reference-target-invalid")
+
+    def test_recursive_reference_closure_terminates(self):
+        schema = _schema("https://example.test/recursive.json")
+        schema["$defs"] = {
+            "node": {
+                "type": "object",
+                "properties": {"next": {"$ref": "#/$defs/node"}},
+            }
+        }
+        schema["properties"]["tree"] = {"$ref": "#/$defs/node"}
+        self.write_schema("recursive.schema.json", schema)
+
+        validator = get_schema_validator("recursive.schema.json", self.directory)
+
+        self.assertTrue(
+            validator.is_valid(
+                {
+                    "schemaVersion": "1.0",
+                    "tree": {"next": {"next": {}}},
+                }
+            )
+        )
 
     def test_reference_to_a_boolean_schema_is_valid(self):
         schema = _schema()

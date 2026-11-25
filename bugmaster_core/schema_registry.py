@@ -37,13 +37,17 @@ def _schema_id_key(uri):
     return urlunsplit((scheme, netloc, parsed.path, parsed.query, ""))
 
 
-def _schema_resources(resource, base_uri):
+def _schema_resources(resource, base_uri, root_base_is_effective=False):
     contents = resource.contents
     declared_id = contents.get("$id") if isinstance(contents, dict) else None
     if isinstance(declared_id, str) and "#" in declared_id:
         raise SchemaRegistryError("schema-id-invalid")
     resource_id = resource.id()
-    effective_uri = urljoin(base_uri, resource_id) if resource_id else base_uri
+    effective_uri = (
+        base_uri
+        if root_base_is_effective or not resource_id
+        else urljoin(base_uri, resource_id)
+    )
     parsed_effective_uri = urlsplit(effective_uri)
     if not parsed_effective_uri.scheme or parsed_effective_uri.fragment:
         raise SchemaRegistryError("schema-id-invalid")
@@ -52,12 +56,19 @@ def _schema_resources(resource, base_uri):
         yield from _schema_resources(subresource, effective_uri)
 
 
+def _reference_base_uri(base_uri, reference):
+    if reference.startswith("#"):
+        return urldefrag(base_uri)[0]
+    return urldefrag(urljoin(base_uri, reference))[0]
+
+
 def _load_schema_bundle(schemas_directory):
     try:
         from jsonschema import Draft202012Validator, FormatChecker
         from jsonschema.exceptions import SchemaError
         from referencing import Registry, Resource
         from referencing.exceptions import Unresolvable
+        from referencing.jsonschema import DRAFT202012
     except ImportError as error:
         raise SchemaRegistryError("schema-validator-dependency-missing") from error
 
@@ -168,42 +179,74 @@ def _load_schema_bundle(schemas_directory):
     except (ValueError, TypeError) as error:
         raise SchemaRegistryError("schema-resource-invalid") from error
 
+    pending_resources = []
     for root_resource in root_resources.values():
-        for resource, effective_uri in _schema_resources(root_resource, ""):
-            contents = resource.contents
-            if not isinstance(contents, dict):
+        pending_resources.extend(_schema_resources(root_resource, ""))
+
+    visited_resources = set()
+    while pending_resources:
+        resource, effective_uri = pending_resources.pop()
+        visit_key = (id(resource.contents), effective_uri)
+        if visit_key in visited_resources:
+            continue
+        visited_resources.add(visit_key)
+
+        contents = resource.contents
+        if not isinstance(contents, dict):
+            continue
+        for keyword in _REFERENCE_KEYWORDS:
+            if keyword not in contents:
                 continue
+            reference = contents[keyword]
+            reference_uri = _reference_base_uri(effective_uri, reference)
             resolver = registry.resolver(base_uri=effective_uri)
-            for keyword in _REFERENCE_KEYWORDS:
-                if keyword not in contents:
-                    continue
-                reference = contents[keyword]
+            try:
+                resolved = resolver.lookup(reference)
+            except (Unresolvable, ValueError, TypeError) as error:
                 try:
-                    resolved = resolver.lookup(reference)
-                except (Unresolvable, ValueError, TypeError) as error:
-                    try:
-                        reference_uri, _ = urldefrag(
-                            urljoin(effective_uri, reference)
-                        )
-                        target_resource = resources_by_id_key[
-                            _schema_id_key(reference_uri)
-                        ]
-                        registry = registry.with_resource(
-                            reference_uri, target_resource
-                        )
-                        resolved = registry.resolver(
-                            base_uri=effective_uri
-                        ).lookup(reference)
-                    except (KeyError, Unresolvable, ValueError, TypeError) as alias_error:
-                        raise SchemaRegistryError(
-                            "schema-reference-unresolved:{}".format(reference)
-                        ) from alias_error
-                try:
-                    Draft202012Validator.check_schema(resolved.contents)
-                except SchemaError as error:
+                    target_resource = resources_by_id_key[
+                        _schema_id_key(reference_uri)
+                    ]
+                    registry = registry.with_resource(
+                        reference_uri, target_resource
+                    )
+                    resolved = registry.resolver(
+                        base_uri=effective_uri
+                    ).lookup(reference)
+                except (
+                    KeyError,
+                    Unresolvable,
+                    ValueError,
+                    TypeError,
+                ) as alias_error:
                     raise SchemaRegistryError(
-                        "schema-reference-target-invalid:{}".format(reference)
-                    ) from error
+                        "schema-reference-unresolved:{}".format(reference)
+                    ) from alias_error
+            try:
+                Draft202012Validator.check_schema(resolved.contents)
+            except SchemaError as error:
+                raise SchemaRegistryError(
+                    "schema-reference-target-invalid:{}".format(reference)
+                ) from error
+
+            registered_target = resources_by_id_key.get(
+                _schema_id_key(reference_uri)
+            )
+            target_is_registered_root = (
+                registered_target is not None
+                and resolved.contents is registered_target.contents
+            )
+            target_resource = Resource.from_contents(
+                resolved.contents,
+                default_specification=DRAFT202012,
+            )
+            pending_resources.extend(
+                _schema_resources(
+                    target_resource,
+                    reference_uri,
+                    root_base_is_effective=target_is_registered_root,
+                )
+            )
 
     return schemas, registry
 
