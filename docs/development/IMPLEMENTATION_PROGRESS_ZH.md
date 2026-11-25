@@ -1,13 +1,13 @@
 # BugMaster 工程实施进度矩阵
 
 **更新日期：** 2026-11-25
-**当前状态：** PR #15 已合并到 `main`（合并提交 `d578c61`）；W1-02 已提交至 `develop`，提交 `069b1a7d30cf8cc461dbeee988758c5b1991ed1f`，并通过 [PR #16](https://github.com/naodeng/bugmaster/pull/16) 提交至 `main`，等待项目所有者审阅并手动合并。Ponytail（精简代码审查）及三轮 Codex 安全复核发现四项行终止符输入问题，均已修复并补充回归测试。最新修复后的全量测试、覆盖率和质量检查通过；最终代码复核无可执行缺陷，最终安全复核无代码问题，发现的设计文档计数歧义已更正。PR 合并前暂停后续开发。本切片只判断记录一致性，不认证来源或审核人，不授权、不派发，也不修改 `can_dispatch()` 的全风险拒绝行为。安全复核为 AI 源码复核，并非独立真人审查。W7 原始 Evidence Blob（证据原件字节）存储、可信来源适配器、浏览器运行时和真实基准评测仍未完成；完整产品仍为 Release No-Go（暂不发布）。
+**当前状态：** PR #15 已合并到 `main`（合并提交 `d578c61`）；W1-02 已通过 [PR #16](https://github.com/naodeng/bugmaster/pull/16) 合并，合并提交 `718bc67`。本轮浏览器探索工具与真人审核边界文档切片基于该合并基线，在 `develop` 分支完成并接受 Codex 代码/安全审查；不接入浏览器运行时，也不声称完成双宿主实测。W1-02 的代码审查和安全审查由 Codex 完成，项目所有者已确认并合并；没有独立真人安全审查签署。该切片只验证记录一致性，不认证来源或审核人，不授权、不派发，也不修改 `can_dispatch()` 的全风险拒绝行为。W7 原始 Evidence Blob（证据原件字节）存储、可信来源适配器、浏览器运行时和真实基准评测仍未完成；完整产品仍为 Release No-Go（暂不发布）。
 
 ## 仓库审计摘要
 
-- 当前开发工作树：`/Users/inaodeng/.codex/worktrees/w5-scope-action-gateway/bugmaster`，活动分支 `develop`，本地与远端 head 为 `069b1a7`。PR #15 已合并到 `origin/main` 的 `d578c61`。W1-02 最新修复后的全量测试、覆盖率与质量扫描、代码复核和安全复核均已完成；安全复核未发现代码问题。PR [#16](https://github.com/naodeng/bugmaster/pull/16) 已开放，等待项目所有者审阅和手动合并；该 PR 合并前不开始下一个实现切片。
+- 当前开发工作树：`/Users/inaodeng/.codex/worktrees/w5-scope-action-gateway/bugmaster`，活动分支 `develop`；PR #15 已合并到 `origin/main` 的 `d578c61`，PR #16 已合并到 `main`，合并提交为 `718bc67`。本轮文档切片在该合并基线上完成；分支推送和 PR 状态以 GitHub 实时状态为准。W1-02 的最新修复、全量测试、覆盖率与质量扫描、代码审查和 Codex 安全审查均有记录；该审查不等于独立真人安全签署。
 - GitHub 上游：`AI-Native-QA-Lab/bugmaster`；个人项目 fork：`naodeng/bugmaster`。两者均为公开仓库，当前连接具有管理员权限。
-- 仓库简介与 13 个主题标签的同步、起始提交 `cef3cb5` 推送到个人 fork（分叉仓库），均为早期历史记录；PR #13 合并提交 `5c640a21` 是治理基线，当前 `develop` 已包含 PR #15 和 W1-02 设计；W1-02 实现已由 PR #16 推送。
+- 仓库简介与 13 个主题标签的同步、起始提交 `cef3cb5` 推送到个人 fork（分叉仓库），均为早期历史记录；PR #13 合并提交 `5c640a21` 是治理基线；当前 `develop` 已包含 PR #15 和 PR #16。
 - 当前代码来源：用户提供的 `/Users/inaodeng/Downloads/bugmaster 2/`（128 个文件）。该 v1.1 基线采用 11 个 Discovery / Validation / Reporting（发现/验证/报告）Skill ID；旧 v1.0 的 `hunt-*` 目录不导入。
 - 现有实现仍是工程起点：`bugmaster_core` 已有严格表面/范围门禁与本地 OpenAPI（开放 API 描述格式）3 静态发现；没有 URL（统一资源定位符）/Browser（浏览器）动态发现或真实 API（应用程序接口）/浏览器执行闭环。
 - 16 个 Patterns 属于候选规则，50 个 Benchmark 属于计划清单；不能据此声称真实验证完成。
@@ -19,7 +19,7 @@
 | 工作流 | 目标 | 状态 | 验收证据 / 下一步 |
 |---|---|---|---|
 | W0 | 开发基线与品牌/Skill 名称统一 | 本地检查通过 | `check_branding.py`、`validate_catalog.py`、Skill 命名契约通过；基线提交 `cef3cb5` 已推送到 fork |
-| W1 | Scope（授权范围）、Surface（测试表面）、Feature（功能）、Oracle（预期行为判定依据）、Finding（缺陷记录）、Evidence（证据）、Journal（动作日志）数据契约 | 部分实现；W1-02 已进入 PR #16，等待合并 | 已有 Scope、Feature Inventory（功能清单）、Approval（审批）、Action（动作）、Event（事件）、Checkpoint（检查点）、Session（会话）、Oracle（预期行为判定依据）/Evidence（证据）和 Candidate Assessment（候选评估）契约；`validate_contract_bindings()` 完成 Scope/Action/Approval Schema（数据结构规则）校验及跨记录字段绑定。最新测试、覆盖与代码/安全复核通过。结果不认证来源/审核人、不授权或派发。Evidence 原件持久化、可信来源校验及 Confirmed Gate（缺陷确认门禁）仍未实现 |
+| W1 | Scope（授权范围）、Surface（测试表面）、Feature（功能）、Oracle（预期行为判定依据）、Finding（缺陷记录）、Evidence（证据）、Journal（动作日志）数据契约 | 部分实现；W1-02 已由 PR #16 合并 | 已有 Scope、Feature Inventory（功能清单）、Approval（审批）、Action（动作）、Event（事件）、Checkpoint（检查点）、Session（会话）、Oracle（预期行为判定依据）/Evidence（证据）和 Candidate Assessment（候选评估）契约；`validate_contract_bindings()` 完成 Scope/Action/Approval Schema（数据结构规则）校验及跨记录字段绑定。实现和验证不认证来源/审核人、不授权或派发。Evidence 原件持久化、可信来源校验及 Confirmed Gate（缺陷确认门禁）仍未实现 |
 | W2 | 11 个独立 Skill（技能包） | 本地闭包验证通过 | 11 个包均含规范 Skill/Pattern（缺陷模式）闭包且 Manifest（清单）摘要一致；Codex/Claude 干净安装和真实 Eval（评测）未验证 |
 | W3 | 16 个 Bug Pattern（缺陷模式） | 候选规则 | 需适用/排除条件、Oracle（预期行为判定依据）、反例和真实对照评测 |
 | W4 | 风险路由与有界自主探索 | 部分实现 | `scripts/discover_openapi.py` 可从本地 OpenAPI（开放 API 描述格式）3 JSON 输出稳定 ID 和 JSON Pointer（JSON 指针）来源清单；URL（统一资源定位符）/Browser（浏览器）发现、风险路由与动态执行仍待实现 |
@@ -28,7 +28,7 @@
 | W7 | Finding（缺陷记录）、跨入口去重与报告 | 部分实现：候选评估 + Oracle/Evidence 绑定 + Candidate/Finding 元数据存储 | Candidate Assessment（候选评估）辅助函数仍只生成 `candidate`、`needs_review` 或暂定 `duplicate`。PR #14 已加入 Oracle（预期行为判定依据）来源字节、Evidence（证据）制品摘要、精确 Oracle 版本与 Action Journal（动作日志）结果引用绑定；本切片实现提交 [`1a86eea`](https://github.com/naodeng/bugmaster/commit/1a86eeabffad401df3f5e1f484c856e548a10360) 新增 Candidate（候选记录）/Finding（缺陷记录）私有本地元数据持久化、不可变修订和摘要链。以上仍不认证来源/审核人、不保存证据原件字节、不验证外部引用、不抑制规范重复项，也不解锁 `Confirmed Gate`（缺陷确认门禁）；报告、真实可信来源适配器和审核身份认证仍待实现 |
 | W8 | 回归建议 | 待实现 | 只输出建议，不自动修改/提交测试代码 |
 | W9 | 50 场景 Benchmark（基准评测） | 计划细化，仍未执行 | 保持 50 总数；7 个既有 API（应用程序接口）/UI（用户界面）场景映射候选正例、可信正常反证、模糊 Oracle、模型与执行矛盾、错误拒绝风险、人工反馈、跨表面去重；Manifest（清单）仍为 `planned`（计划中），需隔离 Ground Truth（真实结论）并进行 G0–G3 对照实验 |
-| W10 | Codex 与 Claude Code 双宿主验证 | 未验证 | W10-02 首项交付为浏览器工具比较与选型记录；满足 W5-02/W7-02/W9-02 依赖后，再跑两宿主真实安装和 API（应用程序接口）/Browser（浏览器）权限测试 |
+| W10 | Codex 与 Claude Code 双宿主验证 | 工具调研与审核边界文档已细化；双宿主未验证 | 当前文档切片只提供 W10-02 一手资料比较、审核边界和选型/验收方案。W5-02、W7-02、W9-02 依赖满足前不运行同场对照；不新增 BugMaster Skill（技能包）或 Agent Runtime（智能体运行时），不记录虚构 Run ID（运行记录编号） |
 | W11 | 发布治理 | 部分实施 | PR #13 已确立 Q15（逐 PR 代码扫描、R2/R3 变更增加安全扫描）与项目所有者手动确认/合并；Q16（正式发布双人授权）和供应链证据仍待落实。完整 Release（正式发布）为 No-Go（暂不发布） |
 
 ## 质量状态
@@ -47,12 +47,12 @@
 | PR #15 合并前 W7 行/分支覆盖 | PASS（通过，100% / 100%） | `bugmaster_core` 与 `scripts`：3057/3057 语句、1096/1096 分支；覆盖数据 `/private/tmp/bugmaster-w7-finding-metadata-final.coverage`；不是当前 W1-02 验证 |
 | 本分支发布质量门禁 | NO-GO（预期） | `quality_gate.py --mode release`：功能清单未冻结、业务覆盖未超过 60%、核心功能缺少 Happy（成功）/Negative（失败）/Edge（边界）场景的执行证据；不是本切片测试失败 |
 | PR #13 合并前验证（历史） | PASS | 准确 head `d6602dd`：单元 488/488、契约 96/96、安全测试 1/1、行/分支覆盖 2384/2384 与 880/880；Actions Run `45019266106` 全部通过。这些结果不包含当前 W7 改动 |
-| PR #13 Q15 代码/安全扫描（历史） | PASS | PR 描述记录的 Codex 代码复扫与安全复核针对 `d6602dd`；属于 AI 扫描结果，不代表独立真人安全复核，也不覆盖当前 W7 改动 |
+| PR #13 Q15 代码/安全扫描（历史） | PASS | PR 描述记录的 Codex 代码复扫与安全复核针对 `d6602dd`；属于 AI（人工智能）扫描结果，不代表独立真人安全复核，也不覆盖当前 W7 改动 |
 | PR #14 GitHub 拉取请求 / GitHub Actions（自动化检查） | PASS（通过，已合并） | [PR #14](https://github.com/naodeng/bugmaster/pull/14)；[运行 #116](https://github.com/naodeng/bugmaster/actions/runs/45107658770) 单元、契约、安全、覆盖率、目录、基准清单结构与品牌校验全部成功；合并提交 `e594946ca4d823c044897c000c1975a7301631c7` |
-| PR #14 Q15 Codex 代码扫描/安全复核 | PASS（历史） | 扫描针对 PR #14；静态 AI 安全复核不代表独立真人审查，也不覆盖当前 Candidate/Finding 切片 |
+| PR #14 Q15 Codex 代码扫描/安全复核 | PASS（历史） | 扫描针对 PR #14；静态 AI（人工智能）安全复核不代表独立真人审查，也不覆盖当前 Candidate/Finding 切片 |
 | W7 Candidate/Finding 历史定向单元/契约测试 | PASS（通过） | 存储单测 83/83、候选评估单测 59/59、全量契约 129/129；证据见 [W7 元数据持久化 TDD 记录](2026-11-23_W7_CANDIDATE_FINDING_METADATA_TDD_ZH.md) |
 | W7 Candidate/Finding 历史 Q15 代码/安全审查 | PASS（历史） | `codex review --uncommitted` 未发现可执行缺陷；需求与编码规范双轴复核及聚焦安全复核未发现阻断项；结果只针对 W7 变更 |
-| W7 切片独立真人安全复核 | 未进行 | W7 未认证来源或审核人、未改动作授权或 Confirmed Gate；后续跨入上述边界时，按项目所有者要求先单独讨论真人复核范围 |
+| W7 切片独立真人安全复核 | 未进行 | W7 未认证来源或审核人、未改动作授权或 Confirmed Gate；若后续工作确有独立真人审查要求，先完成 Codex 代码/安全审查，再单独列明审查对象、依据和影响，与项目所有者讨论，不将 Codex 结果等同真人签署 |
 | W1-02 最新修复前全量验证 | PASS（通过，非最终） | 单元 638/638、契约 132/132、安全 1/1；`bugmaster_core` 与 `scripts` 行/分支覆盖 100%（3157/3157 条语句，1150/1150 条分支）；不含 Action.createdAt 新增回归用例 |
 | W1-02 最新修复后验证 | PASS（通过） | 单元 639/639、契约 134/134、安全 1/1；行/分支覆盖 3159/3159 与 1152/1152（均 100%）；品牌、目录和 Benchmark（基准评测）结构扫描通过；Release（正式发布）门禁按预期 NO-GO，详见 [W1-02 契约绑定 TDD 记录](2026-11-25_W1_APPROVAL_EXECUTION_BINDING_TDD_ZH.md) |
 | 当前 W1-02 代码/安全复核 | PASS（通过） | Codex 代码复核未发现可执行缺陷；最终安全复核未发现代码问题，文档计数歧义已修复。Approval 不绑定 surface（测试表面）的目标粒度作为未来可信网关设计事项记录。Codex 安全复核不是独立真人审查。详见 [W1-02 契约绑定 TDD 记录](2026-11-25_W1_APPROVAL_EXECUTION_BINDING_TDD_ZH.md) |
@@ -71,7 +71,8 @@
 ## 执行顺序
 
 1. 运行基线静态检查、单元/契约测试与当前质量门禁，记录真实输出。
-2. PR #15 已合并。W1-02 已通过 PR #16 从 `develop` 提交至 `main`；等待项目所有者审阅并手动合并，合并前暂停后续开发，不叠加第二个 PR。实现证据见 [W1-02 契约绑定 TDD 记录](2026-11-25_W1_APPROVAL_EXECUTION_BINDING_TDD_ZH.md)。
-3. W1-02 合并后继续浏览器探索工具调研：先完善人工审核边界与浏览器工具对照文档，再按 W5/W7/W9 依赖评估隔离 Order Demo（订单演示项目）同场对照和运行时实现。凡涉及真实来源认证、审核身份、动作授权或 Confirmed Gate（缺陷确认门禁）的变更，先与项目所有者讨论是否需独立真人安全复核。
-4. 每次只推进一个功能 PR；每轮更新本矩阵和独立中文 TDD 记录。不得将内部纵向切片作为缩水 MVP 对外发布。
+2. PR #15、PR #16 均已合并；本轮 `develop` 文档切片基于 PR #16 合并提交 `718bc67`。W1-02 的 RED（先写失败测试）/GREEN（实现使测试通过）/REFACTOR（重构）/VERIFY（全面验证）证据见 [W1-02 契约绑定 TDD 记录](2026-11-25_W1_APPROVAL_EXECUTION_BINDING_TDD_ZH.md)。
+3. 当前文档切片已完善浏览器探索工具比较、真人审核边界和隔离 Order Demo（订单演示项目）的验收方案；Codex 代码/安全审查和文档检查已在 `develop` 完成。按照项目所有者已授权的单 PR 流程，下一步单独开一个 `develop` → `main` PR，供项目所有者查看审查结果并手动合并。合并后再评估 W5-02/W7-02/W9-02 依赖是否允许实测；不把文档调研算作运行时实现或双宿主验证。
+4. 变更若实质需要独立真人安全审查，先由 Codex 完成代码与安全审查，再把审查对象、依据、影响和待决定事项单独列出，与项目所有者讨论。不得把 Codex 审查写成真人独立签署；是否接受剩余风险由项目所有者确认，PR 仍由项目所有者手动合并。Q16 公开发行的双人授权维持独立规则。
+5. 每次只推进一个功能 PR；每轮更新本矩阵和独立中文开发记录。不得将内部纵向切片作为缩水 MVP 对外发布。
 
