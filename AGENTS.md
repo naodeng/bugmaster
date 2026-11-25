@@ -32,10 +32,12 @@
 - Do not claim real API/Browser tests, dual-host compatibility, security audit, 50 executed Eval scenarios or production release until verified.
 - Do not generate/commit regression tests as part of Q9: output recommendations only.
 
-## Pull requests
-- Work on one implementation PR at a time. Finish its implementation, verification, Q15 scans, and project-owner decision before starting the next feature or opening its PR.
-- Do not stack feature branches or PRs on unmerged PRs. Start the next feature from the latest merged base.
+## Branch and pull request workflow
+- `develop` is the only ongoing development branch. Make all implementation commits directly on `develop`; do not create temporary `codex/*` feature branches or feature worktrees.
+- Work on one implementation slice at a time. Complete implementation, verification, Q15 scans, and the project-owner decision on `develop` before opening a PR. Open one PR at a time with `develop` as the source branch and `main` as the target branch.
+- After a PR from `develop` to `main` is merged, fast-forward `develop` to the latest `main` before starting the next slice.
 - If the active PR is blocked on CI, a required scan, or a project-owner decision, pause subsequent feature work and resolve the active PR first.
+- Existing local `codex/*` branches are legacy. Delete them after confirming their work is already on `main`/`develop` or otherwise preserved. Branch cleanup does not authorize deleting a dirty worktree or discarding uncommitted files.
 - Reference workstream W0–W11 and a Feature/Obligation ID.
 - Show RED → GREEN → REFACTOR → VERIFY with links, test and coverage reports, Q15 scan evidence, and applicable Q16 authorization in Chinese.
 - Run a Codex code scan for every PR; R2 and R3 changes also require a Codex security scan. The project owner reviews the results and merges manually. Q15 does not require independent human review or signature; do not auto-merge.

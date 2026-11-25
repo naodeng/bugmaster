@@ -32,6 +32,21 @@ class ActionSchemaTests(unittest.TestCase):
     def test_readonly_r0_action_is_valid(self):
         self.assertEqual(list(self.validator.iter_errors(self.readonly_action)), [])
 
+    def test_action_method_rejects_trailing_newline(self):
+        for separator in ("\r", "\n", "\u2028", "\u2029"):
+            with self.subTest(separator=repr(separator)):
+                document = copy.deepcopy(self.readonly_action)
+                document["method"] = f"GET{separator}"
+                self.assert_invalid(document)
+
+    def test_action_digests_reject_trailing_newline(self):
+        for field in ("intentDigest", "parameterDigest"):
+            for separator in ("\r", "\n", "\u2028", "\u2029"):
+                with self.subTest(field=field, separator=repr(separator)):
+                    document = copy.deepcopy(self.readonly_action)
+                    document[field] = "a" * 64 + separator
+                    self.assert_invalid(document)
+
     def test_r2_action_binds_scope_and_action_approval_references(self):
         self.assertEqual(list(self.validator.iter_errors(self.r2_action)), [])
         approval = json.loads(

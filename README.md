@@ -10,6 +10,8 @@ BugMaster's target is a portable Agent Skills bundle for evidence-driven explora
 
 The W7 data layer now has versioned Candidate and Finding schemas and private local metadata persistence. Revisions retain identifiers, references, and digests, not raw Evidence bytes. The store has no Evidence Blob field or blob service. It does not detect raw or Base64-encoded evidence placed in free-text fields, so callers must keep evidence content out of those fields. This storage checks local structure and integrity only: it does not authenticate sources or reviewers, connect the records to a trusted workflow, or unlock Finding confirmation.
 
+W1-02 adds `bugmaster_core.contract_binding.validate_contract_bindings()` to validate Scope, Action, and Approval schemas and their cross-record references. Its result reports consistency only; it does not authenticate approvals, authorize actions, or enable dispatch.
+
 ## Target installation (not verified)
 ```bash
 # Repository exists; this host install path remains unverified until release checks pass.

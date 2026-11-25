@@ -35,6 +35,28 @@ class ApprovalSchemaTests(unittest.TestCase):
     def test_action_approval_binds_normalized_r2_intent(self):
         self.assertEqual(list(self.validator.iter_errors(self.action_approval)), [])
 
+    def test_action_approval_accepts_normalized_action_method_tokens(self):
+        for method in ("M-SEARCH", "GET2", "POST_V2"):
+            with self.subTest(method=method):
+                document = copy.deepcopy(self.action_approval)
+                document["method"] = method
+                self.assertEqual(list(self.validator.iter_errors(document)), [])
+
+    def test_action_approval_method_rejects_trailing_newline(self):
+        for separator in ("\r", "\n", "\u2028", "\u2029"):
+            with self.subTest(separator=repr(separator)):
+                document = copy.deepcopy(self.action_approval)
+                document["method"] = f"POST{separator}"
+                self.assert_invalid(document)
+
+    def test_action_approval_digests_reject_trailing_newline(self):
+        for field in ("actionDigest", "parameterDigest"):
+            for separator in ("\r", "\n", "\u2028", "\u2029"):
+                with self.subTest(field=field, separator=repr(separator)):
+                    document = copy.deepcopy(self.action_approval)
+                    document[field] = "a" * 64 + separator
+                    self.assert_invalid(document)
+
     def test_action_approval_requires_action_and_parameter_digests(self):
         document = copy.deepcopy(self.action_approval)
         del document["actionDigest"]
