@@ -215,7 +215,7 @@ W0 冻结/更名，W1 Contracts，W2 Skills，W3 Patterns，W4 Dynamic Router，
 | Skills/Patterns | 11 个 Skill（技能包）、16 个 Pattern（缺陷模式）文件齐全，仍是候选资产；真实宿主安装和评测未完成 |
 | 50 Benchmark（基准评测） | 50 个案例仍为 planned（计划中），没有真实执行记录 |
 | API（应用程序接口）/Browser（浏览器）自主探索 | 只有本地 OpenAPI 静态发现；URL（统一资源定位符）/浏览器动态发现、应用程序接口/浏览器执行闭环未实现或验证 |
-| GitHub 工程状态 | 上游与个人 fork 均已存在；PR #18 已合并，fork 的 `main` 与 `develop` 同步于 `9d83f5a` |
+| GitHub 工程状态 | PR #19 文档同步已合并，个人 fork 的 `main` 与 `develop` 同步于 `132fbcf`；运行时代码基线仍为 PR #18 的 `9d83f5a` |
 | 单元代码覆盖 | 最新记录的 W1-02 验证覆盖 `bugmaster_core/` 与 `scripts/`：行覆盖为 3159/3159，分支覆盖为 1152/1152；这是该次代码验证记录，不代表业务功能门禁或发布门禁通过 |
 | 业务功能覆盖与核心三类用例 | 未达成：Feature Inventory（功能清单）未冻结、没有真实业务执行证据，核心用例矩阵为空 |
 | 最终发布 | No-Go（暂不发布）：完整功能、真实 Benchmark、双宿主和 Q16 发布授权均未完成 |

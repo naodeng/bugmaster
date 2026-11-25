@@ -39,3 +39,9 @@
 - [W5 Codex 宿主审批边界调研](2026-11-25_W5_CODEX_HOST_APPROVAL_BOUNDARY_RESEARCH_ZH.md)
 - [W1-02 Scope、Action 与 Approval 契约绑定验证记录](2026-11-25_W1_APPROVAL_EXECUTION_BINDING_TDD_ZH.md)
 - `schemas/README.zh-CN.md`、`scripts/validate_gates.py`、`bugmaster_core/` 当前实现与 PR #18 合并记录
+
+## PR #19 合并后的状态同步
+
+- PR #19 已于本次复核后合并，合并提交为 `132fbcf10b301e920031366b722776f218273194`；该 PR 只更新文档，没有改变运行时代码。
+- 按仓库流程，`develop` 已快进同步并推送到远端；核对时本地 `develop`、`origin/main` 和 `origin/develop` 均指向 `132fbcf`。
+- 因此当前仓库提交头为 `132fbcf`，最近的运行时代码基线仍是 PR #18 的 `9d83f5a`；最近代码验证证据仍为 W1-02 记录。
