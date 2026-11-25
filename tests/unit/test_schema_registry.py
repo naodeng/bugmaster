@@ -166,6 +166,72 @@ class SchemaRegistryTests(unittest.TestCase):
             )
         )
 
+    def test_relative_nested_id_is_not_applied_twice_during_registry_crawl(self):
+        root = _schema("https://example.test/root.json")
+        root["$defs"] = {
+            "nested": {
+                "$id": "a/n.json",
+                "type": "object",
+            }
+        }
+        root["properties"]["nested"] = {
+            "$ref": "https://example.test/a/a/n.json"
+        }
+        self.write_schema("root.schema.json", root)
+
+        self.assert_registry_error("schema-reference-unresolved")
+
+    def test_reference_closure_uses_nested_id_after_json_pointer_resolution(self):
+        root = _schema("https://example.test/root.json")
+        root["$defs"] = {
+            "nested": {
+                "$id": "sub/n.json",
+                "properties": {
+                    "x": {"default": {"$ref": "allowed.json"}}
+                },
+            }
+        }
+        root["allOf"] = [
+            {"$ref": "#/$defs/nested/properties/x/default"}
+        ]
+        root_level_allowed = _schema("https://example.test/allowed.json")
+        self.write_schema("root.schema.json", root)
+        self.write_schema("allowed.schema.json", root_level_allowed)
+
+        self.assert_registry_error("schema-reference-unresolved")
+
+    def test_referenced_default_registers_nested_local_schema_resources(self):
+        root = _schema("https://example.test/root.json")
+        root["properties"]["payload"] = {
+            "default": {
+                "$id": "https://example.test/target.json",
+                "$defs": {
+                    "nested": {
+                        "$id": "sub/nested.json",
+                        "type": "object",
+                        "required": ["value"],
+                        "properties": {"value": {"const": "ok"}},
+                    }
+                },
+                "$ref": "sub/nested.json",
+            }
+        }
+        root["allOf"] = [
+            {"$ref": "#/properties/payload/default"}
+        ]
+        self.write_schema("referenced-default.schema.json", root)
+
+        validator = get_schema_validator(
+            "referenced-default.schema.json", self.directory
+        )
+
+        self.assertTrue(
+            validator.is_valid({"schemaVersion": "1.0", "value": "ok"})
+        )
+        self.assertFalse(
+            validator.is_valid({"schemaVersion": "1.0"})
+        )
+
     def test_nested_schema_id_cannot_include_a_fragment(self):
         schema = _schema("https://example.test/root.json")
         schema["$defs"] = {

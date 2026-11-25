@@ -2,6 +2,7 @@
 
 import json
 import re
+from copy import deepcopy
 from pathlib import Path
 from urllib.parse import urldefrag, urljoin, urlsplit, urlunsplit
 
@@ -13,6 +14,24 @@ _REFERENCE_KEYWORDS = ("$ref", "$dynamicRef")
 
 class SchemaRegistryError(ValueError):
     """A local schema bundle is invalid or contains an unresolved reference."""
+
+
+class _BaseUriTracker:
+    def __init__(self, base_uri):
+        self.base_uri = base_uri
+
+    def in_subresource(self, subresource):
+        resource_id = subresource.id()
+        if resource_id is None:
+            return self
+        return _BaseUriTracker(urljoin(self.base_uri, resource_id))
+
+
+def _pointer_base_uri(registry, base_uri, pointer):
+    resource = registry.get_or_retrieve(base_uri).value
+    tracker = _BaseUriTracker(base_uri)
+    resolved = resource.pointer(pointer, tracker)
+    return resolved.resolver.base_uri
 
 
 def _schema_id_key(uri):
@@ -152,7 +171,7 @@ def _load_schema_bundle(schemas_directory):
     root_resources = {}
     for schema in schemas.values():
         try:
-            resource = Resource.from_contents(schema)
+            resource = Resource.from_contents(deepcopy(schema))
             registry = registry.with_resource(schema["$id"], resource)
             root_resources[schema["$id"]] = resource
         except (ValueError, TypeError) as error:
@@ -163,21 +182,45 @@ def _load_schema_bundle(schemas_directory):
         _schema_id_key(schema_id): resource
         for schema_id, resource in root_resources.items()
     }
-    try:
-        for root_resource in root_resources.values():
-            for resource, effective_uri in _schema_resources(root_resource, ""):
-                if resource is root_resource or resource.id() is None:
+    resources_by_contents_id = {
+        id(resource.contents): resource for resource in root_resources.values()
+    }
+    root_resource_contents_ids = set(resources_by_contents_id)
+    resource_uris_by_contents_id = {
+        id(resource.contents): schema_id
+        for schema_id, resource in root_resources.items()
+    }
+
+    def register_resources(resource, base_uri, root_base_is_effective=False):
+        nonlocal registry
+        try:
+            for candidate, effective_uri in _schema_resources(
+                resource,
+                base_uri,
+                root_base_is_effective=root_base_is_effective,
+            ):
+                contents_id = id(candidate.contents)
+                if contents_id in resources_by_contents_id:
                     continue
+                if candidate.id() is None:
+                    continue
+
                 effective_uri_key = _schema_id_key(effective_uri)
                 if effective_uri_key in registered_ids:
                     raise SchemaRegistryError("schema-id-duplicate")
-                registry = registry.with_resource(effective_uri, resource)
+                candidate.contents["$id"] = effective_uri
+                registry = registry.with_resource(effective_uri, candidate)
                 registered_ids.add(effective_uri_key)
-                resources_by_id_key[effective_uri_key] = resource
-    except SchemaRegistryError:
-        raise
-    except (ValueError, TypeError) as error:
-        raise SchemaRegistryError("schema-resource-invalid") from error
+                resources_by_id_key[effective_uri_key] = candidate
+                resources_by_contents_id[contents_id] = candidate
+                resource_uris_by_contents_id[contents_id] = effective_uri
+        except SchemaRegistryError:
+            raise
+        except (ValueError, TypeError) as error:
+            raise SchemaRegistryError("schema-resource-invalid") from error
+
+    for root_resource in root_resources.values():
+        register_resources(root_resource, "")
 
     pending_resources = []
     for root_resource in root_resources.values():
@@ -229,22 +272,40 @@ def _load_schema_bundle(schemas_directory):
                     "schema-reference-target-invalid:{}".format(reference)
                 ) from error
 
-            registered_target = resources_by_id_key.get(
-                _schema_id_key(reference_uri)
+            resolved_contents_id = id(resolved.contents)
+            target_is_registered_resource = (
+                resolved_contents_id in resources_by_contents_id
             )
-            target_is_registered_root = (
-                registered_target is not None
-                and resolved.contents is registered_target.contents
-            )
+            reference_fragment = urldefrag(reference)[1]
+            if reference_fragment.startswith("/"):
+                target_base_uri = _pointer_base_uri(
+                    registry,
+                    reference_uri,
+                    reference_fragment,
+                )
+            elif (
+                target_is_registered_resource
+                and resolved_contents_id not in root_resource_contents_ids
+            ):
+                target_base_uri = resource_uris_by_contents_id[
+                    resolved_contents_id
+                ]
+            else:
+                target_base_uri = reference_uri
             target_resource = Resource.from_contents(
                 resolved.contents,
                 default_specification=DRAFT202012,
             )
+            register_resources(
+                target_resource,
+                target_base_uri,
+                root_base_is_effective=target_is_registered_resource,
+            )
             pending_resources.extend(
                 _schema_resources(
                     target_resource,
-                    reference_uri,
-                    root_base_is_effective=target_is_registered_root,
+                    target_base_uri,
+                    root_base_is_effective=target_is_registered_resource,
                 )
             )
 
