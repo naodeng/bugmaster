@@ -1,13 +1,13 @@
 # BugMaster 工程实施进度矩阵
 
 **更新日期：** 2026-11-25
-**当前状态：** PR #15 已合并到 `main`（合并提交 `d578c61`）；`develop` 当前基线为 `4e82d7f`，包含 W1-02 设计。Ponytail（精简代码审查）及三轮 Codex 安全复核发现四项行终止符输入问题，均已修复并补充回归测试。最新修复后的全量测试、覆盖率和质量检查通过；最终代码复核无可执行缺陷，最终安全复核无代码问题，发现的设计文档计数歧义已更正。改动仍在 `develop` 本地工作树，尚未提交或创建 PR；接下来提交唯一 PR，由项目所有者审阅并手动合并，合并前暂停后续开发。本切片只判断记录一致性，不认证来源或审核人，不授权、不派发，也不修改 `can_dispatch()` 的全风险拒绝行为。安全复核为 AI 源码复核，并非独立真人审查。W7 原始 Evidence Blob（证据原件字节）存储、可信来源适配器、浏览器运行时和真实基准评测仍未完成；完整产品仍为 Release No-Go（暂不发布）。
+**当前状态：** PR #15 已合并到 `main`（合并提交 `d578c61`）；W1-02 已提交至 `develop`，提交 `069b1a7d30cf8cc461dbeee988758c5b1991ed1f`，并通过 [PR #16](https://github.com/naodeng/bugmaster/pull/16) 提交至 `main`，等待项目所有者审阅并手动合并。Ponytail（精简代码审查）及三轮 Codex 安全复核发现四项行终止符输入问题，均已修复并补充回归测试。最新修复后的全量测试、覆盖率和质量检查通过；最终代码复核无可执行缺陷，最终安全复核无代码问题，发现的设计文档计数歧义已更正。PR 合并前暂停后续开发。本切片只判断记录一致性，不认证来源或审核人，不授权、不派发，也不修改 `can_dispatch()` 的全风险拒绝行为。安全复核为 AI 源码复核，并非独立真人审查。W7 原始 Evidence Blob（证据原件字节）存储、可信来源适配器、浏览器运行时和真实基准评测仍未完成；完整产品仍为 Release No-Go（暂不发布）。
 
 ## 仓库审计摘要
 
-- 当前开发工作树：`/Users/inaodeng/.codex/worktrees/w5-scope-action-gateway/bugmaster`，活动分支 `develop`，基线提交 `4e82d7f`，与 `origin/develop` 一致。PR #15 已合并到 `origin/main` 的 `d578c61`。W1-02 最新修复后的全量测试、覆盖率与质量扫描、代码复核和安全复核均已完成；安全复核未发现代码问题。接下来创建唯一 `develop` → `main` PR，由项目所有者审阅和手动合并。该 PR 合并前不开始下一个实现切片。
+- 当前开发工作树：`/Users/inaodeng/.codex/worktrees/w5-scope-action-gateway/bugmaster`，活动分支 `develop`，本地与远端 head 为 `069b1a7`。PR #15 已合并到 `origin/main` 的 `d578c61`。W1-02 最新修复后的全量测试、覆盖率与质量扫描、代码复核和安全复核均已完成；安全复核未发现代码问题。PR [#16](https://github.com/naodeng/bugmaster/pull/16) 已开放，等待项目所有者审阅和手动合并；该 PR 合并前不开始下一个实现切片。
 - GitHub 上游：`AI-Native-QA-Lab/bugmaster`；个人项目 fork：`naodeng/bugmaster`。两者均为公开仓库，当前连接具有管理员权限。
-- 仓库简介与 13 个主题标签的同步、起始提交 `cef3cb5` 推送到个人 fork（分叉仓库），均为早期历史记录；PR #13 合并提交 `5c640a21` 是治理基线，当前 `develop` 已包含 PR #15 和 W1-02 设计；本地 W1-02 实现尚未推送。
+- 仓库简介与 13 个主题标签的同步、起始提交 `cef3cb5` 推送到个人 fork（分叉仓库），均为早期历史记录；PR #13 合并提交 `5c640a21` 是治理基线，当前 `develop` 已包含 PR #15 和 W1-02 设计；W1-02 实现已由 PR #16 推送。
 - 当前代码来源：用户提供的 `/Users/inaodeng/Downloads/bugmaster 2/`（128 个文件）。该 v1.1 基线采用 11 个 Discovery / Validation / Reporting（发现/验证/报告）Skill ID；旧 v1.0 的 `hunt-*` 目录不导入。
 - 现有实现仍是工程起点：`bugmaster_core` 已有严格表面/范围门禁与本地 OpenAPI（开放 API 描述格式）3 静态发现；没有 URL（统一资源定位符）/Browser（浏览器）动态发现或真实 API（应用程序接口）/浏览器执行闭环。
 - 16 个 Patterns 属于候选规则，50 个 Benchmark 属于计划清单；不能据此声称真实验证完成。
@@ -19,7 +19,7 @@
 | 工作流 | 目标 | 状态 | 验收证据 / 下一步 |
 |---|---|---|---|
 | W0 | 开发基线与品牌/Skill 名称统一 | 本地检查通过 | `check_branding.py`、`validate_catalog.py`、Skill 命名契约通过；基线提交 `cef3cb5` 已推送到 fork |
-| W1 | Scope（授权范围）、Surface（测试表面）、Feature（功能）、Oracle（预期行为判定依据）、Finding（缺陷记录）、Evidence（证据）、Journal（动作日志）数据契约 | 部分实现；W1-02 等待最终复扫与 PR 合并 | 已有 Scope、Feature Inventory（功能清单）、Approval（审批）、Action（动作）、Event（事件）、Checkpoint（检查点）、Session（会话）、Oracle（预期行为判定依据）/Evidence（证据）和 Candidate Assessment（候选评估）契约；`validate_contract_bindings()` 完成 Scope/Action/Approval Schema（数据结构规则）校验及跨记录字段绑定。最新测试与覆盖通过；Ponytail 和 Codex 安全复核发现的行终止符问题均已修复，最终复扫待进行。结果不认证来源/审核人、不授权或派发。Evidence 原件持久化、可信来源校验及 Confirmed Gate（缺陷确认门禁）仍未实现 |
+| W1 | Scope（授权范围）、Surface（测试表面）、Feature（功能）、Oracle（预期行为判定依据）、Finding（缺陷记录）、Evidence（证据）、Journal（动作日志）数据契约 | 部分实现；W1-02 已进入 PR #16，等待合并 | 已有 Scope、Feature Inventory（功能清单）、Approval（审批）、Action（动作）、Event（事件）、Checkpoint（检查点）、Session（会话）、Oracle（预期行为判定依据）/Evidence（证据）和 Candidate Assessment（候选评估）契约；`validate_contract_bindings()` 完成 Scope/Action/Approval Schema（数据结构规则）校验及跨记录字段绑定。最新测试、覆盖与代码/安全复核通过。结果不认证来源/审核人、不授权或派发。Evidence 原件持久化、可信来源校验及 Confirmed Gate（缺陷确认门禁）仍未实现 |
 | W2 | 11 个独立 Skill（技能包） | 本地闭包验证通过 | 11 个包均含规范 Skill/Pattern（缺陷模式）闭包且 Manifest（清单）摘要一致；Codex/Claude 干净安装和真实 Eval（评测）未验证 |
 | W3 | 16 个 Bug Pattern（缺陷模式） | 候选规则 | 需适用/排除条件、Oracle（预期行为判定依据）、反例和真实对照评测 |
 | W4 | 风险路由与有界自主探索 | 部分实现 | `scripts/discover_openapi.py` 可从本地 OpenAPI（开放 API 描述格式）3 JSON 输出稳定 ID 和 JSON Pointer（JSON 指针）来源清单；URL（统一资源定位符）/Browser（浏览器）发现、风险路由与动态执行仍待实现 |
@@ -71,7 +71,7 @@
 ## 执行顺序
 
 1. 运行基线静态检查、单元/契约测试与当前质量门禁，记录真实输出。
-2. PR #15 已合并。完成 W1-02 最新修复的 RED/GREEN/REFACTOR/VERIFY 与代码/安全复扫后，提交一个 `develop` → `main` 的 PR；项目所有者审阅并手动合并前暂停后续开发，不叠加第二个 PR。实现证据见 [W1-02 契约绑定 TDD 记录](2026-11-25_W1_APPROVAL_EXECUTION_BINDING_TDD_ZH.md)。
+2. PR #15 已合并。W1-02 已通过 PR #16 从 `develop` 提交至 `main`；等待项目所有者审阅并手动合并，合并前暂停后续开发，不叠加第二个 PR。实现证据见 [W1-02 契约绑定 TDD 记录](2026-11-25_W1_APPROVAL_EXECUTION_BINDING_TDD_ZH.md)。
 3. W1-02 合并后继续浏览器探索工具调研：先完善人工审核边界与浏览器工具对照文档，再按 W5/W7/W9 依赖评估隔离 Order Demo（订单演示项目）同场对照和运行时实现。凡涉及真实来源认证、审核身份、动作授权或 Confirmed Gate（缺陷确认门禁）的变更，先与项目所有者讨论是否需独立真人安全复核。
 4. 每次只推进一个功能 PR；每轮更新本矩阵和独立中文 TDD 记录。不得将内部纵向切片作为缩水 MVP 对外发布。
 
