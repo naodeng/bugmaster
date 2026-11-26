@@ -9,7 +9,7 @@
 - **PR #21 首轮复核修复提交：** `a80e57b29d32e17c3a24764faac7ef7c91773c6b`
 - **PR #21 第二轮复核修复提交：** `2c44652738b74b11ec7962abd5e977b9bb98bdd6`
 - **PR #21 第三轮复核修复提交：** `82d3847f6edbeb7aead99f75d061e74d52762433`
-- **状态：** PR #21 三轮审查共五条 P2 意见已在本地 `develop` 修复；另一个 Spec（方案）复核缺口也已补齐。修复提交 `82d3847` 通过 680 项单测、134 项契约测试、1 项安全测试和 100% 行/分支覆盖；Standards（规范）、Spec（方案）与聚焦安全复核均无可执行发现。该提交待推送；针对新 PR 头的 Q15（逐 PR 代码扫描及适用的安全扫描）待完成。合并前不启动下一片。
+- **状态：** PR #21 三轮审查共五条 P2 意见已在 `develop` 修复并推送；另一个 Spec（方案）复核缺口也已补齐。修复提交 `82d3847` 通过 680 项单测、134 项契约测试、1 项安全测试和 100% 行/分支覆盖；最新代码扫描在 PR 头 `4a4c46d` 完成且无新发现。Standards（规范）、Spec（方案）与本地聚焦安全复核无可执行发现；Codex 安全扫描未返回结果，Q15 安全门禁仍待完成。合并前不启动下一片。
 
 ## 范围
 
@@ -152,4 +152,5 @@ PR #21 的 Codex Review（代码审查）在提交 `7176b34` 上指出两处 P2 
 | 品牌、目录、基准清单结构 | `check_branding.py`、`validate_catalog.py`、`validate_benchmark.py` | PASS；基准场景未执行 |
 | 发布门禁 | `python3.12 scripts/quality_gate.py --mode release --coverage /private/tmp/bugmaster-pr21-fifth-review-coverage.json` | 按预期 NO-GO：功能清单未冻结、业务执行覆盖未超过 60%、核心 Happy/Negative/Edge 场景缺少实际证据 |
 | Standards / Spec / 聚焦安全复核 | 当前代码与测试差异 | 无可执行发现；安全复核为只读代码检查，不代表独立真人审查或完整渗透测试 |
-| Q15 Codex 代码/安全扫描 | 修复提交 `82d3847` 尚未推送 | 待更新 PR #21 后针对最新 PR 头扫描；完成前不标为通过 |
+| Q15 Codex 代码扫描 | PASS（通过） | PR 头 `4a4c46d` 扫描完成，无新发现；后续记录提交只更新中文文档，不改代码 |
+| Q15 Codex 安全扫描 | PENDING（待完成） | GitHub 扫描状态未启动；本机 `codex exec --sandbox read-only` 未产出结论并被中断。聚焦源代码审查无可执行发现，但不能替代 Q15 扫描；合并前仍需完成 |
