@@ -62,6 +62,14 @@ def _schema_resources(resource, base_uri, root_base_is_effective=False):
     if isinstance(declared_id, str) and "#" in declared_id:
         raise SchemaRegistryError("schema-id-invalid")
     resource_id = resource.id()
+    if root_base_is_effective and resource_id:
+        try:
+            declared_uri = urljoin(base_uri, resource_id)
+            parsed_declared_uri = urlsplit(declared_uri)
+        except ValueError as error:
+            raise SchemaRegistryError("schema-id-invalid") from error
+        if not parsed_declared_uri.scheme or parsed_declared_uri.fragment:
+            raise SchemaRegistryError("schema-id-invalid")
     effective_uri = (
         base_uri
         if root_base_is_effective or not resource_id
@@ -191,7 +199,12 @@ def _load_schema_bundle(schemas_directory):
         for schema_id, resource in root_resources.items()
     }
 
-    def register_resources(resource, base_uri, root_base_is_effective=False):
+    def register_resources(
+        resource,
+        base_uri,
+        root_base_is_effective=False,
+        skip_root=False,
+    ):
         nonlocal registry
         try:
             for candidate, effective_uri in _schema_resources(
@@ -199,6 +212,8 @@ def _load_schema_bundle(schemas_directory):
                 base_uri,
                 root_base_is_effective=root_base_is_effective,
             ):
+                if skip_root and candidate is resource:
+                    continue
                 contents_id = id(candidate.contents)
                 if contents_id in resources_by_contents_id:
                     continue
@@ -277,7 +292,8 @@ def _load_schema_bundle(schemas_directory):
                 resolved_contents_id in resources_by_contents_id
             )
             reference_fragment = urldefrag(reference)[1]
-            if reference_fragment.startswith("/"):
+            pointer_reference = reference_fragment.startswith("/")
+            if pointer_reference:
                 target_base_uri = _pointer_base_uri(
                     registry,
                     reference_uri,
@@ -296,16 +312,20 @@ def _load_schema_bundle(schemas_directory):
                 resolved.contents,
                 default_specification=DRAFT202012,
             )
+            target_base_is_effective = (
+                target_is_registered_resource or pointer_reference
+            )
             register_resources(
                 target_resource,
                 target_base_uri,
-                root_base_is_effective=target_is_registered_resource,
+                root_base_is_effective=target_base_is_effective,
+                skip_root=(pointer_reference and not target_is_registered_resource),
             )
             pending_resources.extend(
                 _schema_resources(
                     target_resource,
                     target_base_uri,
-                    root_base_is_effective=target_is_registered_resource,
+                    root_base_is_effective=target_base_is_effective,
                 )
             )
 

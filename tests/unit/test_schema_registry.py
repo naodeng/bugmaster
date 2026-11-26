@@ -7,6 +7,7 @@ from unittest import mock
 
 from bugmaster_core.schema_registry import (
     SchemaRegistryError,
+    _schema_resources,
     get_schema_validator,
     validate_schema_registry,
 )
@@ -39,6 +40,21 @@ class SchemaRegistryTests(unittest.TestCase):
     def assert_registry_error(self, expected_code):
         with self.assertRaisesRegex(SchemaRegistryError, expected_code):
             validate_schema_registry(self.directory)
+
+    def test_effective_root_rejects_malformed_declared_id(self):
+        resource = mock.Mock()
+        resource.contents = {"$id": "http://[::1"}
+        resource.id.return_value = "http://[::1"
+        resource.subresources.return_value = ()
+
+        with self.assertRaisesRegex(SchemaRegistryError, "schema-id-invalid"):
+            list(
+                _schema_resources(
+                    resource,
+                    "https://example.test/root.json",
+                    root_base_is_effective=True,
+                )
+            )
 
     def test_repository_schema_registry_has_pinned_versions_and_closed_refs(self):
         validate_schema_registry()
@@ -199,6 +215,48 @@ class SchemaRegistryTests(unittest.TestCase):
         self.write_schema("allowed.schema.json", root_level_allowed)
 
         self.assert_registry_error("schema-reference-unresolved")
+
+    def test_referenced_default_id_does_not_change_pointer_runtime_base(self):
+        root = _schema("https://example.test/root.json")
+        root["properties"]["payload"] = {
+            "default": {
+                "$id": "sub/target.json",
+                "$ref": "allowed.json",
+            }
+        }
+        root["allOf"] = [
+            {"$ref": "#/properties/payload/default"}
+        ]
+        subdirectory_target = _schema(
+            "https://example.test/sub/allowed.json"
+        )
+        self.write_schema("root.schema.json", root)
+        self.write_schema("subdirectory-target.schema.json", subdirectory_target)
+
+        self.assert_registry_error("schema-reference-unresolved")
+
+    def test_referenced_default_id_uses_pointer_runtime_base_for_nested_refs(self):
+        root = _schema("https://example.test/root.json")
+        root["properties"]["payload"] = {
+            "default": {
+                "$id": "sub/target.json",
+                "$ref": "allowed.json",
+            }
+        }
+        root["allOf"] = [
+            {"$ref": "#/properties/payload/default"}
+        ]
+        root_level_target = _schema("https://example.test/allowed.json")
+        root_level_target["required"].append("rootOnly")
+        self.write_schema("root.schema.json", root)
+        self.write_schema("root-level-target.schema.json", root_level_target)
+
+        validator = get_schema_validator("root.schema.json", self.directory)
+
+        self.assertTrue(
+            validator.is_valid({"schemaVersion": "1.0", "rootOnly": True})
+        )
+        self.assertFalse(validator.is_valid({"schemaVersion": "1.0"}))
 
     def test_referenced_default_registers_nested_local_schema_resources(self):
         root = _schema("https://example.test/root.json")
