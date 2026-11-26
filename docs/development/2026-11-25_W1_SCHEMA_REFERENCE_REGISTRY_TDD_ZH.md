@@ -9,7 +9,7 @@
 - **PR #21 首轮复核修复提交：** `a80e57b29d32e17c3a24764faac7ef7c91773c6b`
 - **PR #21 第二轮复核修复提交：** `2c44652738b74b11ec7962abd5e977b9bb98bdd6`
 - **PR #21 第三轮复核修复提交：** `82d3847f6edbeb7aead99f75d061e74d52762433`
-- **状态：** PR #21 三轮 Codex Review（代码审查）的五条 P2 意见和一项 Spec（方案）复核缺口已修复；后续完整分支复核又发现一项 URI（统一资源标识符）解析错误类型边界问题，已由提交 `8ad7683` 修复。当前全量单测 681/681、契约测试 134/134、安全测试 1/1，语句与分支覆盖率均为 100%。修复后的 Q15 Codex 代码扫描因本机沙箱无法启动 App Server（应用服务）而受阻；Codex 安全扫描仍待完成。合并前不启动下一片。
+- **状态：** PR #21 三轮 Codex Review（代码审查）的五条 P2 意见和一项 Spec（方案）复核缺口已修复；后续完整分支复核又发现一项 URI（统一资源标识符）解析错误类型边界问题，已由提交 `8ad7683` 修复。当前全量单测 681/681、契约测试 134/134、安全测试 1/1，语句与分支覆盖率均为 100%。针对修复提交的 Codex 代码扫描无可执行发现；Codex 安全扫描仍待完成。合并前不启动下一片。
 
 ## 范围
 
@@ -180,5 +180,5 @@ PR #21 的 Codex Review（代码审查）在提交 `7176b34` 上指出两处 P2 
 | 行 / 分支覆盖率 | `python3.12 -m coverage report -m --fail-under=100` | PASS，3358/3358 语句、1218/1218 分支，均 100% |
 | 契约 / 安全测试 | `python3.12 -m unittest discover -s tests/contracts -q`；`python3.12 -m unittest discover -s tests/security -q` | PASS，134/134、1/1 |
 | Diff 空白检查 | `git diff --check` | PASS |
-| 修复后的 Q15 Codex 代码扫描 | `PYTHONPATH=/private/tmp/bugmaster-provenance-test-deps codex review --uncommitted` | BLOCKED（受阻）：沙箱禁止初始化本机 App Server；修复前 PR 头的扫描结果不代表本次提交 |
+| 修复提交的 Q15 Codex 代码扫描 | `PYTHONPATH=/private/tmp/bugmaster-provenance-test-deps codex review --commit 8ad7683ce0b9e17d1f93c0e7e32e33262b988c2f` | PASS；针对修复提交无可执行发现；PR 先前完整代码扫描仍对应修复前的 PR 头 |
 | Q15 Codex 安全扫描 | 当前提交 | PENDING（待完成）；合并前仍需获得扫描结论 |
