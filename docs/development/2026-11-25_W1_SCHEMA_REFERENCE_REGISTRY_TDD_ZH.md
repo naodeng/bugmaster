@@ -9,7 +9,7 @@
 - **PR #21 首轮复核修复提交：** `a80e57b29d32e17c3a24764faac7ef7c91773c6b`
 - **PR #21 第二轮复核修复提交：** `2c44652738b74b11ec7962abd5e977b9bb98bdd6`
 - **PR #21 第三轮复核修复提交：** `82d3847f6edbeb7aead99f75d061e74d52762433`
-- **状态：** PR #21 三轮审查共五条 P2 意见已在 `develop` 修复并推送；另一个 Spec（方案）复核缺口也已补齐。修复提交 `82d3847` 通过 680 项单测、134 项契约测试、1 项安全测试和 100% 行/分支覆盖；最新代码扫描在 PR 头 `4a4c46d` 完成且无新发现。Standards（规范）、Spec（方案）与本地聚焦安全复核无可执行发现；Codex 安全扫描未返回结果，Q15 安全门禁仍待完成。合并前不启动下一片。
+- **状态：** PR #21 三轮 Codex Review（代码审查）的五条 P2 意见和一项 Spec（方案）复核缺口已修复；后续完整分支复核又发现一项 URI（统一资源标识符）解析错误类型边界问题，已由提交 `8ad7683` 修复。当前全量单测 681/681、契约测试 134/134、安全测试 1/1，语句与分支覆盖率均为 100%。修复后的 Q15 Codex 代码扫描因本机沙箱无法启动 App Server（应用服务）而受阻；Codex 安全扫描仍待完成。合并前不启动下一片。
 
 ## 范围
 
@@ -154,3 +154,31 @@ PR #21 的 Codex Review（代码审查）在提交 `7176b34` 上指出两处 P2 
 | Standards / Spec / 聚焦安全复核 | 当前代码与测试差异 | 无可执行发现；安全复核为只读代码检查，不代表独立真人审查或完整渗透测试 |
 | Q15 Codex 代码扫描 | PASS（通过） | PR 头 `4a4c46d` 扫描完成，无新发现；后续记录提交只更新中文文档，不改代码 |
 | Q15 Codex 安全扫描 | PENDING（待完成） | GitHub 扫描状态未启动；本机 `codex exec --sandbox read-only` 未产出结论并被中断。聚焦源代码审查无可执行发现，但不能替代 Q15 扫描；合并前仍需完成 |
+
+## PR #21：第四轮复核的 URI 错误类型补强
+
+日期：2026-11-26。完整分支复核指出，`_reference_base_uri()` 调用 `urljoin()` 时若遇到格式错误的 URI（统一资源标识符），Python 可能抛出 `ValueError`（值错误），而调用点位于引用解析的异常映射之前。当前开发依赖的 `FormatChecker`（格式检查器）会先拒绝此类 `$ref`；为确保没有可选 URI 格式检查器时也遵守错误类型契约，新增回归用例模拟该配置。
+
+### RED：复现
+
+- 新用例临时关闭 Draft 2020-12 校验器的 `FORMAT_CHECKER`，再加载包含 `$ref: "https://[::1"` 的 Schema。旧代码在 URI 基址计算处直接抛出 `ValueError: Invalid IPv6 URL`，没有返回 `SchemaRegistryError`（注册表错误）。
+
+### GREEN：修复
+
+- `_reference_base_uri()` 捕获 URI 基址计算的 `ValueError`，转换为 `SchemaRegistryError("schema-reference-unresolved:<reference>")` 并保留原始异常链。调用方仍失败关闭。
+- 修复提交：`8ad7683ce0b9e17d1f93c0e7e32e33262b988c2f`。
+
+### VERIFY：修复验证
+
+环境：macOS；Python 3.12.16；固定依赖位于 `/private/tmp/bugmaster-provenance-test-deps`。
+
+| 检查 | 命令 / 范围 | 结果 |
+|---|---|---|
+| 新增回归用例 RED | `test_malformed_reference_uri_is_reported_as_registry_error`，模拟无 URI 格式检查器 | 修复前 FAIL：`ValueError: Invalid IPv6 URL` |
+| Schema 注册表定向单测 | `PYTHONPATH=/private/tmp/bugmaster-provenance-test-deps PYTHONDONTWRITEBYTECODE=1 python3.12 -m unittest discover -s tests/unit -p test_schema_registry.py -q` | PASS，42/42 |
+| 全量单测与覆盖采集 | `COVERAGE_FILE=/private/tmp/bugmaster-pr21-uri-normalization.coverage PYTHONPATH=/private/tmp/bugmaster-provenance-test-deps PYTHONDONTWRITEBYTECODE=1 python3.12 -m coverage run --branch --source=bugmaster_core,scripts -m unittest discover -s tests/unit -q` | PASS，681/681 |
+| 行 / 分支覆盖率 | `python3.12 -m coverage report -m --fail-under=100` | PASS，3358/3358 语句、1218/1218 分支，均 100% |
+| 契约 / 安全测试 | `python3.12 -m unittest discover -s tests/contracts -q`；`python3.12 -m unittest discover -s tests/security -q` | PASS，134/134、1/1 |
+| Diff 空白检查 | `git diff --check` | PASS |
+| 修复后的 Q15 Codex 代码扫描 | `PYTHONPATH=/private/tmp/bugmaster-provenance-test-deps codex review --uncommitted` | BLOCKED（受阻）：沙箱禁止初始化本机 App Server；修复前 PR 头的扫描结果不代表本次提交 |
+| Q15 Codex 安全扫描 | 当前提交 | PENDING（待完成）；合并前仍需获得扫描结论 |

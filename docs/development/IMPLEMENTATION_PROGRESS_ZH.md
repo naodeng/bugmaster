@@ -1,7 +1,7 @@
 # BugMaster 工程实施进度矩阵
 
 **更新日期：** 2026-11-26
-**当前状态：** PR（拉取请求）#15–#20 均已合并；PR #21 是 W1-03 实现。三轮复核发现的五条 P2 意见和一项 Spec（方案）复核缺口已在 `develop` 修复并推送；修复提交 `82d3847f6edbeb7aead99f75d061e74d52762433` 的验证为 680 项单测、134 项契约测试、安全测试及 100% 行/分支覆盖率通过。最新代码扫描在 PR 头 `4a4c46d` 完成且无新发现；Standards（规范）、Spec（方案）与本地聚焦安全复核均无可执行发现。Codex 安全扫描未返回结果，Q15 安全门禁仍待完成；未完成前不合并 PR，不启动下一片。W5-01 仍保持 fail-closed（失败时保持阻断），`can_dispatch()` 对所有风险等级拒绝；W7 证据原件存储、可信来源适配器、浏览器运行时和真实基准评测仍未完成；完整产品仍为 Release No-Go（暂不发布）。
+**当前状态：** PR（拉取请求）#15–#20 均已合并；PR #21 是 W1-03 实现。五条 Codex Review（代码审查）P2 意见、一项 Spec（方案）复核缺口和后续完整分支复核发现的 URI 错误类型问题，均已在 `develop` 修复；最新修复提交 `8ad7683` 的验证为 681 项单测、134 项契约测试、1 项安全测试及 100% 行/分支覆盖率通过。修复后的本机 Codex 代码扫描受沙箱限制而未完成；Q15 Codex 安全扫描也待完成。两项门禁完成前不合并 PR，不启动下一片。W5-01 仍保持 fail-closed（失败时保持阻断），`can_dispatch()` 对所有风险等级拒绝；W7 证据原件存储、可信来源适配器、浏览器运行时和真实基准评测仍未完成；完整产品仍为 Release No-Go（暂不发布）。
 
 ## 仓库审计摘要
 
@@ -19,7 +19,7 @@
 | 工作流 | 目标 | 状态 | 验收证据 / 下一步 |
 |---|---|---|---|
 | W0 | 开发基线与品牌/Skill 名称统一 | 本地检查通过 | `check_branding.py`、`validate_catalog.py`、Skill 命名契约通过；基线提交 `cef3cb5` 已推送到 fork |
-| W1 | Scope（授权范围）、Surface（测试表面）、Feature（功能）、Oracle（预期行为判定依据）、Finding（缺陷记录）、Evidence（证据）、Journal（动作日志）数据契约 | 部分实现；W1-02 已合并；W1-03 五条 P2 和一项 Spec 复核缺口已修复，最新 Q15 复扫待完成 | 已有 Scope、Feature Inventory（功能清单）、Approval（审批）、Action（动作）、Event（事件）、Checkpoint（检查点）、Session（会话）、Oracle（预期行为判定依据）/Evidence（证据）和 Candidate Assessment（候选评估）契约；`validate_contract_bindings()` 完成记录结构与跨记录字段绑定。W1-03 新增全仓封闭本地 Schema 注册表和版本入口校验，并递归检查被引用目标的引用闭包，加载期与运行期复用 JSON Pointer 实际基准，详见 [TDD 记录](2026-11-25_W1_SCHEMA_REFERENCE_REGISTRY_TDD_ZH.md)。这些实现不认证来源/审核人、不授权或派发。Evidence 原件持久化、可信来源校验及 Confirmed Gate（缺陷确认门禁）仍未实现 |
+| W1 | Scope（授权范围）、Surface（测试表面）、Feature（功能）、Oracle（预期行为判定依据）、Finding（缺陷记录）、Evidence（证据）、Journal（动作日志）数据契约 | 部分实现；W1-02 已合并；W1-03 五条 P2、一项 Spec 复核缺口及一项 URI 错误类型问题已修复；Q15 代码/安全扫描待完成 | 已有 Scope、Feature Inventory（功能清单）、Approval（审批）、Action（动作）、Event（事件）、Checkpoint（检查点）、Session（会话）、Oracle（预期行为判定依据）/Evidence（证据）和 Candidate Assessment（候选评估）契约；`validate_contract_bindings()` 完成记录结构与跨记录字段绑定。W1-03 新增全仓封闭本地 Schema 注册表和版本入口校验，并递归检查被引用目标的引用闭包，加载期与运行期复用 JSON Pointer 实际基准，详见 [TDD 记录](2026-11-25_W1_SCHEMA_REFERENCE_REGISTRY_TDD_ZH.md)。这些实现不认证来源/审核人、不授权或派发。Evidence 原件持久化、可信来源校验及 Confirmed Gate（缺陷确认门禁）仍未实现 |
 | W2 | 11 个独立 Skill（技能包） | 本地闭包验证通过 | 11 个包均含规范 Skill/Pattern（缺陷模式）闭包且 Manifest（清单）摘要一致；Codex/Claude 干净安装和真实 Eval（评测）未验证 |
 | W3 | 16 个 Bug Pattern（缺陷模式） | 候选规则 | 需适用/排除条件、Oracle（预期行为判定依据）、反例和真实对照评测 |
 | W4 | 风险路由与有界自主探索 | 部分实现 | `scripts/discover_openapi.py` 可从本地 OpenAPI（开放 API 描述格式）3 JSON 输出稳定 ID 和 JSON Pointer（JSON 指针）来源清单；URL（统一资源定位符）/Browser（浏览器）发现、风险路由与动态执行仍待实现 |
