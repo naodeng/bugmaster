@@ -55,8 +55,23 @@ def build(skill, out):
             raise ValueError("unsafe-output-path")
         out = resolved_out
 
-    if out.exists() and not out.is_dir():
-        raise ValueError("unsafe-output-path")
+    if out.exists():
+        manifest_path = out / "manifest.json"
+        if (
+            not out.is_dir()
+            or manifest_path.is_symlink()
+            or not manifest_path.is_file()
+        ):
+            raise ValueError("unsafe-output-path")
+        try:
+            previous_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError, UnicodeError) as error:
+            raise ValueError("unsafe-output-path") from error
+        if (
+            not isinstance(previous_manifest, dict)
+            or previous_manifest.get("skill") != skill
+        ):
+            raise ValueError("unsafe-output-path")
 
     out.parent.mkdir(parents=True, exist_ok=True)
     stage_root = pathlib.Path(tempfile.mkdtemp(prefix=f".{out.name}.stage-", dir=out.parent))

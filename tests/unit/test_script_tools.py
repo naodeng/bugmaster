@@ -64,13 +64,28 @@ class ScriptToolsTests(unittest.TestCase):
     def test_standalone_builder_replaces_only_the_requested_output_directory(self):
         with tempfile.TemporaryDirectory() as temporary_directory:
             output = Path(temporary_directory) / "package"
-            output.mkdir()
+            build("discover-api-idempotency-defects", output)
             (output / "stale.txt").write_text("stale", encoding="utf-8")
 
             package = build("discover-api-idempotency-defects", output)
 
             self.assertFalse((package / "stale.txt").exists())
             self.assertTrue((package / "manifest.json").is_file())
+
+    def test_standalone_builder_preserves_unmanaged_existing_output(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            base = Path(temporary_directory)
+            root = base / "repository"
+            self._create_minimal_standalone_repository(root)
+            output = base / "user-data"
+            output.mkdir()
+            (output / "keep.txt").write_text("user data", encoding="utf-8")
+
+            with patch.object(build_standalone, "ROOT", root):
+                with self.assertRaisesRegex(ValueError, "unsafe-output-path"):
+                    build("sample", output)
+
+            self.assertEqual((output / "keep.txt").read_text(), "user data")
 
     def test_standalone_builder_never_removes_repository_or_skill_sources(self):
         for output_name in ("repository", "skill/package"):
@@ -200,7 +215,8 @@ class ScriptToolsTests(unittest.TestCase):
             root = base / "repository"
             self._create_minimal_standalone_repository(root)
             output = base / "package"
-            output.mkdir()
+            with patch.object(build_standalone, "ROOT", root):
+                build("sample", output)
             (output / "keep.txt").write_text("previous", encoding="utf-8")
             original_replace = Path.replace
 
