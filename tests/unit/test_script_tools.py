@@ -1,5 +1,6 @@
 import io
 import json
+import re
 import runpy
 import sys
 import tempfile
@@ -57,6 +58,70 @@ class ScriptToolsTests(unittest.TestCase):
 
             self.assertFalse((package / "stale.txt").exists())
             self.assertTrue((package / "manifest.json").is_file())
+
+    def test_standalone_builder_never_removes_repository_or_skill_sources(self):
+        for output_name in ("repository", "skill/package"):
+            with self.subTest(output=output_name), tempfile.TemporaryDirectory() as temporary_directory:
+                root = Path(temporary_directory) / "repository"
+                skill = root / "skills" / "sample"
+                skill.mkdir(parents=True)
+                (skill / "SKILL.md").write_text("keep", encoding="utf-8")
+                (root / "patterns").mkdir()
+                (root / "registry").mkdir()
+                (root / "registry" / "capabilities.json").write_text(
+                    json.dumps({"capabilities": [{"skill": "sample", "patternIds": []}]}),
+                    encoding="utf-8",
+                )
+                output = root if output_name == "repository" else skill / "package"
+
+                with patch.object(build_standalone, "ROOT", root):
+                    try:
+                        build("sample", output)
+                    except (OSError, ValueError) as error:
+                        self.assertIsInstance(error, ValueError)
+                        self.assertRegex(str(error), "unsafe-output-path")
+                    else:
+                        self.fail("unsafe output path was accepted")
+                    self.assertTrue((skill / "SKILL.md").is_file())
+                    self.assertEqual((skill / "SKILL.md").read_text(), "keep")
+
+    def test_standalone_builder_preserves_existing_output_when_pattern_validation_fails(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            base = Path(temporary_directory)
+            root = base / "repository"
+            (root / "registry").mkdir(parents=True)
+            (root / "skills" / "sample").mkdir(parents=True)
+            (root / "patterns").mkdir()
+            (root / "registry" / "capabilities.json").write_text(
+                json.dumps(
+                    {"capabilities": [{"skill": "sample", "patternIds": ["BP-MISSING"]}]}
+                ),
+                encoding="utf-8",
+            )
+            output = base / "package"
+            output.mkdir()
+            (output / "keep.txt").write_text("previous", encoding="utf-8")
+
+            with patch.object(build_standalone, "ROOT", root):
+                with self.assertRaisesRegex(ValueError, "missing-or-duplicate-pattern"):
+                    build("sample", output)
+
+            self.assertTrue((output / "keep.txt").is_file())
+            self.assertEqual((output / "keep.txt").read_text(), "previous")
+
+    def test_github_workflows_pin_actions_to_full_commit_shas(self):
+        workflow_directory = ROOT / ".github" / "workflows"
+        action_references = []
+        for workflow in workflow_directory.glob("*.y*ml"):
+            action_references.extend(
+                re.findall(r"^\s*-\s*uses:\s*([^\s#]+)", workflow.read_text(), re.MULTILINE)
+            )
+
+        self.assertTrue(action_references)
+        self.assertTrue(
+            all(re.fullmatch(r"[^@]+@[0-9a-f]{40}", reference) for reference in action_references),
+            action_references,
+        )
 
     def test_branding_scan_reports_bad_names_invalid_text_and_forbidden_content(self):
         with tempfile.TemporaryDirectory() as temporary_directory:
