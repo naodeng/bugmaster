@@ -25,34 +25,37 @@ def build(skill, out):
             raise ValueError("missing-or-duplicate-pattern:" + pattern_id)
         pattern_sources[pattern_id] = matches[0]
 
+    requested_output = pathlib.Path(out)
     out = pathlib.Path(os.path.abspath(out))
+    if out.is_symlink():
+        raise ValueError("unsafe-output-path")
     root = ROOT.resolve()
     resolved_out = out.resolve()
     bundle_root = root / "dist" / "standalone"
 
     try:
-        out.relative_to(root)
+        out.relative_to(pathlib.Path(os.path.abspath(ROOT)))
     except ValueError:
-        if root == resolved_out or root in resolved_out.parents or resolved_out in root.parents:
+        output_is_in_repository = False
+    else:
+        output_is_in_repository = True
+
+    try:
+        relative_output = resolved_out.relative_to(bundle_root)
+    except ValueError:
+        if (
+            output_is_in_repository
+            or root == resolved_out
+            or root in resolved_out.parents
+            or resolved_out in root.parents
+        ):
             raise ValueError("unsafe-output-path")
     else:
-        try:
-            relative_output = out.relative_to(bundle_root)
-        except ValueError:
-            raise ValueError("unsafe-output-path") from None
         if not relative_output.parts:
             raise ValueError("unsafe-output-path")
-        parent = out
-        while parent != root:
-            if parent.is_symlink():
-                raise ValueError("unsafe-output-path")
-            parent = parent.parent
-        try:
-            resolved_out.relative_to(bundle_root.resolve())
-        except ValueError:
-            raise ValueError("unsafe-output-path") from None
+        out = resolved_out
 
-    if out.is_symlink() or (out.exists() and not out.is_dir()):
+    if out.exists() and not out.is_dir():
         raise ValueError("unsafe-output-path")
 
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -83,7 +86,7 @@ def build(skill, out):
             raise
         if backup is not None:
             shutil.rmtree(backup)
-        return out
+        return requested_output
     finally:
         shutil.rmtree(stage_root, ignore_errors=True)
 

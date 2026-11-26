@@ -22,6 +22,19 @@ from validate_gates import can_dispatch, can_replay, eligible_confirmed
 
 
 class ScriptToolsTests(unittest.TestCase):
+    @staticmethod
+    def _create_minimal_standalone_repository(root):
+        skill = root / "skills" / "sample"
+        skill.mkdir(parents=True)
+        (skill / "SKILL.md").write_text("sample skill", encoding="utf-8")
+        (root / "patterns").mkdir()
+        (root / "registry").mkdir()
+        (root / "registry" / "capabilities.json").write_text(
+            json.dumps({"capabilities": [{"skill": "sample", "patternIds": []}]}),
+            encoding="utf-8",
+        )
+        return skill
+
     def test_standalone_builder_rejects_unknown_skills_and_missing_patterns(self):
         with tempfile.TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
@@ -108,6 +121,121 @@ class ScriptToolsTests(unittest.TestCase):
 
             self.assertTrue((output / "keep.txt").is_file())
             self.assertEqual((output / "keep.txt").read_text(), "previous")
+
+    def test_standalone_builder_rejects_repository_root_ancestor_and_bundle_root(self):
+        for output_kind in ("repository", "ancestor", "bundle-root"):
+            with self.subTest(output=output_kind), tempfile.TemporaryDirectory() as temporary_directory:
+                base = Path(temporary_directory)
+                root = base / "repository"
+                skill = self._create_minimal_standalone_repository(root)
+                (base / "preserve.txt").write_text("keep", encoding="utf-8")
+                output = {
+                    "repository": root,
+                    "ancestor": base,
+                    "bundle-root": root / "dist" / "standalone",
+                }[output_kind]
+
+                with patch.object(build_standalone, "ROOT", root):
+                    with self.assertRaisesRegex(ValueError, "unsafe-output-path"):
+                        build("sample", output)
+
+                self.assertEqual((skill / "SKILL.md").read_text(), "sample skill")
+                self.assertEqual((base / "preserve.txt").read_text(), "keep")
+
+    def test_standalone_builder_allows_the_repository_managed_bundle_directory(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory) / "repository"
+            self._create_minimal_standalone_repository(root)
+            output = root / "dist" / "standalone" / "sample"
+
+            with patch.object(build_standalone, "ROOT", root):
+                package = build("sample", output)
+
+            self.assertEqual(package, output)
+            self.assertTrue((package / "manifest.json").is_file())
+
+    def test_standalone_builder_rejects_symlinked_repository_output_parent(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            base = Path(temporary_directory)
+            root = base / "repository"
+            skill = self._create_minimal_standalone_repository(root)
+            external = base / "external"
+            external.mkdir()
+            (external / "preserve.txt").write_text("keep", encoding="utf-8")
+            (root / "dist").symlink_to(external, target_is_directory=True)
+            output = root / "dist" / "standalone" / "sample"
+
+            with patch.object(build_standalone, "ROOT", root):
+                with self.assertRaisesRegex(ValueError, "unsafe-output-path"):
+                    build("sample", output)
+
+            self.assertEqual((skill / "SKILL.md").read_text(), "sample skill")
+            self.assertEqual((external / "preserve.txt").read_text(), "keep")
+
+    def test_standalone_builder_rejects_file_and_symlink_outputs(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            base = Path(temporary_directory)
+            root = base / "repository"
+            self._create_minimal_standalone_repository(root)
+            file_output = base / "file-output"
+            file_output.write_text("keep", encoding="utf-8")
+            target = base / "target"
+            target.mkdir()
+            (target / "keep.txt").write_text("keep", encoding="utf-8")
+            symlink_output = base / "symlink-output"
+            symlink_output.symlink_to(target, target_is_directory=True)
+
+            with patch.object(build_standalone, "ROOT", root):
+                for output in (file_output, symlink_output):
+                    with self.subTest(output=output):
+                        with self.assertRaisesRegex(ValueError, "unsafe-output-path"):
+                            build("sample", output)
+
+            self.assertEqual(file_output.read_text(), "keep")
+            self.assertEqual((target / "keep.txt").read_text(), "keep")
+
+    def test_standalone_builder_restores_previous_output_when_publish_fails(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            base = Path(temporary_directory)
+            root = base / "repository"
+            self._create_minimal_standalone_repository(root)
+            output = base / "package"
+            output.mkdir()
+            (output / "keep.txt").write_text("previous", encoding="utf-8")
+            original_replace = Path.replace
+
+            def fail_staged_publish(path, target):
+                if path.parent.name.startswith(".package.stage-") and target == output:
+                    raise OSError("publish-failed")
+                return original_replace(path, target)
+
+            with patch.object(Path, "replace", autospec=True, side_effect=fail_staged_publish):
+                with patch.object(build_standalone, "ROOT", root):
+                    with self.assertRaisesRegex(OSError, "publish-failed"):
+                        build("sample", output)
+
+            self.assertEqual((output / "keep.txt").read_text(), "previous")
+            self.assertEqual(list(base.glob(".package.backup-*")), [])
+
+    def test_standalone_builder_does_not_publish_when_first_publish_fails(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            base = Path(temporary_directory)
+            root = base / "repository"
+            self._create_minimal_standalone_repository(root)
+            output = base / "package"
+            original_replace = Path.replace
+
+            def fail_staged_publish(path, target):
+                if path.parent.name.startswith(".package.stage-") and target == output:
+                    raise OSError("publish-failed")
+                return original_replace(path, target)
+
+            with patch.object(Path, "replace", autospec=True, side_effect=fail_staged_publish):
+                with patch.object(build_standalone, "ROOT", root):
+                    with self.assertRaisesRegex(OSError, "publish-failed"):
+                        build("sample", output)
+
+            self.assertFalse(output.exists())
 
     def test_github_workflows_pin_actions_to_full_commit_shas(self):
         workflow_directory = ROOT / ".github" / "workflows"
