@@ -16,7 +16,7 @@
 
 - 所有 `schemas/*.schema.json` 必须使用 Draft 2020-12（JSON Schema 标准版本），且使用全仓唯一的绝对、无片段 `$id`（规则标识）；重复检查统一协议/主机名大小写，并折叠 HTTP（超文本传输协议）/HTTPS（安全超文本传输协议）默认端口。
 - 每份 Schema 必须在 `required` 中要求 `schemaVersion`，并通过 `const` 将其固定为 `主版本号.次版本号` 字符串。
-- 加载时先校验所有 Schema，再将顶层与嵌套 `$id` 资源注册到本地 `Registry`（注册表），随后按每个 Schema 子规则的有效基准 URI 解析 `$ref` 与 `$dynamicRef`。本地 JSON Pointer（JSON 指针）和跨文件引用必须均能解析到有效的 Schema 或布尔 Schema；`default` 等普通数据字段中的对象不作为 Schema 子规则扫描。
+- 加载时先校验所有 Schema，再将顶层与嵌套 `$id` 资源注册到本地 `Registry`（注册表），随后按每个 Schema 子规则的有效基准 URI 解析 `$ref` 与 `$dynamicRef`。本地 JSON Pointer（JSON 指针）和跨文件引用必须均能解析到有效的 Schema 或布尔 Schema；`default` 等普通数据字段中的对象不作为 Schema 子规则扫描。若引用直接指向这类字段中的对象，该对象按引用目标 Schema 校验，但其自身 `$id` 只有在运行时解析器将其识别为子资源时才改变 URI 基准；加载期闭包检查必须沿用 Pointer 解析得到的运行时基准，并继续注册其下由 Schema 规则识别的嵌套资源。
 - 对 URI 等价但字面拼写不同的引用，仅为已知本地资源添加精确别名；注册表没有网络检索回调。目标不在本地 Schema 集合中、引用路径不存在或 URI 无法解析时，抛出 `SchemaRegistryError` 并阻止调用方继续使用校验器。
 - `contract_binding` 与 Candidate/Finding（候选记录/缺陷记录）本地存储复用 `get_schema_validator()`，不再各自维护外部 Schema 注册特例。
 - 记录只接受各自 Schema 固定的 `schemaVersion`。没有隐式迁移，不宣称不同版本之间自动向后兼容；新增支持版本须单独新增/修改 Schema 和迁移决策。

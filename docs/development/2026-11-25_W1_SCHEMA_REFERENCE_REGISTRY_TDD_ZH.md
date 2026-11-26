@@ -8,7 +8,8 @@
 - **实现提交：** `f2a3d3a333b6b88e01c564a10cb42954ef845fc1`
 - **PR #21 首轮复核修复提交：** `a80e57b29d32e17c3a24764faac7ef7c91773c6b`
 - **PR #21 第二轮复核修复提交：** `2c44652738b74b11ec7962abd5e977b9bb98bdd6`
-- **状态：** PR #21 两轮审查共四条 P2 意见已在本地 `develop` 修复；另一个 Spec（方案）复核缺口也已补齐。提交 `2c44652` 通过 677 项单测、134 项契约测试、1 项安全测试和 100% 行/分支覆盖；Standards（规范）、Spec（方案）与聚焦安全复核均无可执行问题。该提交尚未推送；针对最终 PR 头的 Q15（逐 PR 代码扫描及适用的安全扫描）待推送后完成。合并前不启动下一片。
+- **PR #21 第三轮复核修复提交：** `82d3847f6edbeb7aead99f75d061e74d52762433`
+- **状态：** PR #21 三轮审查共五条 P2 意见已在本地 `develop` 修复；另一个 Spec（方案）复核缺口也已补齐。修复提交 `82d3847` 通过 680 项单测、134 项契约测试、1 项安全测试和 100% 行/分支覆盖；Standards（规范）、Spec（方案）与聚焦安全复核均无可执行发现。该提交待推送；针对新 PR 头的 Q15（逐 PR 代码扫描及适用的安全扫描）待完成。合并前不启动下一片。
 
 ## 范围
 
@@ -121,3 +122,34 @@ PR #21 的 Codex Review（代码审查）在提交 `7176b34` 上指出两处 P2 
 | Release Gate（发布门禁） | `python3.12 scripts/quality_gate.py --mode release --coverage /private/tmp/bugmaster-pr21-finalfix-coverage.json` | 按预期 NO-GO：功能清单未冻结、业务执行覆盖未超过 60%、核心 Happy/Negative/Edge 场景缺少实际证据 |
 | Standards（规范）/ Spec（方案）/ 安全代码复核 | 当前修复差异 | 均无可执行问题；不等同独立真人审查或完整渗透测试 |
 | Q15 Codex 代码/安全扫描 | 最新本地修复待扫描 | 第二轮发现的两条 P2 已修复；推送后重新触发 PR 头代码与安全扫描 |
+
+## PR #21：第三轮复核意见与 Pointer 基准一致性修复
+
+日期：2026-11-26。PR 最新复扫发现第五条 P2：当 JSON Pointer（JSON 指针）指向普通 `default`（默认值）对象，且对象内 `$id` 改变目录时，加载期曾按新 `$id` 检查嵌套引用，而运行时沿用 Pointer 实际解析基准；因此闭包检查可能检查错误目标或遗漏运行时缺失引用。
+
+### RED：复现
+
+- 新增根 `$id` 为 `https://example.test/root.json` 的正向夹具，`default` 声明 `$id: "sub/target.json"` 并引用 `allowed.json`，但本地只注册 `/sub/allowed.json`。旧实现没有在加载期拒绝，失败输出为 `SchemaRegistryError not raised`。
+- 再新增只注册根目录 `/allowed.json` 的正向实例校验，要求加载期闭包与运行时均使用同一目标，并实际执行目标 Schema 约束。
+
+### GREEN：修复
+
+- 对 JSON Pointer 目标使用 `Resource.pointer()`（资源指针解析）得到的有效 URI（统一资源标识符）作为运行时与闭包检查基准。
+- 若指针命中尚未注册为 Schema 子资源的普通数据对象，跳过其根对象资源注册，不把对象自身 `$id` 再作为 URI 边界；仍遍历并注册其下由 JSON Schema 规则识别的嵌套子资源。
+- 即使目标对象自身 `$id` 不作为运行时边界，仍校验其格式和在当前基址下是否可解析，保留不透明 `urn:` 根 URI 下拒绝无效相对 ID 的既有约束。
+
+### VERIFY：第三轮复核修复
+
+环境：macOS；Python 3.12.16；测试依赖来自 `/private/tmp/bugmaster-provenance-test-deps`。覆盖数据来自包含当前工作区源码快照的临时副本。
+
+| 检查 | 命令 / 范围 | 结果 |
+|---|---|---|
+| 新增回归 RED | `PYTHONPATH=/private/tmp/bugmaster-jsonschema python3.12 -m unittest discover -s tests/unit -p test_schema_registry.py -k referenced_default_id_does_not_change_pointer_runtime_base -v` | 修复前 FAIL：`SchemaRegistryError not raised` |
+| Schema 注册表定向单测 | `PYTHONPATH=/private/tmp/bugmaster-provenance-test-deps python3.12 -m unittest discover -s tests/unit -p test_schema_registry.py -q` | PASS，41/41 |
+| 全量单测与覆盖采集 | `PYTHONPATH=/private/tmp/bugmaster-provenance-test-deps python3.12 -m coverage run --branch --source=bugmaster_core,scripts -m unittest discover -s tests/unit -q` | PASS，680/680；覆盖 JSON：`/private/tmp/bugmaster-pr21-fifth-review-coverage.json` |
+| 行/分支覆盖率 | 读取以上 JSON 的 `totals` | PASS，3355/3355 语句、1218/1218 分支，均 100% |
+| 契约 / 安全测试 | `python3.12 -m unittest discover -s tests/contracts -q`；`python3.12 -m unittest discover -s tests/security -q` | PASS，134/134、1/1 |
+| 品牌、目录、基准清单结构 | `check_branding.py`、`validate_catalog.py`、`validate_benchmark.py` | PASS；基准场景未执行 |
+| 发布门禁 | `python3.12 scripts/quality_gate.py --mode release --coverage /private/tmp/bugmaster-pr21-fifth-review-coverage.json` | 按预期 NO-GO：功能清单未冻结、业务执行覆盖未超过 60%、核心 Happy/Negative/Edge 场景缺少实际证据 |
+| Standards / Spec / 聚焦安全复核 | 当前代码与测试差异 | 无可执行发现；安全复核为只读代码检查，不代表独立真人审查或完整渗透测试 |
+| Q15 Codex 代码/安全扫描 | 修复提交 `82d3847` 尚未推送 | 待更新 PR #21 后针对最新 PR 头扫描；完成前不标为通过 |
