@@ -161,7 +161,7 @@ PR #21 的 Codex Review（代码审查）在提交 `7176b34` 上指出两处 P2 
 
 ### RED：复现
 
-- 新用例临时关闭 Draft 2020-12 校验器的 `FORMAT_CHECKER`，再加载包含 `$ref: "https://[::1"` 的 Schema。旧代码在 URI 基址计算处直接抛出 `ValueError: Invalid IPv6 URL`，没有返回 `SchemaRegistryError`（注册表错误）。
+- 新用例临时关闭 Draft 2020-12（JSON Schema 数据结构标准版本）校验器的 `FORMAT_CHECKER`，再加载包含 `$ref: "https://[::1"` 的 Schema。旧代码在 URI 基址计算处直接抛出 `ValueError: Invalid IPv6 URL`，没有返回 `SchemaRegistryError`（注册表错误）。
 
 ### GREEN：修复
 
