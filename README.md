@@ -12,6 +12,8 @@ The W7 data layer now has versioned Candidate and Finding schemas and private lo
 
 W1-02 adds `bugmaster_core.contract_binding.validate_contract_bindings()` to validate Scope, Action, and Approval schemas and their cross-record references. Its result reports consistency only; it does not authenticate approvals, authorize actions, or enable dispatch.
 
+W1-03 adds `bugmaster_core.schema_registry` as the shared local schema loader for contract binding and Candidate/Finding persistence. It requires every schema to pin a major/minor `schemaVersion`, checks unique schema IDs and every `$ref` against a closed local registry, rejects references to non-schema values, and never retrieves remote schemas.
+
 ## Target installation (not verified)
 ```bash
 # Repository exists; this host install path remains unverified until release checks pass.

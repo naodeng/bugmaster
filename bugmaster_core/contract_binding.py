@@ -5,12 +5,12 @@ authenticate provenance, authorize actions, or permit dispatch.
 """
 
 import calendar
-import json
 import re
 from datetime import datetime
 from decimal import Decimal
 from functools import lru_cache
-from pathlib import Path
+
+from .schema_registry import get_schema_validator
 
 
 _SCHEMA_FILES = {
@@ -39,19 +39,10 @@ _RFC3339_DATE_TIME = re.compile(
 
 @lru_cache(maxsize=1)
 def _schema_validators():
-    from jsonschema import Draft202012Validator, FormatChecker
-
-    schemas_directory = Path(__file__).resolve().parents[1] / "schemas"
-    validators = {}
-    for name, filename in _SCHEMA_FILES.items():
-        schema = json.loads(
-            (schemas_directory / filename).read_text(encoding="utf-8")
-        )
-        Draft202012Validator.check_schema(schema)
-        validators[name] = Draft202012Validator(
-            schema, format_checker=FormatChecker()
-        )
-    return validators
+    return {
+        name: get_schema_validator(filename)
+        for name, filename in _SCHEMA_FILES.items()
+    }
 
 
 def _parse_date_time(value):
