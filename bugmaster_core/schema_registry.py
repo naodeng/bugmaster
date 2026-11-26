@@ -84,9 +84,14 @@ def _schema_resources(resource, base_uri, root_base_is_effective=False):
 
 
 def _reference_base_uri(base_uri, reference):
-    if reference.startswith("#"):
-        return urldefrag(base_uri)[0]
-    return urldefrag(urljoin(base_uri, reference))[0]
+    try:
+        if reference.startswith("#"):
+            return urldefrag(base_uri)[0]
+        return urldefrag(urljoin(base_uri, reference))[0]
+    except ValueError as error:
+        raise SchemaRegistryError(
+            "schema-reference-unresolved:{}".format(reference)
+        ) from error
 
 
 def _load_schema_bundle(schemas_directory):

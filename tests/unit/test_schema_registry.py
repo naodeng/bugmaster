@@ -455,6 +455,16 @@ class SchemaRegistryTests(unittest.TestCase):
 
         self.assert_registry_error("schema-reference-unresolved")
 
+    def test_malformed_reference_uri_is_reported_as_registry_error(self):
+        schema = _schema("https://example.test/root.json")
+        schema["properties"]["value"] = {"$ref": "https://[::1"}
+        self.write_schema("malformed-reference.schema.json", schema)
+
+        from jsonschema import Draft202012Validator
+
+        with mock.patch.object(Draft202012Validator, "FORMAT_CHECKER", None):
+            self.assert_registry_error("schema-reference-unresolved")
+
     def test_unregistered_dynamic_reference_is_rejected(self):
         schema = _schema()
         schema["properties"]["value"] = {
